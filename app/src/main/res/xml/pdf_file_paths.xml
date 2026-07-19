@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Solo expone la carpeta pdf_attachments/ dentro de cacheDir.
+         El resto del cacheDir y cualquier otra ubicación no es accesible
+         vía este FileProvider. -->
+    <cache-path name="pdf_attachments" path="pdf_attachments/" />
+</paths>

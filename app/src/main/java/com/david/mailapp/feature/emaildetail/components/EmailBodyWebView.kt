@@ -1,0 +1,660 @@
+package com.david.mailapp.feature.emaildetail.components
+
+import android.annotation.SuppressLint
+import android.graphics.Bitmap
+import android.view.View
+import android.view.ViewGroup
+import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
+import android.webkit.WebSettings
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import androidx.browser.customtabs.CustomTabsIntent
+import org.jsoup.Jsoup
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.webkit.WebSettingsCompat
+import androidx.webkit.WebViewFeature
+import com.david.mailapp.feature.emaildetail.EmailRenderTrace
+import java.lang.ref.WeakReference
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
+/**
+ * Renders email HTML body in a hardened WebView.
+ *
+ * Design decisions per the unified body-rendering spec:
+ * - D2: [loadDataWithBaseURL] with null baseUrl — no relative resource resolution.
+ * - D3: [WebSettings.blockNetworkLoads] = !showImages (kills all remote trackers).
+ * - D4: [WebSettings.javaScriptEnabled] = false — always.
+ * - D6: CSS-injected dark mode from [MaterialTheme.colorScheme] colors
+ *   + [WebSettingsCompat.setAlgorithmicDarkeningAllowed] for content without
+ *   its own background.
+ * - D7: [WebViewClient.shouldOverrideUrlLoading] → Chrome Custom Tabs.
+ * - D10: Lifecycle managed via [DisposableEffect] + [LifecycleEventObserver];
+ *   scroll position is preserved across ON_PAUSE/ON_RESUME and restored
+ *   after new document loads via [postVisualStateCallback].
+ *
+ * @param body Raw HTML email body (already decoded from Base64URL), or null
+ * while the body is still being prepared. The WebView remains mounted in both states.
+ * @param showImages When true, remote network loads are allowed.
+ * @param isDark Whether the app is in dark mode — drives CSS injection.
+ */
+@SuppressLint("SetJavaScriptEnabled")
+@Composable
+fun EmailBodyWebView(
+    body: String?,
+    showImages: Boolean = true,
+    isDark: Boolean,
+    traceMail: String,
+    onPageRendered: (() -> Unit)? = null,
+    onImageLongPress: ((imageUrl: String) -> Unit)? = null,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val scheme = MaterialTheme.colorScheme
+    val surfaceArgb = scheme.surface.toArgb()
+    val onSurfaceArgb = scheme.onSurface.toArgb()
+    val primaryArgb = scheme.primary.toArgb()
+
+    val currentKey = remember(
+        body,
+        showImages,
+        isDark,
+        surfaceArgb,
+        onSurfaceArgb,
+        primaryArgb
+    ) {
+        body?.let {
+            buildLoadKey(
+                it,
+                showImages,
+                isDark,
+                surfaceArgb,
+                onSurfaceArgb,
+                primaryArgb
+            )
+        }
+    }
+
+    // HTML parsing and Jsoup cleanup are CPU-heavy for large inline images.
+    // Prepare the document off-main while the already-mounted WebView remains
+    // hidden behind the Compose loader.
+    var preparedDocument by remember(currentKey) {
+        mutableStateOf<PreparedDocument?>(null)
+    }
+    LaunchedEffect(currentKey) {
+        val sourceBody = body
+        val loadKey = currentKey
+        if (sourceBody == null || loadKey == null) {
+            EmailRenderTrace.d(traceMail, "WV", "HTML_BUILD_WAITING", "reason=body_pending")
+            return@LaunchedEffect
+        }
+
+        val html = withContext(Dispatchers.Default) {
+            val startedAt = EmailRenderTrace.now()
+            EmailRenderTrace.d(
+                traceMail,
+                "WV",
+                "HTML_BUILD_START",
+                "loadKey=$loadKey bodyLen=${sourceBody.length}"
+            )
+            buildHtml(
+                sourceBody,
+                showImages,
+                isDark,
+                surfaceArgb,
+                onSurfaceArgb,
+                primaryArgb
+            ).also { result ->
+                EmailRenderTrace.d(
+                    traceMail,
+                    "WV",
+                    "HTML_BUILD_END",
+                    "loadKey=$loadKey htmlLen=${result.length} " +
+                        "durationMs=${EmailRenderTrace.now() - startedAt}"
+                )
+            }
+        }
+
+        preparedDocument = PreparedDocument(loadKey, html)
+        EmailRenderTrace.d(
+            traceMail,
+            "WV",
+            "HTML_BUILD_READY",
+            "loadKey=$loadKey htmlLen=${html.length}"
+        )
+    }
+
+    // Track the document actually loaded into this WebView. This is separate
+    // from the body being prepared so stale visual callbacks can be rejected.
+    var lastLoaded by remember { mutableStateOf<String?>(null) }
+    var activeLoadKey by remember { mutableStateOf<String?>(null) }
+    var loggedSkippedKey by remember { mutableStateOf<String?>(null) }
+    var loggedWaitingState by remember { mutableStateOf<String?>(null) }
+
+    // ── Lifecycle-aware scroll preservation ────────────────────
+    val savedScrollY = remember { mutableIntStateOf(0) }
+    val webViewRef = remember { mutableStateOf<WeakReference<WebView>?>(null) }
+    val released = remember { mutableStateOf(false) }
+
+    DisposableEffect(traceMail) {
+        EmailRenderTrace.d(
+            traceMail,
+            "WV",
+            "WV_COMPOSABLE_ENTER",
+            "loadKey=${currentKey ?: "none"} bodyLen=${body?.length ?: 0}"
+        )
+        onDispose {
+            EmailRenderTrace.d(
+                traceMail,
+                "WV",
+                "WV_COMPOSABLE_DISPOSE",
+                "loadKey=${currentKey ?: "none"}"
+            )
+        }
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            val webView = webViewRef.value?.get()
+            when (event) {
+                Lifecycle.Event.ON_PAUSE -> {
+                    if (webView == null) {
+                        EmailRenderTrace.d(traceMail, "WV", "WV_ON_PAUSE", "hasWebView=false")
+                        return@LifecycleEventObserver
+                    }
+                    savedScrollY.intValue = webView.scrollY
+                    EmailRenderTrace.d(
+                        traceMail,
+                        "WV",
+                        "WV_ON_PAUSE",
+                        "hasWebView=true scrollY=${webView.scrollY}"
+                    )
+                    webView.onPause()
+                }
+                Lifecycle.Event.ON_RESUME -> {
+                    if (webView == null) {
+                        EmailRenderTrace.d(traceMail, "WV", "WV_ON_RESUME", "hasWebView=false")
+                        return@LifecycleEventObserver
+                    }
+                    EmailRenderTrace.d(
+                        traceMail,
+                        "WV",
+                        "WV_ON_RESUME",
+                        "hasWebView=true savedScrollY=${savedScrollY.intValue}"
+                    )
+                    webView.onResume()
+                    val resumeLoadKey = activeLoadKey
+                    if (resumeLoadKey == null) {
+                        EmailRenderTrace.d(
+                            traceMail,
+                            "WV",
+                            "WV_RESUME_VISUAL_SKIPPED",
+                            "reason=no_active_document"
+                        )
+                        return@LifecycleEventObserver
+                    }
+                    EmailRenderTrace.d(traceMail, "WV", "WV_RESUME_VISUAL_REQUESTED")
+                    webView.postVisualStateCallback(
+                        0L,
+                        object : WebView.VisualStateCallback() {
+                            override fun onComplete(requestId: Long) {
+                                EmailRenderTrace.d(
+                                    traceMail,
+                                    "WV",
+                                    "WV_RESUME_VISUAL_CALLBACK",
+                                    "loadKey=$resumeLoadKey activeLoadKey=$activeLoadKey " +
+                                        "released=${released.value} requestId=$requestId"
+                                )
+                                if (released.value || activeLoadKey != resumeLoadKey) return
+                                webView.post {
+                                    if (released.value || activeLoadKey != resumeLoadKey) {
+                                        return@post
+                                    }
+                                    webView.scrollTo(0, savedScrollY.intValue)
+                                    webView.invalidate()
+                                    EmailRenderTrace.d(
+                                        traceMail,
+                                        "WV",
+                                        "WV_RESUME_SCROLL_APPLIED",
+                                        "scrollY=${savedScrollY.intValue}"
+                                    )
+                                }
+                            }
+                        }
+                    )
+                }
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            EmailRenderTrace.d(traceMail, "WV", "WV_LIFECYCLE_OBSERVER_DISPOSE")
+        }
+    }
+
+    Box(modifier = modifier) {
+        AndroidView(
+            factory = { ctx ->
+                WebView(ctx).apply {
+                    val instance = System.identityHashCode(this).toUInt().toString(16)
+                    EmailRenderTrace.d(
+                        traceMail,
+                        "WV",
+                        "WV_FACTORY",
+                        "instance=$instance loadKey=${currentKey ?: "none"}"
+                    )
+                    layoutParams = ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                    )
+                    isVerticalScrollBarEnabled = false
+                    isHorizontalScrollBarEnabled = false
+                    setBackgroundColor(surfaceArgb)
+                    settings.applyHardening(showImages, isDark)
+
+                    addOnAttachStateChangeListener(
+                        object : View.OnAttachStateChangeListener {
+                            override fun onViewAttachedToWindow(view: View) {
+                                EmailRenderTrace.d(
+                                    traceMail,
+                                    "WV",
+                                    "WV_ATTACHED",
+                                    "instance=$instance width=${view.width} height=${view.height}"
+                                )
+                            }
+
+                            override fun onViewDetachedFromWindow(view: View) {
+                                EmailRenderTrace.d(
+                                    traceMail,
+                                    "WV",
+                                    "WV_DETACHED",
+                                    "instance=$instance width=${view.width} height=${view.height}"
+                                )
+                            }
+                        }
+                    )
+
+                    // Detectar long-press sobre imágenes
+                    setOnLongClickListener {
+                        val hitTestResult = this.hitTestResult
+                        if (hitTestResult.type == WebView.HitTestResult.IMAGE_TYPE ||
+                            hitTestResult.type == WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE) {
+                            val imageUrl = hitTestResult.extra
+                            if (!imageUrl.isNullOrBlank()) {
+                                onImageLongPress?.invoke(imageUrl)
+                                return@setOnLongClickListener true
+                            }
+                        }
+                        false
+                    }
+                }.also { webViewRef.value = WeakReference(it) }
+            },
+            update = { webView ->
+                val document = preparedDocument
+                if (document == null) {
+                    val waitingState = if (currentKey == null) {
+                        "body_pending"
+                    } else {
+                        "html_pending:$currentKey"
+                    }
+                    if (loggedWaitingState != waitingState) {
+                        loggedWaitingState = waitingState
+                        EmailRenderTrace.d(
+                            traceMail,
+                            "WV",
+                            "WV_UPDATE",
+                            "action=wait reason=$waitingState"
+                        )
+                    }
+                } else if (lastLoaded != document.key) {
+                    EmailRenderTrace.d(
+                        traceMail,
+                        "WV",
+                        "WV_UPDATE",
+                        "action=load previousKey=${lastLoaded ?: "none"} loadKey=${document.key} " +
+                            "htmlLen=${document.html.length}"
+                    )
+                    lastLoaded = document.key
+                    activeLoadKey = document.key
+                    loggedSkippedKey = null
+                    loggedWaitingState = null
+                    released.value = false
+                    webViewRef.value = WeakReference(webView)
+                    webView.setBackgroundColor(surfaceArgb)
+                    webView.settings.applyHardening(showImages, isDark)
+                    webView.webChromeClient = TraceWebChromeClient(traceMail, document.key)
+                    webView.webViewClient = CustomTabsWebViewClient(
+                        context,
+                        traceMail,
+                        document.key
+                    ) {
+                        if (!released.value && activeLoadKey == document.key) {
+                            EmailRenderTrace.d(
+                                traceMail,
+                                "WV",
+                                "WV_SCROLL_RESTORE_POSTED",
+                                "loadKey=${document.key} scrollY=${savedScrollY.intValue}"
+                            )
+                            webView.post {
+                                if (released.value || activeLoadKey != document.key) {
+                                    EmailRenderTrace.d(
+                                        traceMail,
+                                        "WV",
+                                        "WV_PAGE_RENDERED_IGNORED",
+                                        "loadKey=${document.key} reason=stale_after_post"
+                                    )
+                                    return@post
+                                }
+                                webView.scrollTo(0, savedScrollY.intValue)
+                                webView.invalidate()
+                                EmailRenderTrace.d(
+                                    traceMail,
+                                    "WV",
+                                    "WV_SCROLL_RESTORE_APPLIED",
+                                    "loadKey=${document.key} scrollY=${savedScrollY.intValue}"
+                                )
+                                EmailRenderTrace.d(
+                                    traceMail,
+                                    "WV",
+                                    "WV_PAGE_RENDERED_DISPATCH",
+                                    "loadKey=${document.key}"
+                                )
+                                onPageRendered?.invoke()
+                            }
+                        } else {
+                            EmailRenderTrace.d(
+                                traceMail,
+                                "WV",
+                                "WV_PAGE_RENDERED_IGNORED",
+                                "loadKey=${document.key} activeLoadKey=$activeLoadKey " +
+                                    "released=${released.value} reason=stale_or_released"
+                            )
+                        }
+                    }
+                    EmailRenderTrace.d(
+                        traceMail,
+                        "WV",
+                        "WV_LOAD_DATA",
+                        "loadKey=${document.key} htmlLen=${document.html.length}"
+                    )
+                    webView.loadDataWithBaseURL(
+                        null,
+                        document.html,
+                        "text/html",
+                        "UTF-8",
+                        null
+                    )
+                } else if (loggedSkippedKey != document.key) {
+                    loggedSkippedKey = document.key
+                    EmailRenderTrace.d(
+                        traceMail,
+                        "WV",
+                        "WV_UPDATE",
+                        "action=skip loadKey=${document.key} reason=already_loaded"
+                    )
+                }
+            },
+            onRelease = { webView ->
+                EmailRenderTrace.d(
+                    traceMail,
+                    "WV",
+                    "WV_RELEASE",
+                    "loadKey=${activeLoadKey ?: "none"} scrollY=${webView.scrollY}"
+                )
+                savedScrollY.intValue = webView.scrollY
+                released.value = true
+                activeLoadKey = null
+                webViewRef.value = null
+                webView.stopLoading()
+                webView.destroy()
+            },
+            modifier = Modifier.fillMaxSize()
+        )
+    }
+}
+
+// ── Keys & Cache ────────────────────────────────────────────────────
+
+private data class PreparedDocument(val key: String, val html: String)
+
+private fun buildLoadKey(
+    body: String,
+    showImages: Boolean,
+    isDark: Boolean,
+    surfaceArgb: Int,
+    onSurfaceArgb: Int,
+    primaryArgb: Int
+): String =
+    "${body.hashCode()}_${showImages}_${isDark}_${surfaceArgb}_${onSurfaceArgb}_${primaryArgb}"
+
+// ── HTML Template (D2, D6) ──────────────────────────────────────────
+
+private fun buildHtml(
+    body: String,
+    showImages: Boolean,
+    isDark: Boolean,
+    surfaceArgb: Int,
+    onSurfaceArgb: Int,
+    primaryArgb: Int
+): String {
+    val bodyRgb = toCssRgb(surfaceArgb)
+    val textRgb = if (isDark) "rgb(224, 224, 224)" else "rgb(33, 33, 33)"
+    val linkRgb = toCssRgb(primaryArgb)
+    val colorScheme = if (isDark) "dark" else "light"
+    val hideRemoteImages = if (!showImages) "img:not([src^=\"data:\"]){display:none!important}" else ""
+    val doc = Jsoup.parseBodyFragment(body)
+    val isSimple = EmailHtmlCleaner.isSimpleHtml(doc)
+    val cleanedBody = EmailHtmlCleaner.clean(doc)
+    val wrappedBody = if (isSimple) {
+        """<div style="margin:0 16px; padding-top: 20px;">$cleanedBody</div>"""
+    } else {
+        cleanedBody
+    }
+    val cssOverrides = """
+  * {
+    -webkit-tap-highlight-color: transparent;
+    color: var(--text) !important;
+    opacity: 1 !important;
+    text-shadow: none !important;
+  }
+  a, a * {
+    color: var(--link) !important;
+  }
+    """.trimIndent()
+
+    return """
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+<style>
+  :root {
+    color-scheme: $colorScheme;
+    --bg: $bodyRgb;
+    --text: $textRgb;
+    --link: $linkRgb;
+  }
+  $cssOverrides
+  body {
+    background-color: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, Roboto, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    margin: 0;
+    padding: 8px 0;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+  img, table { max-width: 100%; height: auto; }
+  blockquote {
+    border-left: 3px solid var(--link);
+    margin-left: 0;
+    padding-left: 12px;
+    color: var(--text);
+  }
+  pre, code {
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+  $hideRemoteImages
+</style>
+</head>
+<body>
+$wrappedBody
+</body>
+</html>
+""".trimIndent()
+}
+
+// ── WebSettings Hardening (D3, D4, D6) ──────────────────────────────
+
+private fun WebSettings.applyHardening(showImages: Boolean, isDark: Boolean) {
+    javaScriptEnabled = false
+    domStorageEnabled = false
+    allowFileAccess = false
+    allowContentAccess = false
+    allowFileAccessFromFileURLs = false
+    allowUniversalAccessFromFileURLs = false
+    mediaPlaybackRequiresUserGesture = true
+    cacheMode = WebSettings.LOAD_NO_CACHE
+    blockNetworkImage = !showImages
+    blockNetworkLoads = !showImages
+    
+    // Configuración de zoom y viewport para que los correos (especialmente newsletters con tablas)
+    // se adapten al ancho de la pantalla móvil en lugar de verse gigantes o hacer zoom por defecto.
+    useWideViewPort = true
+    loadWithOverviewMode = true
+    textZoom = 100
+    builtInZoomControls = true
+    displayZoomControls = false
+    setSupportZoom(true)
+
+    if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
+        WebSettingsCompat.setAlgorithmicDarkeningAllowed(this, isDark)
+    }
+    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+        isAlgorithmicDarkeningAllowed = isDark
+    }
+}
+
+// ── UrlInterception (D7) ────────────────────────────────────────────
+
+private class CustomTabsWebViewClient(
+    private val ctx: android.content.Context,
+    private val traceMail: String,
+    private val loadKey: String,
+    private val onPageReady: () -> Unit
+) : WebViewClient() {
+    override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+        super.onPageStarted(view, url, favicon)
+        EmailRenderTrace.d(traceMail, "WV", "WV_PAGE_STARTED", "loadKey=$loadKey")
+    }
+
+    override fun onPageCommitVisible(view: WebView?, url: String?) {
+        super.onPageCommitVisible(view, url)
+        EmailRenderTrace.d(traceMail, "WV", "WV_COMMIT_VISIBLE", "loadKey=$loadKey")
+    }
+
+    override fun onPageFinished(view: WebView?, url: String?) {
+        super.onPageFinished(view, url)
+        EmailRenderTrace.d(traceMail, "WV", "WV_PAGE_FINISHED", "loadKey=$loadKey")
+        EmailRenderTrace.d(traceMail, "WV", "WV_VISUAL_REQUESTED", "loadKey=$loadKey")
+        view?.postVisualStateCallback(
+            0L,
+            object : WebView.VisualStateCallback() {
+                override fun onComplete(requestId: Long) {
+                    EmailRenderTrace.d(
+                        traceMail,
+                        "WV",
+                        "WV_VISUAL_CALLBACK",
+                        "loadKey=$loadKey requestId=$requestId"
+                    )
+                    onPageReady()
+                }
+            }
+        )
+    }
+
+    override fun shouldOverrideUrlLoading(
+        view: WebView?,
+        request: WebResourceRequest?
+    ): Boolean {
+        val url = request?.url?.toString() ?: return true
+        try {
+            CustomTabsIntent.Builder()
+                .setShowTitle(true)
+                .build()
+                .launchUrl(ctx, android.net.Uri.parse(url))
+        } catch (_: Exception) {}
+        return true
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
+        val safeUrl = url ?: return true
+        try {
+            CustomTabsIntent.Builder()
+                .setShowTitle(true)
+                .build()
+                .launchUrl(ctx, android.net.Uri.parse(safeUrl))
+        } catch (_: Exception) {}
+        return true
+    }
+}
+
+private class TraceWebChromeClient(
+    private val traceMail: String,
+    private val loadKey: String
+) : WebChromeClient() {
+    private var lastMilestone = -1
+
+    override fun onProgressChanged(view: WebView?, newProgress: Int) {
+        super.onProgressChanged(view, newProgress)
+        val milestone = when {
+            newProgress >= 100 -> 100
+            newProgress >= 75 -> 75
+            newProgress >= 50 -> 50
+            newProgress >= 25 -> 25
+            else -> 0
+        }
+        if (milestone != lastMilestone) {
+            lastMilestone = milestone
+            EmailRenderTrace.d(
+                traceMail,
+                "WV",
+                "WV_PROGRESS",
+                "loadKey=$loadKey progress=$newProgress milestone=$milestone"
+            )
+        }
+    }
+}
+
+// ── Helpers ─────────────────────────────────────────────────────────
+
+private fun toCssRgb(argb: Int): String {
+    val r = (argb shr 16) and 0xFF
+    val g = (argb shr 8) and 0xFF
+    val b = argb and 0xFF
+    return "rgb($r,$g,$b)"
+}

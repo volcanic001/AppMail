@@ -1,0 +1,103 @@
+[versions]
+agp = "9.0.0"
+kotlin = "2.1.20"
+ksp = "2.1.20-1.0.31"
+
+# Compose
+compose-bom = "2026.06.01"
+compose-activity = "1.10.1"
+
+# Room
+room = "2.7.0"
+
+# Network
+ktor = "3.0.3"
+
+# Storage
+datastore = "1.1.2"
+
+# Coroutines
+coroutines = "1.9.0"
+
+# Navigation
+navigation = "2.9.3"
+
+# Image loading
+coil = "2.7.0"
+
+# Lifecycle
+lifecycle = "2.9.0"
+
+[libraries]
+# Compose
+compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "compose-bom" }
+compose-ui = { group = "androidx.compose.ui", name = "ui" }
+compose-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }
+compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
+compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
+compose-material3 = { group = "androidx.compose.material3", name = "material3" }
+compose-material-icons = { group = "androidx.compose.material", name = "material-icons-extended" }
+compose-animation = { group = "androidx.compose.animation", name = "animation" }
+compose-animation-core = { group = "androidx.compose.animation", name = "animation-core" }
+compose-activity = { group = "androidx.activity", name = "activity-compose", version.ref = "compose-activity" }
+
+# Lifecycle
+lifecycle-runtime = { group = "androidx.lifecycle", name = "lifecycle-runtime-compose", version.ref = "lifecycle" }
+lifecycle-viewmodel = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecycle" }
+
+# Room
+room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
+room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
+room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
+
+# Ktor
+ktor-client-core = { group = "io.ktor", name = "ktor-client-core", version.ref = "ktor" }
+ktor-client-cio = { group = "io.ktor", name = "ktor-client-cio", version.ref = "ktor" }
+ktor-client-content-negotiation = { group = "io.ktor", name = "ktor-client-content-negotiation", version.ref = "ktor" }
+ktor-serialization-json = { group = "io.ktor", name = "ktor-serialization-kotlinx-json", version.ref = "ktor" }
+ktor-client-auth = { group = "io.ktor", name = "ktor-client-auth", version.ref = "ktor" }
+ktor-client-logging = { group = "io.ktor", name = "ktor-client-logging", version.ref = "ktor" }
+
+# DataStore
+datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
+
+# Coroutines
+coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines" }
+coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
+
+# Navigation
+navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigation" }
+
+# Coil
+coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
+
+# Kotlin stdlib (needed because we don't apply kotlin-android plugin directly)
+kotlin-stdlib = { group = "org.jetbrains.kotlin", name = "kotlin-stdlib", version.ref = "kotlin" }
+kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version = "1.7.3" }
+
+# Security / Crypto (for encrypted token storage)
+security-crypto = { group = "androidx.security", name = "security-crypto", version = "1.1.0-alpha06" }
+
+# Credential Manager (OAuth2)
+credentials = { group = "androidx.credentials", name = "credentials", version = "1.5.0" }
+
+# Chrome Custom Tabs (OAuth2 flow)
+browser = { group = "androidx.browser", name = "browser", version = "1.8.0" }
+
+# WebKit (algorithmic darkening for WebView)
+androidx-webkit = { group = "androidx.webkit", name = "webkit", version = "1.11.0" }
+
+# AndroidX Core (FileProvider, Kotlin extensions)
+core-ktx = { group = "androidx.core", name = "core-ktx", version = "1.15.0" }
+
+jsoup = { group = "org.jsoup", name = "jsoup", version = "1.18.1" }
+
+# Unit testing
+junit = { group = "junit", name = "junit", version = "4.13.2" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }

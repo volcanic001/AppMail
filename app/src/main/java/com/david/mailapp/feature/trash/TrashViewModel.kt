@@ -1,0 +1,116 @@
+package com.david.mailapp.feature.trash
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
+import com.david.mailapp.data.repository.EmailRepository
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+
+class TrashViewModel(
+    private val repository: EmailRepository
+) : ViewModel() {
+
+    private val _uiState = MutableStateFlow<TrashUiState>(TrashUiState.Loading)
+    val uiState: StateFlow<TrashUiState> = _uiState.asStateFlow()
+
+    private var nextPageToken: String? = null
+    private var isLoadingNextPage = false
+
+    init {
+        observeRoom()
+        refresh()
+    }
+
+    private fun observeRoom() {
+        viewModelScope.launch {
+            repository.getTrash().collect { emails ->
+                val current = _uiState.value
+                when (current) {
+                    is TrashUiState.Loading -> {
+                        _uiState.value = TrashUiState.Success(emails = emails)
+                    }
+                    is TrashUiState.Success -> {
+                        _uiState.value = current.copy(emails = emails)
+                    }
+                    is TrashUiState.Error -> { /* keep error visible */ }
+                }
+            }
+        }
+    }
+
+    fun refresh() {
+        viewModelScope.launch {
+            val current = _uiState.value
+            val isManualRefresh = current is TrashUiState.Success
+            if (isManualRefresh) {
+                _uiState.value = current.copy(isRefreshing = true)
+            }
+            try {
+                if (isManualRefresh) delay(800)
+                nextPageToken = repository.refreshTrash(null).nextPageToken
+                val after = _uiState.value
+                if (after is TrashUiState.Success) {
+                    _uiState.value = after.copy(isRefreshing = false)
+                }
+            } catch (e: Exception) {
+                val after = _uiState.value
+                if (after is TrashUiState.Success) {
+                    _uiState.value = after.copy(isRefreshing = false)
+                } else {
+                    _uiState.value = TrashUiState.Error(
+                        e.message ?: "Something went wrong"
+                    )
+                }
+            }
+        }
+    }
+
+    fun loadNextPage() {
+        if (isLoadingNextPage || nextPageToken == null) return
+        isLoadingNextPage = true
+        viewModelScope.launch {
+            val current = _uiState.value
+            if (current is TrashUiState.Success) {
+                _uiState.value = current.copy(isLoadingNextPage = true)
+            }
+            try {
+                nextPageToken = repository.refreshTrash(nextPageToken).nextPageToken
+            } catch (_: Exception) { }
+            finally {
+                isLoadingNextPage = false
+                val after = _uiState.value
+                if (after is TrashUiState.Success) {
+                    _uiState.value = after.copy(isLoadingNextPage = false)
+                }
+            }
+        }
+    }
+
+    fun deletePermanently(emailId: String) {
+        viewModelScope.launch {
+            repository.deletePermanently(emailId)
+        }
+    }
+
+    fun restoreToInbox(emailId: String) {
+        viewModelScope.launch {
+            repository.restoreFromTrash(emailId)
+        }
+    }
+
+    class Factory(
+        private val repository: EmailRepository
+    ) : ViewModelProvider.Factory {
+        @Suppress("UNCHECKED_CAST")
+        override fun <T : ViewModel> create(modelClass: Class<T>): T {
+            if (modelClass.isAssignableFrom(TrashViewModel::class.java)) {
+                return TrashViewModel(repository) as T
+            }
+            throw IllegalArgumentException("Unknown ViewModel: ${modelClass.name}")
+        }
+    }
+}
