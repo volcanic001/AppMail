@@ -196,7 +196,92 @@ class PdfCacheManagerTest {
         assertEquals(firstFile.absolutePath, secondFile.absolutePath)
     }
 
+    // ── clearAll ──────────────────────────────────────────────────
+
+    @Test
+    fun `clearAll removes all pdf and tmp files`() {
+        cacheManager.store("msg_001", "att_a", pdfBytes(64))
+        cacheManager.store("msg_001", "att_b", pdfBytes(128))
+        cacheManager.store("msg_002", "att_a", pdfBytes(256))
+
+        // Also create a stray .tmp file
+        val pdfDir = File(tempDir, "pdf_attachments")
+        val strayTmp = File(pdfDir, "stray.tmp")
+        strayTmp.writeBytes(pdfBytes(32))
+
+        val errors = cacheManager.clearAll()
+
+        assertTrue("clearAll must report no errors", errors.isEmpty())
+        assertNull("msg_001/att_a must be gone", cacheManager.getCachedFile("msg_001", "att_a"))
+        assertNull("msg_001/att_b must be gone", cacheManager.getCachedFile("msg_001", "att_b"))
+        assertNull("msg_002/att_a must be gone", cacheManager.getCachedFile("msg_002", "att_a"))
+        assertFalse("stray .tmp must be gone", strayTmp.exists())
+    }
+
+    @Test
+    fun `clearAll does not delete pdfDir itself`() {
+        cacheManager.store("msg_001", "att_a", pdfBytes(64))
+        val pdfDir = File(tempDir, "pdf_attachments")
+
+        cacheManager.clearAll()
+
+        assertTrue("pdfDir must still exist after clearAll", pdfDir.exists())
+    }
+
+    @Test
+    fun `clearAll does not delete files outside pdf_attachments`() {
+        cacheManager.store("msg_001", "att_a", pdfBytes(64))
+        val outsideFile = File(tempDir, "keep_me.txt")
+        outsideFile.writeText("this should survive")
+
+        cacheManager.clearAll()
+
+        assertTrue("files outside pdf_attachments must survive clearAll", outsideFile.exists())
+    }
+
+    @Test
+    fun `clearAll does not delete non-pdf non-tmp files inside pdfDir`() {
+        val pdfDir = File(tempDir, "pdf_attachments")
+        pdfDir.mkdirs()
+        val metadataFile = File(pdfDir, "metadata.json")
+        metadataFile.writeText("{\"key\": \"value\"}")
+
+        // Also store a real PDF
+        cacheManager.store("msg_001", "att_a", pdfBytes(64))
+
+        cacheManager.clearAll()
+
+        // The JSON file must survive
+        assertTrue("non-pdf/non-tmp files inside pdfDir must survive clearAll", metadataFile.exists())
+        // The PDF must be gone
+        assertNull("PDF must be removed", cacheManager.getCachedFile("msg_001", "att_a"))
+    }
+
+    @Test
+    fun `clearAll returns empty list when pdfDir does not exist`() {
+        pdfDirDoesNotExist()
+
+        val errors = cacheManager.clearAll()
+
+        assertTrue("clearAll must return empty list when pdfDir is missing", errors.isEmpty())
+    }
+
+    @Test
+    fun `clearAll returns empty list when pdfDir is empty`() {
+        val pdfDir = File(tempDir, "pdf_attachments")
+        pdfDir.mkdirs()
+
+        val errors = cacheManager.clearAll()
+
+        assertTrue("clearAll must return empty list on empty dir", errors.isEmpty())
+    }
+
     // ── Helpers ──────────────────────────────────────────────────
+
+    /** Simula que el directorio pdf_attachments no existe. */
+    private fun pdfDirDoesNotExist() {
+        File(tempDir, "pdf_attachments").deleteRecursively()
+    }
 
     companion object {
         /** Crea bytes con firma %PDF- válida seguido de [payloadSize] bytes de relleno. */

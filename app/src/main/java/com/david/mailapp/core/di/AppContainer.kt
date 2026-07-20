@@ -3,6 +3,7 @@ package com.david.mailapp.core.di
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.preferencesDataStore
 import com.david.mailapp.core.auth.AuthManager
 import com.david.mailapp.core.auth.GmailAuthClient
@@ -12,6 +13,9 @@ import com.david.mailapp.data.pdf.PdfCacheManager
 import com.david.mailapp.data.remote.provider.EmailProvider
 import com.david.mailapp.data.repository.EmailRepository
 import io.ktor.client.HttpClient
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicBoolean
 
 /** DataStore for search history — singleton scoped to this file. */
 private val Context.searchHistoryStore: DataStore<Preferences> by preferencesDataStore(name = "search_history")
@@ -86,5 +90,72 @@ object AppContainer {
 
     val emailRepository: EmailRepository by lazy {
         EmailRepository(database, { provider }, pdfCacheManager)
+    }
+
+    // ── Sign-out ──────────────────────────────────────────────
+
+    /** Resultado de [signOut]. */
+    sealed interface SignOutResult {
+        /** Todo se eliminó correctamente — puede cambiar a login. */
+        data object Success : SignOutResult
+
+        /**
+         * Falló la limpieza antes de borrar tokens.
+         * El usuario sigue autenticado y puede reintentar.
+         */
+        data class Failed(val message: String) : SignOutResult
+    }
+
+    private val isSigningOut = AtomicBoolean(false)
+
+    /**
+     * Cierre de sesión completo con orden estricto:
+     *
+     * 1. Rechazar si ya hay un logout en curso (AtomicBoolean CAS).
+     * 2. [deactivateProvider] — cerrar HTTP y detener Gmail.
+     * 3. [database.clearAllTables] — limpiar Room (IO).
+     * 4. [pdfCacheManager.clearAll] — eliminar caché PDF temporal.
+     * 5. [searchHistoryStore.edit] { it.clear() } — historial de búsqueda.
+     * 6. [authClient.signOut] — **último**: borrar tokens cifrados + PKCE.
+     * 7. Retornar [SignOutResult.Success].
+     *
+     * Si falla antes del paso 6, se reactiva el provider y se retorna
+     * [SignOutResult.Failed] para que el usuario pueda reintentar.
+     */
+    suspend fun signOut(): SignOutResult {
+        if (!isSigningOut.compareAndSet(false, true)) {
+            return SignOutResult.Failed("Ya hay un cierre de sesión en curso.")
+        }
+
+        val hadProvider = _provider != null
+
+        try {
+            // 2. Cerrar HTTP y detener operaciones Gmail
+            deactivateProvider()
+
+            // 3. Limpiar Room (fuera del hilo principal)
+            withContext(Dispatchers.IO) {
+                database.clearAllTables()
+            }
+
+            // 4. Limpiar caché PDF temporal (no lanza excepción)
+            pdfCacheManager.clearAll()
+
+            // 5. Limpiar historial de búsqueda
+            searchHistoryStore.edit { it.clear() }
+
+            // 6. Borrar tokens y PKCE (COMMIT — último paso)
+            authClient.signOut()
+
+            return SignOutResult.Success
+        } catch (e: Exception) {
+            // Rollback: reactivar provider si estaba activo
+            if (hadProvider) {
+                activateProvider()
+            }
+            return SignOutResult.Failed("No se pudo cerrar sesión. Inténtalo nuevamente.")
+        } finally {
+            isSigningOut.set(false)
+        }
     }
 }

@@ -1,5 +1,6 @@
 package com.david.mailapp.data.pdf
 
+import android.util.Log
 import java.io.File
 import java.io.IOException
 import java.security.MessageDigest
@@ -61,6 +62,33 @@ class PdfCacheManager(private val cacheDir: File) {
         File(pdfDir, "$hash.tmp").delete()
     }
 
+    /**
+     * Elimina todos los archivos .pdf y .tmp dentro de [pdfDir].
+     * No elimina [pdfDir] ni archivos fuera de él.
+     * No toca PDFs guardados mediante Storage Access Framework (fuera de cacheDir).
+     *
+     * @return lista de mensajes de error (vacía si todo se eliminó correctamente).
+     *         Los errores no interrumpen la operación — se reportan y continúa.
+     */
+    fun clearAll(): List<String> {
+        if (!pdfDir.exists()) return emptyList()
+
+        val errors = mutableListOf<String>()
+        val files = pdfDir.listFiles() ?: return emptyList()
+
+        for (file in files) {
+            if (!file.isFile) continue
+            val name = file.name
+            if (!name.endsWith(".pdf") && !name.endsWith(".tmp")) continue
+            if (!file.delete()) {
+                val msg = "Could not delete ${file.absolutePath}"
+                Log.w(TAG, msg)
+                errors.add(msg)
+            }
+        }
+        return errors
+    }
+
     // ── Internal ──────────────────────────────────────────────
 
     private fun resolveFile(emailId: String, stablePartId: String): File {
@@ -73,5 +101,9 @@ class PdfCacheManager(private val cacheDir: File) {
         val digest = MessageDigest.getInstance("SHA-256")
         return digest.digest(input.toByteArray(Charsets.UTF_8))
             .joinToString("") { "%02x".format(it) }
+    }
+
+    private companion object {
+        private const val TAG = "PdfCacheManager"
     }
 }

@@ -104,9 +104,6 @@ dependencies {
     implementation(libs.kotlin.stdlib)
     implementation(libs.kotlinx.serialization.json)
 
-    // Security (encrypted token storage)
-    implementation(libs.security.crypto)
-
     // Credential Manager (OAuth2)
     implementation(libs.credentials)
 
@@ -124,4 +121,9 @@ dependencies {
 
     // Unit testing
     testImplementation(libs.junit)
+
+    // Instrumented testing
+    androidTestImplementation(libs.androidx.test.core)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.runner)
 }

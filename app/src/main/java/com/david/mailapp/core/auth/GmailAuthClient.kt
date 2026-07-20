@@ -2,32 +2,44 @@ package com.david.mailapp.core.auth
 
 import android.content.Context
 import android.net.Uri
-import android.util.Base64
+import android.util.Log
 import androidx.browser.customtabs.CustomTabsIntent
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.request.forms.submitForm
-import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.parameters
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import java.security.MessageDigest
-import java.security.SecureRandom
+
+/** Result of attempting to launch the OAuth authorization flow. */
+sealed interface OAuthLaunchResult {
+    data object Launched : OAuthLaunchResult
+    data object NoBrowserAvailable : OAuthLaunchResult
+    data object Failed : OAuthLaunchResult
+}
+
+/** Result of processing an OAuth redirect URI. */
+sealed interface OAuthRedirectResult {
+    data object Success : OAuthRedirectResult
+    data object NotOAuthRedirect : OAuthRedirectResult
+    data object UserCancelled : OAuthRedirectResult
+    data object InvalidSession : OAuthRedirectResult
+    data object ExpiredSession : OAuthRedirectResult
+    data object MissingAuthorizationCode : OAuthRedirectResult
+    data object TokenExchangeFailed : OAuthRedirectResult
+}
 
 /**
  * OAuth2 authentication for Gmail via Chrome Custom Tabs + PKCE.
  *
  * Flow:
- * 1. Generate PKCE code_verifier + code_challenge
- * 2. Open Custom Tab with Google's OAuth2 authorize URL
- * 3. User grants permission → Google redirects to com.david.mailapp://oauth?code=...
- * 4. Activity receives the code → call [exchangeCodeForTokens]
- * 5. Tokens stored via [AuthManager]
- *
- * PKCE (Proof Key for Code Exchange) protects against authorization
- * code interception — no client_secret needed.
+ * 1. [launchAuth] generates state + PKCE verifier, persists the session, opens Custom Tab
+ * 2. User grants permission → Google redirects to com.david.mailapp:/oauth2redirect
+ * 3. [handleOAuthRedirect] validates the redirect, consumes the session, exchanges the code
+ * 4. Tokens are persisted via [AuthManager]
  */
 class GmailAuthClient(
     private val authManager: AuthManager
@@ -42,55 +54,165 @@ class GmailAuthClient(
         const val AUTH_URI = "https://accounts.google.com/o/oauth2/auth"
         const val TOKEN_URI = "https://oauth2.googleapis.com/token"
         const val SCOPE = "https://mail.google.com/"
+        private const val TAG = "GmailAuthClient"
     }
 
-    // ── PKCE state (held in memory for the auth session) ────────
+    // ── Launch authorization flow ──────────────────────────────
 
-    private var pendingCodeVerifier: String? = null
+    /**
+     * Generate state + PKCE verifier, persist the session, and open Chrome Custom Tab.
+     * If the tab cannot be opened, the pending session is cleaned up.
+     */
+    suspend fun launchAuth(context: Context): OAuthLaunchResult {
+        val state = OAuthSecurity.generateState()
+        val codeVerifier = OAuthSecurity.generateCodeVerifier()
+        val codeChallenge = OAuthSecurity.deriveCodeChallenge(codeVerifier)
 
-    /** Build the authorization URL and open it in Chrome Custom Tab. */
-    fun launchAuth(context: Context) {
-        val codeVerifier = generateCodeVerifier()
-        pendingCodeVerifier = codeVerifier
-        val codeChallenge = deriveCodeChallenge(codeVerifier)
+        val session = PendingOAuthSession(
+            state = state,
+            codeVerifier = codeVerifier,
+            createdAtEpochMillis = System.currentTimeMillis()
+        )
+        try {
+            authManager.savePendingOAuthSession(session)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "Unable to persist pending OAuth session: ${e::class.simpleName}")
+            return OAuthLaunchResult.Failed
+        }
 
         val authUrl = Uri.parse(AUTH_URI).buildUpon()
             .appendQueryParameter("client_id", CLIENT_ID)
             .appendQueryParameter("redirect_uri", REDIRECT_URI)
             .appendQueryParameter("response_type", "code")
             .appendQueryParameter("scope", SCOPE)
+            .appendQueryParameter("state", state)
             .appendQueryParameter("code_challenge", codeChallenge)
             .appendQueryParameter("code_challenge_method", "S256")
-            .appendQueryParameter("access_type", "offline")     // get refresh_token
-            .appendQueryParameter("prompt", "consent")          // force consent screen
+            .appendQueryParameter("access_type", "offline")
+            .appendQueryParameter("prompt", "consent")
             .build()
 
-        CustomTabsIntent.Builder()
-            .build()
-            .launchUrl(context, authUrl)
+        return try {
+            CustomTabsIntent.Builder()
+                .build()
+                .launchUrl(context, authUrl)
+            OAuthLaunchResult.Launched
+        } catch (e: Exception) {
+            Log.w(TAG, "OAuth Custom Tab launch failed: ${e::class.simpleName}")
+            authManager.clearPendingOAuthSession()
+            when {
+                e.message?.contains("NoActivityResolvedException", ignoreCase = true) == true ||
+                    e.message?.contains("ActivityNotFoundException", ignoreCase = true) == true ->
+                    OAuthLaunchResult.NoBrowserAvailable
+                else -> OAuthLaunchResult.Failed
+            }
+        }
     }
 
-    /**
-     * Exchange the authorization code for access + refresh tokens.
-     * Called from Activity when it receives the redirect.
-     */
-    suspend fun exchangeCodeForTokens(authCode: String): OAuthTokens {
-        val verifier = pendingCodeVerifier
-            ?: throw IllegalStateException("No pending PKCE verifier — call launchAuth() first")
-        pendingCodeVerifier = null
+    // ── Handle redirect ────────────────────────────────────────
 
+    /**
+     * Validate the redirect URI, consume the pending session, and exchange
+     * the authorization code for tokens.
+     *
+     * Strict validation order:
+     * 1. Hierarchical URI
+     * 2. Scheme "com.david.mailapp"
+     * 3. Path "/oauth2redirect"
+     * 4. Exactly one "state" parameter
+     * 5. Consume the session (atomic read + delete)
+     * 6. If state is valid, check for OAuth error
+     * 7. Exactly one non-empty "code" parameter
+     * 8. Exchange code → persist tokens → Success
+     */
+    suspend fun handleOAuthRedirect(
+        uri: Uri,
+        nowEpochMillis: Long = System.currentTimeMillis()
+    ): OAuthRedirectResult {
+        // 1. Scheme — works on both hierarchical and opaque URIs
+        if (uri.scheme != "com.david.mailapp") {
+            return OAuthRedirectResult.NotOAuthRedirect
+        }
+
+        // 2. Path — works on opaque URIs (e.g. "com.david.mailapp:/oauth2redirect")
+        if (uri.path != "/oauth2redirect") {
+            return OAuthRedirectResult.NotOAuthRedirect
+        }
+
+        // 3. Exactly one state parameter (parameter pollution protection)
+        val stateParams = uri.getQueryParameters("state")
+        if (stateParams.size != 1) {
+            return OAuthRedirectResult.NotOAuthRedirect
+        }
+
+        // 4. Consume session atomically
+        val sessionResult = authManager.consumePendingOAuthSession(stateParams[0], nowEpochMillis)
+
+        return when (sessionResult) {
+            is PendingOAuthSessionResult.Missing -> {
+                OAuthRedirectResult.InvalidSession
+            }
+            is PendingOAuthSessionResult.MissingState -> {
+                OAuthRedirectResult.InvalidSession
+            }
+            is PendingOAuthSessionResult.StateMismatch -> {
+                OAuthRedirectResult.InvalidSession
+            }
+            is PendingOAuthSessionResult.Expired -> {
+                OAuthRedirectResult.ExpiredSession
+            }
+            is PendingOAuthSessionResult.Valid -> {
+                // 5. Check for OAuth error
+                val errorParam = uri.getQueryParameter("error")
+                if (errorParam != null) {
+                    return when (errorParam) {
+                        "access_denied" -> OAuthRedirectResult.UserCancelled
+                        else -> OAuthRedirectResult.TokenExchangeFailed
+                    }
+                }
+
+                // 6. Exactly one non-empty code
+                val codeParams = uri.getQueryParameters("code")
+                if (codeParams.size != 1 || codeParams[0].isEmpty()) {
+                    return OAuthRedirectResult.MissingAuthorizationCode
+                }
+
+                // 7. Exchange code for tokens
+                return try {
+                    exchangeCodeForTokens(authCode = codeParams[0], codeVerifier = sessionResult.session.codeVerifier)
+                    OAuthRedirectResult.Success
+                } catch (e: Exception) {
+                    Log.w(TAG, "token exchange failed: ${e::class.simpleName}")
+                    OAuthRedirectResult.TokenExchangeFailed
+                }
+            }
+        }
+    }
+
+    // ── Token exchange (private) ───────────────────────────────
+
+    /**
+     * Exchange authorization code for access + refresh tokens via PKCE.
+     * Verifies [HttpStatusCode.OK] before deserializing.
+     */
+    private suspend fun exchangeCodeForTokens(authCode: String, codeVerifier: String): OAuthTokens {
         val client = HttpClient(CIO)
         return try {
-            val response: HttpResponse = client.submitForm(
+            val response = client.submitForm(
                 url = TOKEN_URI,
                 formParameters = parameters {
                     append("client_id", CLIENT_ID)
                     append("code", authCode)
                     append("grant_type", "authorization_code")
                     append("redirect_uri", REDIRECT_URI)
-                    append("code_verifier", verifier)
+                    append("code_verifier", codeVerifier)
                 }
             )
+            if (response.status != HttpStatusCode.OK) {
+                throw IllegalStateException("Token exchange returned HTTP ${response.status}")
+            }
             val bodyText = response.bodyAsText()
             val body = json.decodeFromString<TokenResponse>(bodyText)
             val tokens = OAuthTokens(
@@ -105,16 +227,17 @@ class GmailAuthClient(
         }
     }
 
+    // ── Token lifecycle ────────────────────────────────────────
+
     /**
      * Refresh the access token using the stored refresh token.
-     * Called automatically by the Ktor auth plugin on 401.
      */
     suspend fun refreshAccessToken(): String? {
         val refreshToken = authManager.getRefreshToken() ?: return null
 
         val client = HttpClient(CIO)
         return try {
-            val response: HttpResponse = client.submitForm(
+            val response = client.submitForm(
                 url = TOKEN_URI,
                 formParameters = parameters {
                     append("client_id", CLIENT_ID)
@@ -145,20 +268,9 @@ class GmailAuthClient(
 
     suspend fun isSignedIn(): Boolean = authManager.isAuthenticated()
 
+    suspend fun cancelPendingAuth() = authManager.clearPendingOAuthSession()
+
     suspend fun signOut() = authManager.clearTokens()
-
-    // ── PKCE helpers ────────────────────────────────────────────
-
-    private fun generateCodeVerifier(): String {
-        val bytes = ByteArray(64)
-        SecureRandom().nextBytes(bytes)
-        return Base64.encodeToString(bytes, Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP)
-    }
-
-    private fun deriveCodeChallenge(verifier: String): String {
-        val digest = MessageDigest.getInstance("SHA-256").digest(verifier.toByteArray())
-        return Base64.encodeToString(digest, Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP)
-    }
 }
 
 // ── Serialization DTOs ──────────────────────────────────────────

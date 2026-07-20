@@ -36,6 +36,7 @@ fun SettingsNavHost(
     onDarkModeChange: (Boolean) -> Unit,
     onUseCustomFontChange: (Boolean) -> Unit,
     onAmoledChange: (Boolean) -> Unit = {},
+    isSigningOut: Boolean = false,
     onSignOut: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
@@ -104,6 +105,7 @@ fun SettingsNavHost(
 
         composable<SettingsRoute.Account> {
             AccountSettingsScreen(
+                isSigningOut = isSigningOut,
                 onSignOut = onSignOut,
                 onBack = { navController.popBackStack() }
             )

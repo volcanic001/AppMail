@@ -24,6 +24,7 @@ fun SettingsScreen(
     onDarkModeChange: (Boolean) -> Unit,
     onUseCustomFontChange: (Boolean) -> Unit,
     onAmoledChange: (Boolean) -> Unit = {},
+    isSigningOut: Boolean = false,
     onSignOut: () -> Unit = {},
     onBack: () -> Unit = {},
     modifier: Modifier = Modifier
@@ -37,6 +38,7 @@ fun SettingsScreen(
         onDarkModeChange = onDarkModeChange,
         onUseCustomFontChange = onUseCustomFontChange,
         onAmoledChange = onAmoledChange,
+        isSigningOut = isSigningOut,
         onSignOut = onSignOut,
         onBack = onBack,
         modifier = modifier

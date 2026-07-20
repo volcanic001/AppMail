@@ -199,46 +199,54 @@ fun InboxScreen(
             }
 
             is InboxUiState.Success -> {
-                if (state.emails.isEmpty() && !state.isRefreshing) {
-                    EmptyInbox()
-                } else {
-                    val ptrState = rememberPullToRefreshState()
-                    PullToRefreshBox(
-                        state = ptrState,
-                        isRefreshing = state.isRefreshing,
-                        onRefresh = { viewModel.refresh() },
+                val ptrState = rememberPullToRefreshState()
+                PullToRefreshBox(
+                    state = ptrState,
+                    isRefreshing = state.isRefreshing,
+                    onRefresh = { viewModel.refresh() },
+                    modifier = Modifier.fillMaxSize(),
+                    indicator = {
+                        val isVisible = state.isRefreshing || ptrState.distanceFraction > 0f
+                        if (isVisible) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.TopCenter)
+                                    .graphicsLayer {
+                                        val fraction = ptrState.distanceFraction.coerceIn(0f, 1.5f)
+                                        translationY = if (state.isRefreshing) 24.dp.toPx() else (fraction * 40.dp.toPx())
+                                        val scale = if (state.isRefreshing) 1f else (fraction * 1.2f).coerceIn(0f, 1f)
+                                        scaleX = scale
+                                        scaleY = scale
+                                        alpha = if (state.isRefreshing) 1f else fraction.coerceIn(0f, 1f)
+                                    }
+                            ) {
+                                ContainedLoadingIndicator(
+                                    containerSize = 48.dp,
+                                    indicatorSize = 32.dp,
+                                    progress = if (state.isRefreshing) null else ptrState.distanceFraction.coerceIn(0f, 1f)
+                                )
+                            }
+                        }
+                    }
+                ) {
+                    LazyColumn(
+                        state = listState,
                         modifier = Modifier.fillMaxSize(),
-                        indicator = {
-                            val isVisible = state.isRefreshing || ptrState.distanceFraction > 0f
-                            if (isVisible) {
+                        contentPadding = PaddingValues(
+                            bottom = paddingValues.calculateBottomPadding() + 24.dp
+                        )
+                    ) {
+                        if (state.emails.isEmpty()) {
+                            item(key = "empty") {
                                 Box(
-                                    modifier = Modifier
-                                        .align(Alignment.TopCenter)
-                                        .graphicsLayer {
-                                            val fraction = ptrState.distanceFraction.coerceIn(0f, 1.5f)
-                                            translationY = if (state.isRefreshing) 24.dp.toPx() else (fraction * 40.dp.toPx())
-                                            val scale = if (state.isRefreshing) 1f else (fraction * 1.2f).coerceIn(0f, 1f)
-                                            scaleX = scale
-                                            scaleY = scale
-                                            alpha = if (state.isRefreshing) 1f else fraction.coerceIn(0f, 1f)
-                                        }
+                                    modifier = Modifier.fillParentMaxSize(),
+                                    contentAlignment = Alignment.Center
                                 ) {
-                                    ContainedLoadingIndicator(
-                                        containerSize = 48.dp,
-                                        indicatorSize = 32.dp,
-                                        progress = if (state.isRefreshing) null else ptrState.distanceFraction.coerceIn(0f, 1f)
-                                    )
+                                    EmptyInbox()
                                 }
                             }
                         }
-                    ) {
-                        LazyColumn(
-                            state = listState,
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(
-                                bottom = paddingValues.calculateBottomPadding() + 24.dp
-                            )
-                        ) {
+                        else {
                             items(
                                 items = state.emails,
                                 key = { it.id }
@@ -281,39 +289,39 @@ fun InboxScreen(
                                     )
                                 )
                             }
+                        }
 
-                            if (state.isLoadingNextPage) {
-                                item(key = "loader") {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(16.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        ContainedLoadingIndicator(
-                                            containerSize = 44.dp,
-                                            indicatorSize = 28.dp
-                                        )
-                                    }
+                        if (state.isLoadingNextPage) {
+                            item(key = "loader") {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(16.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    ContainedLoadingIndicator(
+                                        containerSize = 44.dp,
+                                        indicatorSize = 28.dp
+                                    )
                                 }
                             }
                         }
                     }
+                }
 
-                    // Pagination: trigger loadMore when near the bottom
-                    LaunchedEffect(listState) {
-                        snapshotFlow {
-                            val layout = listState.layoutInfo
-                            val lastIndex = layout.visibleItemsInfo.lastOrNull()?.index ?: 0
-                            lastIndex to layout.totalItemsCount
-                        }
-                            .distinctUntilChanged()
-                            .collect { (lastVisible, total) ->
-                                if (total > 0 && lastVisible >= total - 3) {
-                                    viewModel.loadNextPage()
-                                }
-                            }
+                // Pagination: trigger loadMore when near the bottom.
+                LaunchedEffect(listState, state.emails.isEmpty()) {
+                    snapshotFlow {
+                        val layout = listState.layoutInfo
+                        val lastIndex = layout.visibleItemsInfo.lastOrNull()?.index ?: 0
+                        lastIndex to layout.totalItemsCount
                     }
+                        .distinctUntilChanged()
+                        .collect { (lastVisible, total) ->
+                            if (state.emails.isNotEmpty() && total > 0 && lastVisible >= total - 3) {
+                                viewModel.loadNextPage()
+                            }
+                        }
                 }
             }
         }
