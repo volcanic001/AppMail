@@ -7,17 +7,24 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import com.david.mailapp.core.security.FailingSecretCipher
 import com.david.mailapp.core.security.FakeSecretCipher
 import com.david.mailapp.core.security.SecretCipher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
 import java.io.File
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 /**
  * Tests for [AuthManager] token encryption and legacy migration (Fase 1B).
@@ -295,5 +302,307 @@ class AuthManagerTokenMigrationTest {
         assertTrue("No legacy refresh token", allKeys.none { it == "refresh_token" })
         assertTrue("No legacy expires in", allKeys.none { it == "expires_in" })
         assertTrue("Key must be encrypted_oauth_tokens_v1", allKeys.any { it == "encrypted_oauth_tokens_v1" })
+    }
+
+    // ── V2 payload (Fase 1C.1) ────────────────────────────────
+
+    @Test
+    fun `saveTokens writes v2 payload`() = runBlocking {
+        authManager = AuthManager(testStore, sharedCipher)
+        authManager.saveTokens(OAuthTokens("v2_access", "v2_refresh", 99999L))
+
+        val tokens = authManager.getTokens()
+        assertNotNull("V2 tokens must be readable", tokens)
+        assertEquals("v2_access", tokens!!.accessToken)
+        assertEquals("v2_refresh", tokens.refreshToken)
+        assertEquals(99999L, tokens.expiresAtEpochMillis)
+
+        val encrypted = testStore.data.first()[KEY_ENCRYPTED_TOKENS]!!
+        val payload = sharedCipher.decrypt(
+            encrypted,
+            "mailapp.oauth.tokens.v1".toByteArray()
+        ).decodeToString()
+        assertTrue("V2 payload must persist schemaVersion", payload.contains("\"schemaVersion\":2"))
+    }
+
+    @Test
+    fun `v2 tokens survive restart`() = runBlocking {
+        val am1 = AuthManager(testStore, sharedCipher)
+        am1.saveTokens(OAuthTokens("survive_access", "survive_refresh", 88888L))
+
+        // "Restart" with a new instance
+        val am2 = AuthManager(testStore, sharedCipher)
+        val tokens = am2.getTokens()
+        assertNotNull("V2 tokens must survive restart", tokens)
+        assertEquals("survive_access", tokens!!.accessToken)
+        assertEquals(88888L, tokens.expiresAtEpochMillis)
+    }
+
+    @Test
+    fun `v1 encrypted payload is migrated to v2 with expiresAtEpochMillis=0`() = runBlocking {
+        // Write a v1 encrypted payload using the same cipher the AuthManager will use
+        val v1Encrypted = sharedCipher.encrypt(
+            """{"schemaVersion":1,"accessToken":"v1_access","refreshToken":"v1_refresh","expiresIn":3600}""".toByteArray(),
+            "mailapp.oauth.tokens.v1".toByteArray()
+        )
+        testStore.edit { prefs ->
+            prefs[stringPreferencesKey("encrypted_oauth_tokens_v1")] = v1Encrypted
+        }
+
+        authManager = AuthManager(testStore, sharedCipher)
+        val tokens = authManager.getTokens()
+
+        assertNotNull("V1 must migrate to tokens", tokens)
+        assertEquals("v1_access", tokens!!.accessToken)
+        assertEquals("v1_refresh", tokens.refreshToken)
+        assertEquals("Migrated v1 must have expiresAtEpochMillis=0", 0L, tokens.expiresAtEpochMillis)
+    }
+
+    @Test
+    fun `v1 migration re-encrypts as v2`() = runBlocking {
+        // Write v1 encrypted using sharedCipher
+        val v1Encrypted = sharedCipher.encrypt(
+            """{"schemaVersion":1,"accessToken":"a","refreshToken":"b","expiresIn":3600}""".toByteArray(),
+            "mailapp.oauth.tokens.v1".toByteArray()
+        )
+        testStore.edit { prefs ->
+            prefs[stringPreferencesKey("encrypted_oauth_tokens_v1")] = v1Encrypted
+        }
+
+        authManager = AuthManager(testStore, sharedCipher)
+        authManager.getTokens() // triggers migration
+
+        // After migration, the stored payload must be v2. "Restart" to verify.
+        val am2 = AuthManager(testStore, sharedCipher)
+        val tokens = am2.getTokens()
+        assertNotNull("V2 must survive restart", tokens)
+        assertEquals("a", tokens!!.accessToken)
+        assertEquals(0L, tokens.expiresAtEpochMillis)
+    }
+
+    @Test
+    fun `unversioned v1 payload is migrated to explicit v2`() = runBlocking {
+        val encrypted = sharedCipher.encrypt(
+            """{"accessToken":"old_access","refreshToken":"old_refresh","expiresIn":3600}""".toByteArray(),
+            "mailapp.oauth.tokens.v1".toByteArray()
+        )
+        testStore.edit { it[KEY_ENCRYPTED_TOKENS] = encrypted }
+
+        authManager = AuthManager(testStore, sharedCipher)
+        val tokens = authManager.getTokens()
+
+        assertEquals("old_access", tokens?.accessToken)
+        assertEquals(0L, tokens?.expiresAtEpochMillis)
+        val rewritten = testStore.data.first()[KEY_ENCRYPTED_TOKENS]!!
+        val payload = sharedCipher.decrypt(
+            rewritten,
+            "mailapp.oauth.tokens.v1".toByteArray()
+        ).decodeToString()
+        assertTrue(payload.contains("\"schemaVersion\":2"))
+    }
+
+    @Test
+    fun `unversioned transitional v2 payload is rewritten with explicit version`() = runBlocking {
+        val encrypted = sharedCipher.encrypt(
+            """{"accessToken":"access","refreshToken":"refresh","expiresAtEpochMillis":99999}""".toByteArray(),
+            "mailapp.oauth.tokens.v1".toByteArray()
+        )
+        testStore.edit { it[KEY_ENCRYPTED_TOKENS] = encrypted }
+
+        authManager = AuthManager(testStore, sharedCipher)
+        val tokens = authManager.getTokens()
+
+        assertEquals("access", tokens?.accessToken)
+        assertEquals(99999L, tokens?.expiresAtEpochMillis)
+        val rewritten = testStore.data.first()[KEY_ENCRYPTED_TOKENS]!!
+        val payload = sharedCipher.decrypt(
+            rewritten,
+            "mailapp.oauth.tokens.v1".toByteArray()
+        ).decodeToString()
+        assertTrue(payload.contains("\"schemaVersion\":2"))
+    }
+
+    @Test
+    fun `v1 migration does not overwrite concurrent v2 write`() = runBlocking {
+        val v1Encrypted = sharedCipher.encrypt(
+            """{"schemaVersion":1,"accessToken":"old","refreshToken":"old","expiresIn":3600}""".toByteArray(),
+            "mailapp.oauth.tokens.v1".toByteArray()
+        )
+        testStore.edit { prefs ->
+            prefs[stringPreferencesKey("encrypted_oauth_tokens_v1")] = v1Encrypted
+        }
+
+        val decryptStarted = CountDownLatch(1)
+        val allowDecryptToReturn = CountDownLatch(1)
+        val blockingCipher = object : SecretCipher {
+            override fun encrypt(plaintext: ByteArray, aad: ByteArray): String =
+                sharedCipher.encrypt(plaintext, aad)
+
+            override fun decrypt(encrypted: String, aad: ByteArray): ByteArray {
+                val plaintext = sharedCipher.decrypt(encrypted, aad)
+                decryptStarted.countDown()
+                check(allowDecryptToReturn.await(5, TimeUnit.SECONDS)) {
+                    "Timed out waiting to resume V1 migration"
+                }
+                return plaintext
+            }
+        }
+        authManager = AuthManager(testStore, blockingCipher)
+
+        val migratingRead = async(Dispatchers.Default) { authManager.getTokens() }
+        val readWasPaused = withContext(Dispatchers.IO) {
+            decryptStarted.await(5, TimeUnit.SECONDS)
+        }
+        if (!readWasPaused) allowDecryptToReturn.countDown()
+        assertTrue("V1 read must pause before migration write", readWasPaused)
+
+        authManager.saveTokens(OAuthTokens("fresh_access", "fresh_refresh", 99999L))
+        allowDecryptToReturn.countDown()
+        migratingRead.await()
+
+        val finalTokens = authManager.getTokens()
+        assertNotNull("Fresh tokens must survive", finalTokens)
+        assertEquals("Concurrent v2 write must not be overwritten", "fresh_access", finalTokens!!.accessToken)
+    }
+
+    // ── Empty token payloads (written directly, bypassing saveTokens) ──
+
+    @Test
+    fun `payload with empty refresh token returns null`() = runBlocking {
+        val encrypted = sharedCipher.encrypt(
+            """{"schemaVersion":2,"accessToken":"access","refreshToken":"","expiresAtEpochMillis":99999}""".toByteArray(),
+            "mailapp.oauth.tokens.v1".toByteArray()
+        )
+        testStore.edit { prefs ->
+            prefs[stringPreferencesKey("encrypted_oauth_tokens_v1")] = encrypted
+        }
+
+        authManager = AuthManager(testStore, sharedCipher)
+        assertNull("Empty refresh token payload must return null", authManager.getTokens())
+    }
+
+    @Test
+    fun `payload with empty access token returns null`() = runBlocking {
+        val encrypted = sharedCipher.encrypt(
+            """{"schemaVersion":2,"accessToken":"","refreshToken":"refresh","expiresAtEpochMillis":99999}""".toByteArray(),
+            "mailapp.oauth.tokens.v1".toByteArray()
+        )
+        testStore.edit { prefs ->
+            prefs[stringPreferencesKey("encrypted_oauth_tokens_v1")] = encrypted
+        }
+
+        authManager = AuthManager(testStore, sharedCipher)
+        assertNull("Empty access token payload must return null", authManager.getTokens())
+    }
+
+    // ── Negative expiresAtEpochMillis ─────────────────────────
+
+    @Test
+    fun `negative expiresAtEpochMillis is treated as corrupted`() = runBlocking {
+        authManager = AuthManager(testStore, sharedCipher)
+        val v2WithNegative = sharedCipher.encrypt(
+            """{"schemaVersion":2,"accessToken":"a","refreshToken":"b","expiresAtEpochMillis":-1}""".toByteArray(),
+            "mailapp.oauth.tokens.v1".toByteArray()
+        )
+        testStore.edit { prefs ->
+            prefs[stringPreferencesKey("encrypted_oauth_tokens_v1")] = v2WithNegative
+        }
+
+        assertNull("Negative expiresAtEpochMillis must return null", authManager.getTokens())
+    }
+
+    // ── Unknown schemaVersion ────────────────────────────────
+
+    @Test
+    fun `schemaVersion=99 with all v1 fields is treated as corrupted`() = runBlocking {
+        val encrypted = sharedCipher.encrypt(
+            """{"schemaVersion":99,"accessToken":"a","refreshToken":"b","expiresIn":3600}""".toByteArray(),
+            "mailapp.oauth.tokens.v1".toByteArray()
+        )
+        testStore.edit { prefs ->
+            prefs[stringPreferencesKey("encrypted_oauth_tokens_v1")] = encrypted
+        }
+
+        authManager = AuthManager(testStore, sharedCipher)
+        assertNull("schemaVersion=99 must return null", authManager.getTokens())
+
+        val prefs = testStore.data.first()
+        assertNull("Corrupted payload must be deleted", prefs[stringPreferencesKey("encrypted_oauth_tokens_v1")])
+    }
+
+    @Test
+    fun `schemaVersion=99 with all v2 fields is treated as corrupted`() = runBlocking {
+        val encrypted = sharedCipher.encrypt(
+            """{"schemaVersion":99,"accessToken":"a","refreshToken":"b","expiresAtEpochMillis":99999}""".toByteArray(),
+            "mailapp.oauth.tokens.v1".toByteArray()
+        )
+        testStore.edit { prefs ->
+            prefs[stringPreferencesKey("encrypted_oauth_tokens_v1")] = encrypted
+        }
+
+        authManager = AuthManager(testStore, sharedCipher)
+        assertNull("schemaVersion=99 must return null", authManager.getTokens())
+
+        val prefs = testStore.data.first()
+        assertNull("Corrupted payload must be deleted", prefs[stringPreferencesKey("encrypted_oauth_tokens_v1")])
+    }
+
+    // ── saveTokens validation ─────────────────────────────────
+
+    @Test
+    fun `saveTokens rejects empty access token`() = runBlocking {
+        authManager = AuthManager(testStore, sharedCipher)
+        try {
+            authManager.saveTokens(OAuthTokens("", "refresh", 99999L))
+            fail("saveTokens should throw for empty access token")
+        } catch (e: IllegalArgumentException) {
+            // expected
+        }
+    }
+
+    @Test
+    fun `saveTokens rejects empty refresh token`() = runBlocking {
+        authManager = AuthManager(testStore, sharedCipher)
+        try {
+            authManager.saveTokens(OAuthTokens("access", "", 99999L))
+            fail("saveTokens should throw for empty refresh token")
+        } catch (e: IllegalArgumentException) {
+            // expected
+        }
+    }
+
+    @Test
+    fun `saveTokens rejects negative expiresAtEpochMillis`() = runBlocking {
+        authManager = AuthManager(testStore, sharedCipher)
+        try {
+            authManager.saveTokens(OAuthTokens("access", "refresh", -1L))
+            fail("saveTokens should throw for negative expiresAtEpochMillis")
+        } catch (e: IllegalArgumentException) {
+            // expected
+        }
+    }
+
+    @Test
+    fun `saveTokens accepts expiresAtEpochMillis=0`() = runBlocking {
+        authManager = AuthManager(testStore, sharedCipher)
+        authManager.saveTokens(OAuthTokens("access", "refresh", 0L))
+
+        val tokens = authManager.getTokens()
+        assertNotNull("expiresAtEpochMillis=0 must be valid", tokens)
+        assertEquals(0L, tokens!!.expiresAtEpochMillis)
+    }
+
+    @Test
+    fun `unknown schema version is treated as corrupted`() = runBlocking {
+        val badEncrypted = sharedCipher.encrypt(
+            """{"schemaVersion":99,"accessToken":"a","refreshToken":"b"}""".toByteArray(),
+            "mailapp.oauth.tokens.v1".toByteArray()
+        )
+        testStore.edit { prefs ->
+            prefs[stringPreferencesKey("encrypted_oauth_tokens_v1")] = badEncrypted
+        }
+
+        authManager = AuthManager(testStore, sharedCipher)
+        assertNull("Unknown schema version must return null", authManager.getTokens())
     }
 }

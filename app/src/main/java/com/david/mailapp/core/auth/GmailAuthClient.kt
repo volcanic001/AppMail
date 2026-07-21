@@ -42,7 +42,9 @@ sealed interface OAuthRedirectResult {
  * 4. Tokens are persisted via [AuthManager]
  */
 class GmailAuthClient(
-    private val authManager: AuthManager
+    private val authManager: AuthManager,
+    private val tokenManager: OAuthTokenManager,
+    private val nowEpochMillis: () -> Long = { System.currentTimeMillis() }
 ) {
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -196,6 +198,8 @@ class GmailAuthClient(
     /**
      * Exchange authorization code for access + refresh tokens via PKCE.
      * Verifies [HttpStatusCode.OK] before deserializing.
+     * Exige access y refresh token no vacíos.
+     * Calcula [expiresAtEpochMillis] a partir de expires_in (3600 si ausente).
      */
     private suspend fun exchangeCodeForTokens(authCode: String, codeVerifier: String): OAuthTokens {
         val client = HttpClient(CIO)
@@ -215,10 +219,14 @@ class GmailAuthClient(
             }
             val bodyText = response.bodyAsText()
             val body = json.decodeFromString<TokenResponse>(bodyText)
+            require(body.access_token.isNotEmpty()) { "access_token must not be empty" }
+            require(!body.refresh_token.isNullOrEmpty()) { "refresh_token must not be empty" }
+            val expiresIn = body.expires_in ?: 3600
+            require(expiresIn > 0) { "expires_in must be positive" }
             val tokens = OAuthTokens(
                 accessToken = body.access_token,
-                refreshToken = body.refresh_token ?: "",
-                expiresIn = body.expires_in ?: 3600
+                refreshToken = body.refresh_token!!,
+                expiresAtEpochMillis = calculateExpiresAtEpochMillis(expiresIn)
             )
             authManager.saveTokens(tokens)
             tokens
@@ -227,42 +235,24 @@ class GmailAuthClient(
         }
     }
 
+    internal fun calculateExpiresAtEpochMillis(expiresInSeconds: Int): Long {
+        require(expiresInSeconds > 0) { "expiresInSeconds must be positive" }
+        return nowEpochMillis() + expiresInSeconds * 1000L
+    }
+
     // ── Token lifecycle ────────────────────────────────────────
 
     /**
-     * Refresh the access token using the stored refresh token.
+     * Refresh the access token using [OAuthTokenManager.forceRefresh].
+     * Always delegates — no direct HTTP call.
+     *
+     * @return The new access token on success, or null if the token could not
+     *   be refreshed (transient error, reauthentication required, or no session).
      */
     suspend fun refreshAccessToken(): String? {
-        val refreshToken = authManager.getRefreshToken() ?: return null
-
-        val client = HttpClient(CIO)
-        return try {
-            val response = client.submitForm(
-                url = TOKEN_URI,
-                formParameters = parameters {
-                    append("client_id", CLIENT_ID)
-                    append("refresh_token", refreshToken)
-                    append("grant_type", "refresh_token")
-                }
-            )
-            if (response.status == HttpStatusCode.OK) {
-                val bodyText = response.bodyAsText()
-                val body = json.decodeFromString<TokenResponse>(bodyText)
-                val newTokens = authManager.getTokens()?.copy(
-                    accessToken = body.access_token,
-                    expiresIn = body.expires_in ?: 3600
-                )
-                if (newTokens != null) {
-                    authManager.saveTokens(newTokens)
-                }
-                body.access_token
-            } else {
-                null
-            }
-        } catch (_: Exception) {
-            null
-        } finally {
-            client.close()
+        return when (val result = tokenManager.forceRefresh()) {
+            is OAuthTokenResult.Available -> result.tokens.accessToken
+            else -> null
         }
     }
 

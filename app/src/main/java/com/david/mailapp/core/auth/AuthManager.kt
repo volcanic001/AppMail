@@ -14,6 +14,9 @@ import com.david.mailapp.core.security.SecretCipher
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "auth_tokens")
 
@@ -24,7 +27,7 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(na
 data class OAuthTokens(
     val accessToken: String,
     val refreshToken: String,
-    val expiresIn: Int = 3600
+    val expiresAtEpochMillis: Long = 0L
 )
 
 /**
@@ -57,6 +60,7 @@ class AuthManager(
         // ── AAD constants (two distinct domains) ──────────────────
         private val AAD_TOKENS = "mailapp.oauth.tokens.v1".toByteArray()
         private val AAD_SESSION = "mailapp.oauth.pending-session.v1".toByteArray()
+        private val TOKEN_JSON = Json { encodeDefaults = true }
 
         /** TTL for a pending OAuth session: 10 minutes in milliseconds. */
         internal const val PENDING_SESSION_TTL_MS = 600_000L
@@ -67,10 +71,18 @@ class AuthManager(
     /**
      * Save OAuth2 tokens as encrypted payload.
      *
+     * Validates before encrypting:
+     * - accessToken must not be empty.
+     * - refreshToken must not be empty.
+     * - expiresAtEpochMillis must be >= 0.
+     *
      * Rule 7: If encryption fails, no plaintext is persisted and the error
      * propagates to the caller.
      */
     suspend fun saveTokens(tokens: OAuthTokens) {
+        require(tokens.accessToken.isNotEmpty()) { "accessToken must not be empty" }
+        require(tokens.refreshToken.isNotEmpty()) { "refreshToken must not be empty" }
+        require(tokens.expiresAtEpochMillis >= 0) { "expiresAtEpochMillis must be >= 0" }
         val encrypted = encryptTokensPayload(tokens)
         store.edit { prefs ->
             prefs[KEY_ENCRYPTED_TOKENS] = encrypted
@@ -91,32 +103,45 @@ class AuthManager(
         // Encrypted path (Rule 1)
         val encrypted = prefs[KEY_ENCRYPTED_TOKENS]
         if (encrypted != null) {
-            val result = decryptTokenPayload(encrypted)
+            val decryptResult = decryptTokenPayload(encrypted)
             val hasLegacy = prefs[KEY_ACCESS] != null ||
                 prefs[KEY_REFRESH] != null ||
                 prefs[KEY_EXPIRES] != null
-            if (result == null || hasLegacy) {
-                store.edit {
-                    if (result == null) {
-                        it.remove(KEY_ENCRYPTED_TOKENS)
+
+            if (decryptResult != null) {
+                if (decryptResult is DecryptResult.NeedsRewrite) {
+                    store.edit { editPrefs ->
+                        val currentEncrypted = editPrefs[KEY_ENCRYPTED_TOKENS]
+                        // Only overwrite if no other coroutine replaced the value
+                        if (currentEncrypted == encrypted) {
+                            editPrefs[KEY_ENCRYPTED_TOKENS] = encryptTokensPayload(decryptResult.tokens)
+                        }
                     }
-                    removeLegacyTokenKeys(it)
+                }
+                if (hasLegacy) {
+                    store.edit { removeLegacyTokenKeys(it) }
+                }
+            } else {
+                store.edit {
+                    it.remove(KEY_ENCRYPTED_TOKENS)
+                    if (hasLegacy) {
+                        removeLegacyTokenKeys(it)
+                    }
                 }
             }
-            return result
+            return decryptResult?.tokens
         }
 
         // Legacy migration path (Rule 2/3)
         val access = prefs[KEY_ACCESS]
         val refresh = prefs[KEY_REFRESH]
         if (access != null && refresh != null) {
-            val tokens = OAuthTokens(access, refresh, prefs[KEY_EXPIRES] ?: 3600)
+            val tokens = OAuthTokens(access, refresh, expiresAtEpochMillis = 0L)
             return try {
-                val enc = encryptTokensPayload(tokens)
                 var migrated = false
                 store.edit { prefsEdit ->
                     if (prefsEdit[KEY_ENCRYPTED_TOKENS] == null) {
-                        prefsEdit[KEY_ENCRYPTED_TOKENS] = enc
+                        prefsEdit[KEY_ENCRYPTED_TOKENS] = encryptTokensPayload(tokens)
                         migrated = true
                     }
                     removeLegacyTokenKeys(prefsEdit)
@@ -142,7 +167,12 @@ class AuthManager(
 
     suspend fun getRefreshToken(): String? = getTokens()?.refreshToken
 
-    suspend fun isAuthenticated(): Boolean = getAccessToken() != null
+    suspend fun isAuthenticated(): Boolean {
+        val tokens = getTokens()
+        return tokens != null &&
+            tokens.accessToken.isNotEmpty() &&
+            tokens.refreshToken.isNotEmpty()
+    }
 
     /**
      * Clear all tokens — both encrypted and legacy.
@@ -259,26 +289,101 @@ class AuthManager(
 
     // ── Private helpers ───────────────────────────────────────
 
-    /** Encrypt [OAuthTokens] into a payload string. Propagates on failure (Rule 7). */
+    /** Encrypt [OAuthTokens] into a v2 payload string. Propagates on failure (Rule 7). */
     private fun encryptTokensPayload(tokens: OAuthTokens): String {
-        val payload = OAuthTokensPayload(
+        val payload = OAuthTokensPayloadV2(
             accessToken = tokens.accessToken,
             refreshToken = tokens.refreshToken,
-            expiresIn = tokens.expiresIn
+            expiresAtEpochMillis = tokens.expiresAtEpochMillis
         )
-        return cipher.encrypt(Json.encodeToString(OAuthTokensPayload.serializer(), payload).toByteArray(), AAD_TOKENS)
+        return cipher.encrypt(
+            TOKEN_JSON.encodeToString(OAuthTokensPayloadV2.serializer(), payload).toByteArray(),
+            AAD_TOKENS
+        )
     }
 
-    /** Decrypt and parse an encrypted token payload. Returns null on failure (Rule 4/5). */
-    private fun decryptTokenPayload(encrypted: String): OAuthTokens? {
-        return try {
-            val jsonStr = cipher.decrypt(encrypted, AAD_TOKENS).decodeToString()
-            val payload = Json.decodeFromString<OAuthTokensPayload>(jsonStr)
-            require(payload.schemaVersion == 1)
-            OAuthTokens(payload.accessToken, payload.refreshToken, payload.expiresIn)
+    /** Result of [decryptTokenPayload]. */
+    private sealed interface DecryptResult {
+        val tokens: OAuthTokens
+        data class Current(override val tokens: OAuthTokens) : DecryptResult
+        data class NeedsRewrite(override val tokens: OAuthTokens) : DecryptResult
+    }
+
+    /**
+     * Decrypt and parse an encrypted token payload. Returns null on failure.
+     *
+     * Validates schema version and field requirements.
+     */
+    private fun decryptTokenPayload(encrypted: String): DecryptResult? {
+        val jsonStr = try {
+            cipher.decrypt(encrypted, AAD_TOKENS).decodeToString()
         } catch (_: Exception) {
-            // Rule 4: corrupted → delete (caller reads fresh store.data)
+            return null
+        }
+
+        return try {
+            val jsonObject = TOKEN_JSON.parseToJsonElement(jsonStr).jsonObject
+            val schemaVersion = jsonObject["schemaVersion"]?.jsonPrimitive?.intOrNull
+
+            if (schemaVersion == null) {
+                return decodeUnversionedTokenPayload(jsonStr, jsonObject.keys)
+            }
+
+            when (schemaVersion) {
+                1 -> {
+                    val v1 = TOKEN_JSON.decodeFromString<OAuthTokensPayloadV1>(jsonStr)
+                    require(v1.accessToken.isNotEmpty())
+                    require(v1.refreshToken.isNotEmpty())
+                    require(v1.expiresIn > 0)
+                    DecryptResult.NeedsRewrite(
+                        OAuthTokens(v1.accessToken, v1.refreshToken, expiresAtEpochMillis = 0L)
+                    )
+                }
+
+                2 -> {
+                    val v2 = TOKEN_JSON.decodeFromString<OAuthTokensPayloadV2>(jsonStr)
+                    require(v2.accessToken.isNotEmpty())
+                    require(v2.refreshToken.isNotEmpty())
+                    require(v2.expiresAtEpochMillis >= 0)
+                    DecryptResult.Current(
+                        OAuthTokens(v2.accessToken, v2.refreshToken, v2.expiresAtEpochMillis)
+                    )
+                }
+
+                else -> null
+            }
+        } catch (_: Exception) {
             null
+        }
+    }
+
+    /** Reads payloads written before schemaVersion was encoded explicitly. */
+    private fun decodeUnversionedTokenPayload(
+        jsonStr: String,
+        fields: Set<String>
+    ): DecryptResult? {
+        return when {
+            "expiresIn" in fields && "expiresAtEpochMillis" !in fields -> {
+                val v1 = TOKEN_JSON.decodeFromString<OAuthTokensPayloadV1>(jsonStr)
+                require(v1.accessToken.isNotEmpty())
+                require(v1.refreshToken.isNotEmpty())
+                require(v1.expiresIn > 0)
+                DecryptResult.NeedsRewrite(
+                    OAuthTokens(v1.accessToken, v1.refreshToken, expiresAtEpochMillis = 0L)
+                )
+            }
+
+            "expiresAtEpochMillis" in fields && "expiresIn" !in fields -> {
+                val v2 = TOKEN_JSON.decodeFromString<OAuthTokensPayloadV2>(jsonStr)
+                require(v2.accessToken.isNotEmpty())
+                require(v2.refreshToken.isNotEmpty())
+                require(v2.expiresAtEpochMillis >= 0)
+                DecryptResult.NeedsRewrite(
+                    OAuthTokens(v2.accessToken, v2.refreshToken, v2.expiresAtEpochMillis)
+                )
+            }
+
+            else -> null
         }
     }
 

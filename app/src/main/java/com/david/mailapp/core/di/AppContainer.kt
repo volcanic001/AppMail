@@ -46,12 +46,20 @@ object AppContainer {
         AuthManager(appContext)
     }
 
+    val googleOAuthTokenService: com.david.mailapp.core.auth.GoogleOAuthTokenService by lazy {
+        com.david.mailapp.core.auth.GoogleOAuthTokenService()
+    }
+
+    val oauthTokenManager: com.david.mailapp.core.auth.OAuthTokenManager by lazy {
+        com.david.mailapp.core.auth.OAuthTokenManager(authManager, googleOAuthTokenService)
+    }
+
     val appSettingsManager: com.david.mailapp.core.settings.AppSettingsManager by lazy {
         com.david.mailapp.core.settings.AppSettingsManager(appContext)
     }
 
     val authClient: GmailAuthClient by lazy {
-        GmailAuthClient(authManager)
+        GmailAuthClient(authManager, oauthTokenManager)
     }
 
     /** DataStore for search history (last 5 queries). */
