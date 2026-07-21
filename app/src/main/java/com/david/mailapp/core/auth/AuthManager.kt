@@ -169,9 +169,7 @@ class AuthManager(
 
     suspend fun isAuthenticated(): Boolean {
         val tokens = getTokens()
-        return tokens != null &&
-            tokens.accessToken.isNotEmpty() &&
-            tokens.refreshToken.isNotEmpty()
+        return tokens != null && tokens.refreshToken.isNotEmpty()
     }
 
     /**

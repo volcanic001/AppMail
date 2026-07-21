@@ -51,10 +51,25 @@ class MainActivity : ComponentActivity() {
         // Check auth state on launch
         lifecycleScope.launch {
             val signedIn = AppContainer.authClient.isSignedIn()
-            if (signedIn) {
+            if (signedIn && !AppContainer.oauthTokenManager.isReauthenticationPending) {
                 AppContainer.activateProvider()
             }
-            isSignedInFlow.value = signedIn
+            isSignedInFlow.value = signedIn && !AppContainer.oauthTokenManager.isReauthenticationPending
+        }
+
+        lifecycleScope.launch {
+            AppContainer.sessionExpiredSignal.collect { expired ->
+                if (expired) {
+                    viewModelStore.clear()
+                    isSignedInFlow.value = false
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Tu sesión expiró. Inicia sesión nuevamente.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                    AppContainer.sessionExpiredSignal.value = false
+                }
+            }
         }
 
         handleOAuthRedirect(intent?.data)

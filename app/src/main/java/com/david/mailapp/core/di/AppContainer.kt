@@ -13,21 +13,15 @@ import com.david.mailapp.data.pdf.PdfCacheManager
 import com.david.mailapp.data.remote.provider.EmailProvider
 import com.david.mailapp.data.repository.EmailRepository
 import io.ktor.client.HttpClient
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.withContext
-import java.util.concurrent.atomic.AtomicBoolean
 
 /** DataStore for search history — singleton scoped to this file. */
 private val Context.searchHistoryStore: DataStore<Preferences> by preferencesDataStore(name = "search_history")
 
-/**
- * Manual dependency injection container.
- *
- * Lifecycle:
- * 1. App starts → [init] called → DB + AuthManager ready
- * 2. User signs in → [activateProvider] → GmailProvider created
- * 3. User signs out → [deactivateProvider] → provider destroyed
- */
 object AppContainer {
 
     private lateinit var appContext: Context
@@ -36,7 +30,13 @@ object AppContainer {
         appContext = context.applicationContext
     }
 
-    // ── Always-available singletons ─────────────────────────────
+    // ── Application-level scope (outlives any Activity) ────────────
+    val applicationScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    /** True when the UI must show the session-expired message and return to Login. */
+    val sessionExpiredSignal: MutableStateFlow<Boolean> = MutableStateFlow(false)
+
+    // ── Always-available singletons ──────────────────────────────────
 
     val database: MailDatabase by lazy {
         MailDatabase.create(appContext)
@@ -67,103 +67,81 @@ object AppContainer {
         appContext.searchHistoryStore
     }
 
-    // ── PDF cache ───────────────────────────────────────────────
+    // ── PDF cache ──────────────────────────────────────────────────
 
     val pdfCacheManager: PdfCacheManager by lazy {
         PdfCacheManager(appContext.cacheDir)
     }
 
-    // ── Provider (lazy, activated after sign-in) ────────────────
+    // ── Provider (activated after sign-in, coordinated lifecycle) ──────
 
-    private var _provider: EmailProvider? = null
+    internal val providerCoordinator: ProviderLifecycleCoordinator<com.david.mailapp.data.remote.provider.EmailProvider> by lazy {
+        ProviderLifecycleCoordinator(
+            isReauthPending = { oauthTokenManager.isReauthenticationPending },
+            createClient = { HttpClientFactory.createGmailClient(oauthTokenManager) },
+            createProvider = { client ->
+                com.david.mailapp.data.remote.provider.gmail.GmailProvider(client)
+            }
+        )
+    }
+
     val provider: EmailProvider?
-        get() = _provider
-
-    private var _httpClient: HttpClient? = null
+        get() = providerCoordinator.provider
 
     /** Call after successful OAuth2 sign-in to activate the email provider. */
-    fun activateProvider() {
-        _httpClient = HttpClientFactory.createGmailClient(authManager, authClient)
-        _provider = com.david.mailapp.data.remote.provider.gmail.GmailProvider(_httpClient!!)
+    suspend fun activateProvider() {
+        providerCoordinator.activateProvider()
     }
 
     /** Call on sign-out to tear down the provider and HTTP client. */
-    fun deactivateProvider() {
-        _provider = null
-        _httpClient?.close()
-        _httpClient = null
+    suspend fun deactivateProvider() {
+        providerCoordinator.deactivateProvider()
     }
 
-    // ── Repository ──────────────────────────────────────────────
+    // ── Repository ────────────────────────────────────────────────
 
     val emailRepository: EmailRepository by lazy {
         EmailRepository(database, { provider }, pdfCacheManager)
     }
 
-    // ── Sign-out ──────────────────────────────────────────────
+    // ── Session termination coordinator ────────────────────────────
+
+    private val sessionCoordinator: SessionCoordinator by lazy {
+        SessionCoordinator(
+            clearProvider = ::deactivateProvider,
+            clearDatabase = { withContext(Dispatchers.IO) { database.clearAllTables() } },
+            clearPdfCache = { pdfCacheManager.clearAll() },
+            clearSearchHistory = { searchHistoryStore.edit { it.clear() } },
+            clearCredentials = { authClient.signOut() },
+            isAuthenticated = { authManager.isAuthenticated() },
+            reactivateProvider = ::activateProvider
+        )
+    }
 
     /** Resultado de [signOut]. */
     sealed interface SignOutResult {
-        /** Todo se eliminó correctamente — puede cambiar a login. */
         data object Success : SignOutResult
-
-        /**
-         * Falló la limpieza antes de borrar tokens.
-         * El usuario sigue autenticado y puede reintentar.
-         */
         data class Failed(val message: String) : SignOutResult
     }
 
-    private val isSigningOut = AtomicBoolean(false)
-
     /**
-     * Cierre de sesión completo con orden estricto:
-     *
-     * 1. Rechazar si ya hay un logout en curso (AtomicBoolean CAS).
-     * 2. [deactivateProvider] — cerrar HTTP y detener Gmail.
-     * 3. [database.clearAllTables] — limpiar Room (IO).
-     * 4. [pdfCacheManager.clearAll] — eliminar caché PDF temporal.
-     * 5. [searchHistoryStore.edit] { it.clear() } — historial de búsqueda.
-     * 6. [authClient.signOut] — **último**: borrar tokens cifrados + PKCE.
-     * 7. Retornar [SignOutResult.Success].
-     *
-     * Si falla antes del paso 6, se reactiva el provider y se retorna
-     * [SignOutResult.Failed] para que el usuario pueda reintentar.
+     * Manual logout: ordered cleanup with rollback on pre-commit failure.
      */
     suspend fun signOut(): SignOutResult {
-        if (!isSigningOut.compareAndSet(false, true)) {
-            return SignOutResult.Failed("Ya hay un cierre de sesión en curso.")
+        return when (val r = sessionCoordinator.signOut()) {
+            is SessionCoordinator.SignOutResult.Success -> SignOutResult.Success
+            is SessionCoordinator.SignOutResult.Failed -> SignOutResult.Failed(r.message)
         }
+    }
 
-        val hadProvider = _provider != null
-
-        try {
-            // 2. Cerrar HTTP y detener operaciones Gmail
-            deactivateProvider()
-
-            // 3. Limpiar Room (fuera del hilo principal)
-            withContext(Dispatchers.IO) {
-                database.clearAllTables()
-            }
-
-            // 4. Limpiar caché PDF temporal (no lanza excepción)
-            pdfCacheManager.clearAll()
-
-            // 5. Limpiar historial de búsqueda
-            searchHistoryStore.edit { it.clear() }
-
-            // 6. Borrar tokens y PKCE (COMMIT — último paso)
-            authClient.signOut()
-
-            return SignOutResult.Success
-        } catch (e: Exception) {
-            // Rollback: reactivar provider si estaba activo
-            if (hadProvider) {
-                activateProvider()
-            }
-            return SignOutResult.Failed("No se pudo cerrar sesión. Inténtalo nuevamente.")
-        } finally {
-            isSigningOut.set(false)
-        }
+    /**
+     * Automatic invalidation after invalid_grant. Fail-closed; never reactivates provider.
+     *
+     * Returns [SessionCoordinator.InvalidationResult.Completed] when the cleanup ran, or
+     * [SessionCoordinator.InvalidationResult.AlreadySignedOut] when the manual logout had
+     * already cleared the session (UI must not show the expiry message in that case).
+     */
+    suspend fun invalidateExpiredSession(): SessionCoordinator.InvalidationResult {
+        return sessionCoordinator.invalidateExpiredSession()
     }
 }

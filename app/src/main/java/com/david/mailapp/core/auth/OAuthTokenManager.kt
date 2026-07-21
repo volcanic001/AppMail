@@ -1,8 +1,12 @@
 package com.david.mailapp.core.auth
 
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Result of [OAuthTokenManager.ensureFreshToken] or [OAuthTokenManager.forceRefresh].
@@ -47,6 +51,25 @@ class OAuthTokenManager(
     /** 5-minute margin: within this window the token is considered "about to expire". */
     private val refreshMutex = Mutex()
 
+    private val isReauthPending = AtomicBoolean(false)
+    private val reauthChannel = Channel<Unit>(capacity = Channel.CONFLATED)
+
+    /** Expose the reauthentication events as a Flow. */
+    val reauthenticationEvents: Flow<Unit> = reauthChannel.receiveAsFlow()
+
+    /** Expose the current status of the reauthentication latch. */
+    val isReauthenticationPending: Boolean
+        get() = isReauthPending.get()
+
+    /** Reset the latch and discard any pending events. Called after successful login. */
+    suspend fun resetReauthenticationLatch() = refreshMutex.withLock {
+        isReauthPending.set(false)
+        // Drain any old events that were left in the conflated channel
+        reauthChannel.tryReceive()
+    }
+
+    suspend fun loadTokens(): OAuthTokens? = authManager.getTokens()
+
     companion object {
         private const val REFRESH_MARGIN_MS = 300_000L
     }
@@ -69,6 +92,9 @@ class OAuthTokenManager(
      * 9. [ReauthenticationRequired] → propagated as-is without deleting tokens.
      */
     suspend fun ensureFreshToken(): OAuthTokenResult {
+        if (isReauthPending.get()) {
+            return OAuthTokenResult.ReauthenticationRequired
+        }
         val initialTokens = authManager.getTokens() ?: return OAuthTokenResult.NoSession
         if (initialTokens.refreshToken.isEmpty()) {
             return OAuthTokenResult.ReauthenticationRequired
@@ -79,6 +105,9 @@ class OAuthTokenManager(
 
         // Need refresh — acquire mutex for single-flight
         return refreshMutex.withLock {
+            if (isReauthPending.get()) {
+                return@withLock OAuthTokenResult.ReauthenticationRequired
+            }
             // Re-read tokens — another coroutine may have refreshed while we waited
             val currentTokens = authManager.getTokens()
             if (currentTokens == null) return@withLock OAuthTokenResult.NoSession
@@ -105,6 +134,9 @@ class OAuthTokenManager(
      * 6. [ReauthenticationRequired] → propagated.
      */
     suspend fun forceRefresh(rejectedAccessToken: String? = null): OAuthTokenResult {
+        if (isReauthPending.get()) {
+            return OAuthTokenResult.ReauthenticationRequired
+        }
         val initialTokens = authManager.getTokens() ?: return OAuthTokenResult.NoSession
 
         // Another coroutine already refreshed with a different token
@@ -113,6 +145,9 @@ class OAuthTokenManager(
         }
 
         return refreshMutex.withLock {
+            if (isReauthPending.get()) {
+                return@withLock OAuthTokenResult.ReauthenticationRequired
+            }
             // Re-read and re-check after acquiring mutex
             val currentTokens = authManager.getTokens()
             if (currentTokens == null) return@withLock OAuthTokenResult.NoSession
@@ -175,6 +210,10 @@ class OAuthTokenManager(
             }
 
             is OAuthRefreshResult.ReauthenticationRequired -> {
+                // Activate latch and publish event
+                if (isReauthPending.compareAndSet(false, true)) {
+                    reauthChannel.trySend(Unit)
+                }
                 // Propagate without deleting tokens
                 OAuthTokenResult.ReauthenticationRequired
             }

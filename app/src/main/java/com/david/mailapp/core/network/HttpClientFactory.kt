@@ -1,10 +1,14 @@
 package com.david.mailapp.core.network
 
-import com.david.mailapp.core.auth.AuthManager
-import com.david.mailapp.core.auth.GmailAuthClient
+import com.david.mailapp.core.auth.OAuthTokenManager
+import com.david.mailapp.core.auth.OAuthTokenResult
 import io.ktor.client.HttpClient
+import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.engine.cio.CIO
+import io.ktor.client.plugins.api.createClientPlugin
 import io.ktor.client.plugins.auth.Auth
+import io.ktor.client.plugins.auth.authProvider
+import io.ktor.client.plugins.auth.providers.BearerAuthProvider
 import io.ktor.client.plugins.auth.providers.BearerTokens
 import io.ktor.client.plugins.auth.providers.bearer
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -12,24 +16,57 @@ import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logging
 import io.ktor.http.ContentType
+import io.ktor.http.URLProtocol
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
+
+/** Thrown to abort a request before it reaches the network when the session is invalid. */
+class OAuthSessionExpiredException(message: String) : IllegalStateException(message)
 
 object HttpClientFactory {
 
+    private const val GMAIL_HOST = "gmail.googleapis.com"
+
     /**
-     * Gmail API client with automatic Bearer token handling.
-     *
-     * - [loadTokens]: reads stored access + refresh tokens from [AuthManager]
-     * - [refreshTokens]: calls [GmailAuthClient.refreshAccessToken] on 401,
-     *   which hits oauth2.googleapis.com/token with the refresh_token.
+     * Returns true only for requests that are both HTTPS and targeting the exact
+     * Gmail API host. Used as the single security predicate across the freshness
+     * plugin, [sendWithoutRequest], and [refreshTokens].
      */
+    private fun isTrustedGmailRequest(host: String, protocol: URLProtocol): Boolean =
+        host == GMAIL_HOST && protocol == URLProtocol.HTTPS
+
     fun createGmailClient(
-        authManager: AuthManager,
-        authClient: GmailAuthClient
+        tokenManager: OAuthTokenManager,
+        engine: HttpClientEngine = CIO.create()
     ): HttpClient {
-        return HttpClient(CIO) {
+
+        val freshnessPlugin = createClientPlugin("OAuthFreshnessPlugin") {
+            val mutex = Mutex()
+            onRequest { request, _ ->
+                if (isTrustedGmailRequest(request.url.host, request.url.protocol)) {
+                    mutex.withLock {
+                        when (val r = tokenManager.ensureFreshToken()) {
+                            is OAuthTokenResult.Available -> {
+                                if (r.refreshed) {
+                                    this@createClientPlugin.client
+                                        .authProvider<BearerAuthProvider>()
+                                        ?.clearToken()
+                                }
+                            }
+                            is OAuthTokenResult.TemporarilyUnavailable,
+                            is OAuthTokenResult.ReauthenticationRequired,
+                            is OAuthTokenResult.NoSession ->
+                                throw OAuthSessionExpiredException("Cannot proceed: ${r::class.simpleName}")
+                        }
+                    }
+                }
+            }
+        }
+
+        return HttpClient(engine) {
             install(ContentNegotiation) {
                 json(Json {
                     ignoreUnknownKeys = true
@@ -38,20 +75,31 @@ object HttpClientFactory {
                 })
             }
 
+            defaultRequest {
+                url("https://$GMAIL_HOST/gmail/v1/")
+                contentType(ContentType.Application.Json)
+            }
+
+            install(freshnessPlugin)
+
             install(Auth) {
                 bearer {
+                    sendWithoutRequest { req ->
+                        isTrustedGmailRequest(req.url.host, req.url.protocol)
+                    }
+
                     loadTokens {
-                        val tokens = authManager.getTokens()
-                        if (tokens != null) {
-                            BearerTokens(tokens.accessToken, tokens.refreshToken)
-                        } else null
+                        tokenManager.loadTokens()
+                            ?.let { BearerTokens(it.accessToken, it.refreshToken) }
                     }
 
                     refreshTokens {
-                        val newAccess = authClient.refreshAccessToken()
-                        if (newAccess != null) {
-                            val tokens = authManager.getTokens()
-                            BearerTokens(newAccess, tokens?.refreshToken ?: "")
+                        val req = response.call.request
+                        if (isTrustedGmailRequest(req.url.host, req.url.protocol)) {
+                            val r = tokenManager.forceRefresh(oldTokens?.accessToken)
+                            if (r is OAuthTokenResult.Available) {
+                                BearerTokens(r.tokens.accessToken, r.tokens.refreshToken)
+                            } else null
                         } else null
                     }
                 }
@@ -59,11 +107,6 @@ object HttpClientFactory {
 
             install(Logging) {
                 level = LogLevel.HEADERS
-            }
-
-            defaultRequest {
-                url("https://gmail.googleapis.com/gmail/v1/")
-                contentType(ContentType.Application.Json)
             }
         }
     }

@@ -5,11 +5,15 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.david.mailapp.core.security.FakeSecretCipher
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.yield
+import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -110,48 +114,60 @@ class OAuthTokenManagerTest {
 
     @Test
     fun `ten concurrent calls to ensureFreshToken produce one OAuth request`() = runBlocking {
-        authManager.saveTokens(OAuthTokens("access", "refresh", now() + 60_000L))
-        val refreshStarted = CompletableDeferred<Unit>()
-        val allowRefreshToFinish = CompletableDeferred<Unit>()
-        val invocationCount = AtomicInteger(0)
-        val refreshService = object : OAuthRefreshService {
-            override suspend fun refresh(refreshToken: String): OAuthRefreshResult {
-                invocationCount.incrementAndGet()
-                refreshStarted.complete(Unit)
-                allowRefreshToFinish.await()
-                return OAuthRefreshResult.Success("new_access", 3600)
-            }
-        }
-        val manager = OAuthTokenManager(authManager, refreshService, ::now)
-
-        coroutineScope {
-            val startTogether = CompletableDeferred<Unit>()
-            val launched = List(10) { CompletableDeferred<Unit>() }
-            val deferred = List(10) { index ->
-                async {
-                    launched[index].complete(Unit)
-                    startTogether.await()
-                    manager.ensureFreshToken()
+        withTimeout(5_000L) {
+            authManager.saveTokens(OAuthTokens("access", "refresh", now() + 60_000L))
+            val refreshStarted = CompletableDeferred<Unit>()
+            val allCallersReachedManager = CompletableDeferred<Unit>()
+            val allowRefreshToFinish = CompletableDeferred<Unit>()
+            val invocationCount = AtomicInteger(0)
+            val clockCalls = AtomicInteger(0)
+            val refreshService = object : OAuthRefreshService {
+                override suspend fun refresh(refreshToken: String): OAuthRefreshResult {
+                    invocationCount.incrementAndGet()
+                    refreshStarted.complete(Unit)
+                    allowRefreshToFinish.await()
+                    return OAuthRefreshResult.Success("new_access", 3600)
                 }
             }
+            val manager = OAuthTokenManager(authManager, refreshService) {
+                if (clockCalls.incrementAndGet() == 11) {
+                    allCallersReachedManager.complete(Unit)
+                }
+                now()
+            }
 
-            launched.awaitAll()
-            startTogether.complete(Unit)
-            refreshStarted.await()
-            repeat(10) { yield() }
-            allowRefreshToFinish.complete(Unit)
+            coroutineScope {
+                val startTogether = CompletableDeferred<Unit>()
+                val allReady = CompletableDeferred<Unit>()
+                val readyCount = AtomicInteger(0)
+                val deferred = List(10) {
+                    async {
+                        if (readyCount.incrementAndGet() == 10) {
+                            allReady.complete(Unit)
+                        }
+                        startTogether.await()
+                        manager.ensureFreshToken()
+                    }
+                }
 
-            val results = deferred.awaitAll()
-            val available = results.filterIsInstance<OAuthTokenResult.Available>()
-            assertEquals("All 10 calls must return Available", 10, available.size)
-            assertTrue("All calls must receive the refreshed token", available.all {
-                it.tokens.accessToken == "new_access"
-            })
-            val refreshedCount = available.count { it.refreshed }
-            assertEquals("Exactly 1 call should report refreshed", 1, refreshedCount)
+                allReady.await()
+                startTogether.complete(Unit)
+                refreshStarted.await()
+                allCallersReachedManager.await()
+                allowRefreshToFinish.complete(Unit)
+
+                val results = deferred.awaitAll()
+                val available = results.filterIsInstance<OAuthTokenResult.Available>()
+                assertEquals("All 10 calls must return Available", 10, available.size)
+                assertTrue("All calls must receive the refreshed token", available.all {
+                    it.tokens.accessToken == "new_access"
+                })
+                val refreshedCount = available.count { it.refreshed }
+                assertEquals("Exactly 1 call should report refreshed", 1, refreshedCount)
+            }
+
+            assertEquals("Exactly 1 OAuth request", 1, invocationCount.get())
         }
-
-        assertEquals("Exactly 1 OAuth request", 1, invocationCount.get())
     }
 
     @Test
@@ -334,5 +350,119 @@ class OAuthTokenManagerTest {
             result
         )
         assertNotNull("Tokens must not be deleted", authManager.getTokens())
+    }
+
+    // ── Latch & Reauthentication Events (Fase 1C.2) ────────────────────
+
+    @Test
+    fun `ten concurrent invalid_grant produce one OAuth call and one event`() = runBlocking {
+        withTimeout(5_000L) {
+            authManager.saveTokens(OAuthTokens("access", "refresh", now() + 60_000L))
+            val callCount = AtomicInteger(0)
+            val clockCalls = AtomicInteger(0)
+            val refreshStarted = CompletableDeferred<Unit>()
+            val allCallersReachedManager = CompletableDeferred<Unit>()
+            val allowFinish = CompletableDeferred<Unit>()
+            val refreshService = object : OAuthRefreshService {
+                override suspend fun refresh(refreshToken: String): OAuthRefreshResult {
+                    callCount.incrementAndGet()
+                    refreshStarted.complete(Unit)
+                    allowFinish.await()
+                    return OAuthRefreshResult.ReauthenticationRequired
+                }
+            }
+            val manager = OAuthTokenManager(authManager, refreshService) {
+                if (clockCalls.incrementAndGet() == 11) {
+                    allCallersReachedManager.complete(Unit)
+                }
+                now()
+            }
+            val eventCount = AtomicInteger(0)
+            val eventReceived = CompletableDeferred<Unit>()
+            val collectJob = launch(start = CoroutineStart.UNDISPATCHED) {
+                manager.reauthenticationEvents.collect {
+                    eventCount.incrementAndGet()
+                    eventReceived.complete(Unit)
+                }
+            }
+
+            coroutineScope {
+                val start = CompletableDeferred<Unit>()
+                val allReady = CompletableDeferred<Unit>()
+                val readyCount = AtomicInteger(0)
+                val jobs = List(10) {
+                    async {
+                        if (readyCount.incrementAndGet() == 10) {
+                            allReady.complete(Unit)
+                        }
+                        start.await()
+                        manager.ensureFreshToken()
+                    }
+                }
+                allReady.await()
+                start.complete(Unit)
+                refreshStarted.await()
+                allCallersReachedManager.await()
+                allowFinish.complete(Unit)
+                val results = jobs.awaitAll()
+                assertTrue(results.all { it is OAuthTokenResult.ReauthenticationRequired })
+            }
+            eventReceived.await()
+            collectJob.cancel()
+            collectJob.join()
+
+            assertEquals("Solo una llamada OAuth", 1, callCount.get())
+            assertEquals("Solo un evento de reautenticación", 1, eventCount.get())
+            assertTrue(manager.isReauthenticationPending)
+            assertNotNull("Las credenciales se conservan hasta la invalidación", authManager.getTokens())
+        }
+    }
+
+    @Test
+    fun `reset is serialized - late ReauthRequired does not override reset`() = runBlocking {
+        authManager.saveTokens(OAuthTokens("access", "refresh", now() + 60_000L))
+        val blockRefresh = CompletableDeferred<Unit>()
+        val refreshStarted = CompletableDeferred<Unit>()
+        val callCount = AtomicInteger(0)
+        val refreshService = object : OAuthRefreshService {
+            override suspend fun refresh(refreshToken: String): OAuthRefreshResult {
+                val c = callCount.incrementAndGet()
+                if (c == 1) {
+                    refreshStarted.complete(Unit)
+                    blockRefresh.await()
+                }
+                return OAuthRefreshResult.ReauthenticationRequired
+            }
+        }
+        val manager = OAuthTokenManager(authManager, refreshService, ::now)
+        // Start a refresh that will block inside the mutex
+        val refreshJob = async { manager.ensureFreshToken() }
+        refreshStarted.await()
+        // Reset while refresh is blocked — must wait for the mutex
+        val resetJob = async(start = CoroutineStart.UNDISPATCHED) {
+            manager.resetReauthenticationLatch()
+        }
+        // Unblock the refresh
+        blockRefresh.complete(Unit)
+        refreshJob.await()
+        resetJob.await()
+        // Reset acquired mutex after refresh finished, so latch is now false
+        assertFalse("Latch debe estar limpio tras el reset", manager.isReauthenticationPending)
+    }
+
+    @Test
+    fun `transient failures do not emit reauthentication events`() = runBlocking {
+        authManager.saveTokens(OAuthTokens("access", "refresh", now() + 60_000L))
+        val refreshService = FakeOAuthRefreshService(List(5) { OAuthRefreshResult.TransientFailure })
+        val manager = OAuthTokenManager(authManager, refreshService, ::now)
+        val events = mutableListOf<Unit>()
+        val job = launch(start = CoroutineStart.UNDISPATCHED) {
+            manager.reauthenticationEvents.collect { events.add(it) }
+        }
+        repeat(3) { manager.ensureFreshToken() }
+        job.cancel()
+        job.join()
+        assertEquals("Transitorios no emiten eventos", 0, events.size)
+        assertFalse(manager.isReauthenticationPending)
     }
 }

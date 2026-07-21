@@ -229,6 +229,7 @@ class GmailAuthClient(
                 expiresAtEpochMillis = calculateExpiresAtEpochMillis(expiresIn)
             )
             authManager.saveTokens(tokens)
+            tokenManager.resetReauthenticationLatch()
             tokens
         } finally {
             client.close()
@@ -241,20 +242,6 @@ class GmailAuthClient(
     }
 
     // ── Token lifecycle ────────────────────────────────────────
-
-    /**
-     * Refresh the access token using [OAuthTokenManager.forceRefresh].
-     * Always delegates — no direct HTTP call.
-     *
-     * @return The new access token on success, or null if the token could not
-     *   be refreshed (transient error, reauthentication required, or no session).
-     */
-    suspend fun refreshAccessToken(): String? {
-        return when (val result = tokenManager.forceRefresh()) {
-            is OAuthTokenResult.Available -> result.tokens.accessToken
-            else -> null
-        }
-    }
 
     suspend fun isSignedIn(): Boolean = authManager.isAuthenticated()
 
