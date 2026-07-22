@@ -46,8 +46,21 @@ sealed interface OAuthTokenResult {
 class OAuthTokenManager(
     private val authManager: AuthManager,
     private val refreshService: OAuthRefreshService,
+    private val lifecycleLogger: (String) -> Unit = {},
     private val nowEpochMillis: () -> Long = { System.currentTimeMillis() }
 ) {
+    /** Preserves the original three-argument clock-injection API. */
+    constructor(
+        authManager: AuthManager,
+        refreshService: OAuthRefreshService,
+        nowEpochMillis: () -> Long
+    ) : this(
+        authManager = authManager,
+        refreshService = refreshService,
+        lifecycleLogger = {},
+        nowEpochMillis = nowEpochMillis
+    )
+
     /** 5-minute margin: within this window the token is considered "about to expire". */
     private val refreshMutex = Mutex()
 
@@ -69,6 +82,15 @@ class OAuthTokenManager(
     }
 
     suspend fun loadTokens(): OAuthTokens? = authManager.getTokens()
+
+    /** Emits a non-sensitive lifecycle event without allowing diagnostics to affect auth. */
+    internal fun traceLifecycle(event: String) {
+        try {
+            lifecycleLogger(event)
+        } catch (_: Exception) {
+            // Diagnostics must never change OAuth behavior.
+        }
+    }
 
     companion object {
         private const val REFRESH_MARGIN_MS = 300_000L
@@ -181,9 +203,12 @@ class OAuthTokenManager(
         tokens: OAuthTokens,
         forceTransientFailure: Boolean
     ): OAuthTokenResult {
+        val trigger = if (forceTransientFailure) "http_401" else "proactive"
+        traceLifecycle("refresh_started trigger=$trigger")
         val refreshResult = try {
             refreshService.refresh(tokens.refreshToken)
         } catch (e: CancellationException) {
+            traceLifecycle("refresh_cancelled trigger=$trigger")
             throw e
         } catch (_: Exception) {
             OAuthRefreshResult.TransientFailure
@@ -198,11 +223,18 @@ class OAuthTokenManager(
                 )
                 // Persist the updated tokens (keeps the existing refresh token)
                 authManager.saveTokens(updatedTokens)
+                traceLifecycle("refresh_succeeded trigger=$trigger")
                 OAuthTokenResult.Available(updatedTokens, refreshed = true)
             }
 
             is OAuthRefreshResult.TransientFailure -> {
-                if (forceTransientFailure || nowEpochMillis() >= tokens.expiresAtEpochMillis) {
+                val accessTokenUsable = !forceTransientFailure &&
+                    nowEpochMillis() < tokens.expiresAtEpochMillis
+                traceLifecycle(
+                    "refresh_transient trigger=$trigger " +
+                        "session_preserved=true access_token_usable=$accessTokenUsable"
+                )
+                if (!accessTokenUsable) {
                     OAuthTokenResult.TemporarilyUnavailable
                 } else {
                     OAuthTokenResult.Available(tokens, refreshed = false)
@@ -214,6 +246,7 @@ class OAuthTokenManager(
                 if (isReauthPending.compareAndSet(false, true)) {
                     reauthChannel.trySend(Unit)
                 }
+                traceLifecycle("reauthentication_required trigger=$trigger")
                 // Propagate without deleting tokens
                 OAuthTokenResult.ReauthenticationRequired
             }

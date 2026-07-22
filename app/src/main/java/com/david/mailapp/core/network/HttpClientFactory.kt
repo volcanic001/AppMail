@@ -1,5 +1,6 @@
 package com.david.mailapp.core.network
 
+import com.david.mailapp.BuildConfig
 import com.david.mailapp.core.auth.OAuthTokenManager
 import com.david.mailapp.core.auth.OAuthTokenResult
 import io.ktor.client.HttpClient
@@ -14,8 +15,10 @@ import io.ktor.client.plugins.auth.providers.bearer
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.plugins.logging.LogLevel
+import io.ktor.client.plugins.logging.Logger
 import io.ktor.client.plugins.logging.Logging
 import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
 import io.ktor.http.URLProtocol
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
@@ -40,7 +43,8 @@ object HttpClientFactory {
 
     fun createGmailClient(
         tokenManager: OAuthTokenManager,
-        engine: HttpClientEngine = CIO.create()
+        engine: HttpClientEngine = CIO.create(),
+        networkLogger: Logger? = null
     ): HttpClient {
 
         val freshnessPlugin = createClientPlugin("OAuthFreshnessPlugin") {
@@ -54,6 +58,12 @@ object HttpClientFactory {
                                     this@createClientPlugin.client
                                         .authProvider<BearerAuthProvider>()
                                         ?.clearToken()
+                                    tokenManager.traceLifecycle(
+                                        "bearer_cache_cleared trigger=proactive"
+                                    )
+                                    tokenManager.traceLifecycle(
+                                        "gmail_request_continues_after_refresh trigger=proactive"
+                                    )
                                 }
                             }
                             is OAuthTokenResult.TemporarilyUnavailable,
@@ -98,6 +108,10 @@ object HttpClientFactory {
                         if (isTrustedGmailRequest(req.url.host, req.url.protocol)) {
                             val r = tokenManager.forceRefresh(oldTokens?.accessToken)
                             if (r is OAuthTokenResult.Available) {
+                                tokenManager.traceLifecycle(
+                                    "gmail_retry_authorized trigger=http_401 " +
+                                        "token_source=${if (r.refreshed) "renewed" else "concurrent_refresh"}"
+                                )
                                 BearerTokens(r.tokens.accessToken, r.tokens.refreshToken)
                             } else null
                         } else null
@@ -106,7 +120,11 @@ object HttpClientFactory {
             }
 
             install(Logging) {
-                level = LogLevel.HEADERS
+                if (networkLogger != null) {
+                    logger = networkLogger
+                }
+                level = if (BuildConfig.DEBUG) LogLevel.HEADERS else LogLevel.NONE
+                sanitizeHeader { header -> header == HttpHeaders.Authorization }
             }
         }
     }

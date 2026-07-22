@@ -10,6 +10,7 @@ import com.david.mailapp.core.auth.OAuthTokens
 import com.david.mailapp.core.security.FakeSecretCipher
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
+import io.ktor.client.plugins.logging.Logger
 import io.ktor.client.request.get
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
@@ -353,5 +354,35 @@ class HttpClientIntegrationTest {
             assertEquals("Exactamente 3 peticiones", 3, requestCount.get())
             assertEquals("Cero renovaciones", 0, oauthCalls.get())
         }
+    }
+
+    @Test
+    fun `ktor header logging redacts authorization token`() = runBlocking {
+        val accessToken = "sensitive_authorization_marker"
+        authManager.saveTokens(OAuthTokens(accessToken, "refresh", now() + 600_000L))
+        val tokenManager = OAuthTokenManager(
+            authManager,
+            FakeOAuthRefreshService(emptyList()),
+            ::now
+        )
+        val logMessages = mutableListOf<String>()
+        val logger = object : Logger {
+            override fun log(message: String) {
+                logMessages.add(message)
+            }
+        }
+        val engine = MockEngine { mockOk() }
+
+        HttpClientFactory.createGmailClient(tokenManager, engine, logger).use { client ->
+            client.get(gmailUrl())
+        }
+
+        val output = logMessages.joinToString("\n")
+        assertTrue("El logger debe recibir la traza HTTP en debug", output.isNotEmpty())
+        assertTrue(
+            "La traza debe conservar el nombre del header para diagnóstico",
+            output.contains("Authorization", ignoreCase = true)
+        )
+        assertFalse("El access token nunca debe aparecer en logs", output.contains(accessToken))
     }
 }

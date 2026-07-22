@@ -1,5 +1,6 @@
 package com.david.mailapp.core.di
 
+import com.david.mailapp.core.auth.OAuthRevocationService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
@@ -15,17 +16,29 @@ import java.util.concurrent.atomic.AtomicBoolean
  * If the manual logout already cleared credentials, automatic invalidation is a no-op.
  * Credentials are always cleared in a non-cancellable block.
  */
-class SessionCoordinator(
+class SessionCoordinator internal constructor(
     private val clearProvider: suspend () -> Unit,
     private val clearDatabase: suspend () -> Unit,
     private val clearPdfCache: () -> Unit,
     private val clearSearchHistory: suspend () -> Unit,
     private val clearCredentials: suspend () -> Unit,
     private val isAuthenticated: suspend () -> Boolean,
-    private val reactivateProvider: suspend () -> Unit
+    private val reactivateProvider: suspend () -> Unit,
+    private val readRefreshToken: suspend () -> String? = { null },
+    private val revocationService: OAuthRevocationService? = null,
+    private val revocationTimeoutMillis: Long = DEFAULT_REVOCATION_TIMEOUT_MS
 ) {
+    init {
+        require(revocationTimeoutMillis > 0L) { "Revocation timeout must be positive" }
+    }
+
     internal val terminationMutex = Mutex()
     private val isManualSigningOut = AtomicBoolean(false)
+    private var credentialsCommitted = false
+
+    private companion object {
+        private const val DEFAULT_REVOCATION_TIMEOUT_MS = 3_000L
+    }
 
     sealed interface SignOutResult {
         data object Success : SignOutResult
@@ -50,20 +63,71 @@ class SessionCoordinator(
         }
         return try {
             terminationMutex.withLock {
+                if (credentialsCommitted) {
+                    val isAuth = try {
+                        isAuthenticated()
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        true
+                    }
+                    if (!isAuth) {
+                        return@withLock SignOutResult.Success
+                    }
+                    credentialsCommitted = false
+                }
+
                 try {
                     clearProvider()
                     withContext(Dispatchers.IO) { clearDatabase() }
                     clearPdfCache()
                     clearSearchHistory()
-                    clearCredentials()
+
+                    val refreshToken = try {
+                        readRefreshToken()
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        null
+                    }
+
+                    withContext(NonCancellable) {
+                        clearCredentials()
+                        credentialsCommitted = true
+
+                        if (!refreshToken.isNullOrBlank() && revocationService != null) {
+                            try {
+                                kotlinx.coroutines.withTimeout(revocationTimeoutMillis) {
+                                    revocationService.revoke(refreshToken)
+                                }
+                            } catch (e: Exception) {
+                                // Ignore all exceptions, including timeouts
+                            }
+                        }
+                    }
                     SignOutResult.Success
-                } catch (_: Exception) {
-                    reactivateProvider()
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    safeReactivateProvider()
+                    throw e
+                } catch (e: Exception) {
+                    safeReactivateProvider()
                     SignOutResult.Failed("No se pudo cerrar sesión. Inténtalo nuevamente.")
                 }
             }
         } finally {
             isManualSigningOut.set(false)
+        }
+    }
+
+    private suspend fun safeReactivateProvider() {
+        if (!credentialsCommitted) {
+            withContext(NonCancellable) {
+                try {
+                    reactivateProvider()
+                } catch (e: Exception) {
+                    // Ignore
+                }
+            }
         }
     }
 
@@ -82,6 +146,7 @@ class SessionCoordinator(
                 }
 
                 if (!isAuth) return@withLock InvalidationResult.AlreadySignedOut
+                credentialsCommitted = false
 
                 credentialsMustBeCleared = true
 
@@ -124,6 +189,7 @@ class SessionCoordinator(
                 if (credentialsMustBeCleared) {
                     withContext(NonCancellable) {
                         clearCredentials()
+                        credentialsCommitted = true
                     }
                 }
             }

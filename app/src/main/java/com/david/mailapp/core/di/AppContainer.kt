@@ -1,10 +1,12 @@
 package com.david.mailapp.core.di
 
 import android.content.Context
+import android.util.Log
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.preferencesDataStore
+import com.david.mailapp.BuildConfig
 import com.david.mailapp.core.auth.AuthManager
 import com.david.mailapp.core.auth.GmailAuthClient
 import com.david.mailapp.core.network.HttpClientFactory
@@ -51,7 +53,15 @@ object AppContainer {
     }
 
     val oauthTokenManager: com.david.mailapp.core.auth.OAuthTokenManager by lazy {
-        com.david.mailapp.core.auth.OAuthTokenManager(authManager, googleOAuthTokenService)
+        com.david.mailapp.core.auth.OAuthTokenManager(
+            authManager = authManager,
+            refreshService = googleOAuthTokenService,
+            lifecycleLogger = { event ->
+                if (BuildConfig.DEBUG) {
+                    Log.d("OAuthLifecycle", event)
+                }
+            }
+        )
     }
 
     val appSettingsManager: com.david.mailapp.core.settings.AppSettingsManager by lazy {

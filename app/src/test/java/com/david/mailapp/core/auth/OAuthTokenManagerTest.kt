@@ -97,6 +97,38 @@ class OAuthTokenManagerTest {
     }
 
     @Test
+    fun `proactive refresh emits safe lifecycle events without token values`() = runBlocking {
+        val accessToken = "sensitive_access_marker"
+        val refreshToken = "sensitive_refresh_marker"
+        val renewedToken = "sensitive_renewed_marker"
+        authManager.saveTokens(OAuthTokens(accessToken, refreshToken, now() + 60_000L))
+        val events = mutableListOf<String>()
+        val manager = OAuthTokenManager(
+            authManager = authManager,
+            refreshService = FakeOAuthRefreshService(
+                listOf(OAuthRefreshResult.Success(renewedToken, 3600))
+            ),
+            nowEpochMillis = ::now,
+            lifecycleLogger = events::add
+        )
+
+        val result = manager.ensureFreshToken()
+
+        assertTrue(result is OAuthTokenResult.Available)
+        assertEquals(
+            listOf(
+                "refresh_started trigger=proactive",
+                "refresh_succeeded trigger=proactive"
+            ),
+            events
+        )
+        val output = events.joinToString("\n")
+        assertFalse(output.contains(accessToken))
+        assertFalse(output.contains(refreshToken))
+        assertFalse(output.contains(renewedToken))
+    }
+
+    @Test
     fun `expired token triggers refresh`() = runBlocking {
         authManager.saveTokens(OAuthTokens("old_access", "refresh", now() - 60_000L))
         val refreshService = FakeOAuthRefreshService(listOf(
