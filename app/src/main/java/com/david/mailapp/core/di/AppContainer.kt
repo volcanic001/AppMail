@@ -9,6 +9,8 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.david.mailapp.BuildConfig
 import com.david.mailapp.core.auth.AuthManager
 import com.david.mailapp.core.auth.GmailAuthClient
+import com.david.mailapp.core.auth.GoogleOAuthRevocationService
+import com.david.mailapp.core.auth.OAuthRevocationService
 import com.david.mailapp.core.network.HttpClientFactory
 import com.david.mailapp.data.local.MailDatabase
 import com.david.mailapp.data.pdf.PdfCacheManager
@@ -46,6 +48,10 @@ object AppContainer {
 
     val authManager: AuthManager by lazy {
         AuthManager(appContext)
+    }
+
+    internal val googleOAuthRevocationService: OAuthRevocationService by lazy {
+        GoogleOAuthRevocationService()
     }
 
     val googleOAuthTokenService: com.david.mailapp.core.auth.GoogleOAuthTokenService by lazy {
@@ -124,7 +130,9 @@ object AppContainer {
             clearSearchHistory = { searchHistoryStore.edit { it.clear() } },
             clearCredentials = { authClient.signOut() },
             isAuthenticated = { authManager.isAuthenticated() },
-            reactivateProvider = ::activateProvider
+            reactivateProvider = ::activateProvider,
+            readRefreshToken = { authManager.getRefreshToken() },
+            revocationService = googleOAuthRevocationService
         )
     }
 
