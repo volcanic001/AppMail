@@ -5,6 +5,11 @@ import java.io.File
 import java.io.IOException
 import java.security.MessageDigest
 
+sealed interface PdfCacheClearResult {
+    data object Success : PdfCacheClearResult
+    data class Failure(val errors: List<String>) : PdfCacheClearResult
+}
+
 /**
  * Almacenamiento local de PDFs descargados en [cacheDir]/pdf_attachments/.
  *
@@ -17,7 +22,10 @@ import java.security.MessageDigest
  * La escritura es atómica: se escribe a un archivo .tmp y se renombra.
  * En caso de error, el .tmp se elimina.
  */
-class PdfCacheManager(private val cacheDir: File) {
+class PdfCacheManager(
+    private val cacheDir: File,
+    private val deleteFile: (File) -> Boolean = { it.delete() }
+) {
 
     private val pdfDir = File(cacheDir, "pdf_attachments")
 
@@ -66,27 +74,31 @@ class PdfCacheManager(private val cacheDir: File) {
      * Elimina todos los archivos .pdf y .tmp dentro de [pdfDir].
      * No elimina [pdfDir] ni archivos fuera de él.
      * No toca PDFs guardados mediante Storage Access Framework (fuera de cacheDir).
-     *
-     * @return lista de mensajes de error (vacía si todo se eliminó correctamente).
-     *         Los errores no interrumpen la operación — se reportan y continúa.
      */
-    fun clearAll(): List<String> {
-        if (!pdfDir.exists()) return emptyList()
+    fun clearAll(): PdfCacheClearResult {
+        if (!pdfDir.exists()) return PdfCacheClearResult.Success
 
         val errors = mutableListOf<String>()
-        val files = pdfDir.listFiles() ?: return emptyList()
+        val files = pdfDir.listFiles()
+        if (files == null) {
+            return PdfCacheClearResult.Failure(listOf("Could not list files in ${pdfDir.absolutePath}"))
+        }
 
         for (file in files) {
             if (!file.isFile) continue
             val name = file.name
             if (!name.endsWith(".pdf") && !name.endsWith(".tmp")) continue
-            if (!file.delete()) {
+            if (!deleteFile(file) && file.exists()) {
                 val msg = "Could not delete ${file.absolutePath}"
                 Log.w(TAG, msg)
                 errors.add(msg)
             }
         }
-        return errors
+        return if (errors.isEmpty()) {
+            PdfCacheClearResult.Success
+        } else {
+            PdfCacheClearResult.Failure(errors)
+        }
     }
 
     // ── Internal ──────────────────────────────────────────────

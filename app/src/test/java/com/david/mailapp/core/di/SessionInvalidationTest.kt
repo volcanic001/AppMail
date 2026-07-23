@@ -1,6 +1,8 @@
 package com.david.mailapp.core.di
 
 import com.david.mailapp.core.auth.OAuthRevocationService
+import com.david.mailapp.core.session.SessionWriteGuardImpl
+import com.david.mailapp.data.pdf.PdfCacheClearResult
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
@@ -35,17 +37,22 @@ class SessionInvalidationTest {
         onClearHistory: suspend () -> Unit = {},
         onClearCredentials: suspend () -> Unit = {},
         onReactivate: suspend () -> Unit = {},
+        pdfResult: PdfCacheClearResult = PdfCacheClearResult.Success,
         onReadRefreshToken: suspend () -> String? = { null },
         revocationService: OAuthRevocationService? = null,
         revocationTimeoutMillis: Long = 3_000L
     ): SessionCoordinator = SessionCoordinator(
         clearProvider = onClearProvider,
         clearDatabase = onClearDatabase,
-        clearPdfCache = onClearPdf,
+        clearPdfCache = {
+            onClearPdf()
+            pdfResult
+        },
         clearSearchHistory = onClearHistory,
         clearCredentials = onClearCredentials,
         isAuthenticated = { authenticatedRef[0] },
         reactivateProvider = onReactivate,
+        writeGuard = SessionWriteGuardImpl(),
         readRefreshToken = onReadRefreshToken,
         revocationService = revocationService,
         revocationTimeoutMillis = revocationTimeoutMillis
@@ -131,7 +138,10 @@ class SessionInvalidationTest {
         val coordinator = SessionCoordinator(
             clearProvider = { executed.add("provider") },
             clearDatabase = { executed.add("db") },
-            clearPdfCache = { executed.add("pdf") },
+            clearPdfCache = {
+                executed.add("pdf")
+                PdfCacheClearResult.Success
+            },
             clearSearchHistory = { executed.add("history") },
             clearCredentials = { credCount.incrementAndGet() },
             isAuthenticated = {
@@ -139,7 +149,8 @@ class SessionInvalidationTest {
                 blockAuth.await()
                 true
             },
-            reactivateProvider = { reactivateCount.incrementAndGet() }
+            reactivateProvider = { reactivateCount.incrementAndGet() },
+            writeGuard = SessionWriteGuardImpl()
         )
 
         val job = launch {
@@ -163,11 +174,12 @@ class SessionInvalidationTest {
         val coordinator = SessionCoordinator(
             clearProvider = {},
             clearDatabase = {},
-            clearPdfCache = {},
+            clearPdfCache = { PdfCacheClearResult.Success },
             clearSearchHistory = {},
             clearCredentials = { credCount.incrementAndGet() },
             isAuthenticated = { throw RuntimeException("auth check failed") },
-            reactivateProvider = {}
+            reactivateProvider = {},
+            writeGuard = SessionWriteGuardImpl()
         )
         val result = coordinator.invalidateExpiredSession()
         assertTrue(result is SessionCoordinator.InvalidationResult.Completed)
@@ -180,11 +192,12 @@ class SessionInvalidationTest {
         val coordinator = SessionCoordinator(
             clearProvider = {},
             clearDatabase = {},
-            clearPdfCache = {},
+            clearPdfCache = { PdfCacheClearResult.Success },
             clearSearchHistory = {},
             clearCredentials = { throw RuntimeException("credentials failed") },
             isAuthenticated = { true },
-            reactivateProvider = { reactivateCount.incrementAndGet() }
+            reactivateProvider = { reactivateCount.incrementAndGet() },
+            writeGuard = SessionWriteGuardImpl()
         )
         var exceptionThrown = false
         var result: SessionCoordinator.InvalidationResult? = null
@@ -206,10 +219,11 @@ class SessionInvalidationTest {
         val coordinator = SessionCoordinator(
             clearProvider = {},
             clearDatabase = { throw RuntimeException("db failed") },
-            clearPdfCache = {}, clearSearchHistory = {},
+            clearPdfCache = { PdfCacheClearResult.Success }, clearSearchHistory = {},
             clearCredentials = { credCount.incrementAndGet(); auth[0] = false },
             isAuthenticated = { auth[0] },
-            reactivateProvider = {}
+            reactivateProvider = {},
+            writeGuard = SessionWriteGuardImpl()
         )
         val result = coordinator.signOut()
         assertTrue(result is SessionCoordinator.SignOutResult.Failed)
@@ -234,10 +248,11 @@ class SessionInvalidationTest {
                     blockMutex.await()
                 }
             },
-            clearPdfCache = {}, clearSearchHistory = {},
+            clearPdfCache = { PdfCacheClearResult.Success }, clearSearchHistory = {},
             clearCredentials = { credCount.incrementAndGet(); auth = false },
             isAuthenticated = { auth },
-            reactivateProvider = {}
+            reactivateProvider = {},
+            writeGuard = SessionWriteGuardImpl()
         )
         val manual = async { coordinator.signOut() }
         enteredMutex.await() // Ensure manual has entered and holds mutex
@@ -260,11 +275,15 @@ class SessionInvalidationTest {
         val coordinator = SessionCoordinator(
             clearProvider = { executed.add("provider") },
             clearDatabase = { executed.add("db") },
-            clearPdfCache = { executed.add("pdf") },
+            clearPdfCache = {
+                executed.add("pdf")
+                PdfCacheClearResult.Success
+            },
             clearSearchHistory = { executed.add("history") },
             clearCredentials = { executed.add("credentials"); auth[0] = false },
             isAuthenticated = { auth[0] },
-            reactivateProvider = {}
+            reactivateProvider = {},
+            writeGuard = SessionWriteGuardImpl()
         )
         val signOutResult = coordinator.signOut()
         assertTrue(signOutResult is SessionCoordinator.SignOutResult.Success)
@@ -757,5 +776,70 @@ class SessionInvalidationTest {
         assertEquals(1, reactivateCount.get())
         assertEquals(0, credCount.get())
         assertEquals(0, fakeRevocation.revokeCount.get())
+    }
+
+    @Test
+    fun `manual logout reports PDF deletion failure and keeps credentials`() = runBlocking {
+        val credentialsCleared = AtomicInteger(0)
+        val reactivated = AtomicInteger(0)
+        val coordinator = makeCoordinator(
+            pdfResult = PdfCacheClearResult.Failure(listOf("delete failed")),
+            onClearCredentials = { credentialsCleared.incrementAndGet() },
+            onReactivate = { reactivated.incrementAndGet() }
+        )
+
+        val result = coordinator.signOut()
+
+        assertTrue(result is SessionCoordinator.SignOutResult.Failed)
+        assertEquals(0, credentialsCleared.get())
+        assertEquals(1, reactivated.get())
+    }
+
+    @Test
+    fun `automatic invalidation persists pending marker before PDF cleanup and keeps it on failure`() = runBlocking {
+        val order = mutableListOf<String>()
+        val markerValues = mutableListOf<Boolean>()
+        val coordinatorWithMarker = SessionCoordinator(
+            clearProvider = {},
+            clearDatabase = {},
+            clearPdfCache = {
+                order.add("pdf")
+                PdfCacheClearResult.Failure(listOf("delete failed"))
+            },
+            clearSearchHistory = {},
+            clearCredentials = { order.add("credentials") },
+            isAuthenticated = { true },
+            reactivateProvider = {},
+            writeGuard = SessionWriteGuardImpl(),
+            setPendingPdfCleanup = {
+                markerValues.add(it)
+                order.add("marker:$it")
+            }
+        )
+
+        coordinatorWithMarker.invalidateExpiredSession()
+
+        assertEquals(listOf("marker:true", "pdf", "credentials"), order)
+        assertEquals(listOf(true), markerValues)
+    }
+
+    @Test
+    fun `automatic invalidation clears pending marker after successful PDF cleanup`() = runBlocking {
+        val markerValues = mutableListOf<Boolean>()
+        val coordinator = SessionCoordinator(
+            clearProvider = {},
+            clearDatabase = {},
+            clearPdfCache = { PdfCacheClearResult.Success },
+            clearSearchHistory = {},
+            clearCredentials = {},
+            isAuthenticated = { true },
+            reactivateProvider = {},
+            writeGuard = SessionWriteGuardImpl(),
+            setPendingPdfCleanup = { markerValues.add(it) }
+        )
+
+        coordinator.invalidateExpiredSession()
+
+        assertEquals(listOf(true, false), markerValues)
     }
 }

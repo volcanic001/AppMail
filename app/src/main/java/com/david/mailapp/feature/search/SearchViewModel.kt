@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.david.mailapp.core.session.SessionWriteGuard
 import com.david.mailapp.data.repository.EmailRepository
 import com.david.mailapp.domain.model.Email
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,7 +24,8 @@ import kotlinx.coroutines.launch
 
 class SearchViewModel(
     private val repository: EmailRepository,
-    private val historyStore: DataStore<Preferences>
+    private val historyStore: DataStore<Preferences>,
+    private val writeGuard: SessionWriteGuard
 ) : ViewModel() {
 
     companion object {
@@ -69,6 +71,12 @@ class SearchViewModel(
                     _uiState.value = SearchUiState.Loading
 
                     flow {
+                        val lease = writeGuard.capture()
+                        if (lease == null) {
+                            emit(SearchUiState.Idle)
+                            return@flow
+                        }
+
                         try {
                             Log.d("SearchDebug", "[ViewModel] Calling repository.searchEmails('$query')...")
                             val result = repository.searchEmails(query)
@@ -89,7 +97,9 @@ class SearchViewModel(
                             emit(state)
 
                             // Save to history only on successful search
-                            saveToHistory(query)
+                            writeGuard.commit(lease) {
+                                saveToHistory(query)
+                            }
                         } catch (e: Exception) {
                             Log.e("SearchDebug", "[ViewModel] Exception searching for '$query': ${e.message}", e)
                             emit(
@@ -183,7 +193,10 @@ class SearchViewModel(
 
     fun clearHistory() {
         viewModelScope.launch {
-            historyStore.edit { it.remove(HISTORY_KEY) }
+            val lease = writeGuard.capture() ?: return@launch
+            writeGuard.commit(lease) {
+                historyStore.edit { it.remove(HISTORY_KEY) }
+            }
         }
     }
 
@@ -191,12 +204,13 @@ class SearchViewModel(
 
     class Factory(
         private val repository: EmailRepository,
-        private val historyStore: DataStore<Preferences>
+        private val historyStore: DataStore<Preferences>,
+        private val writeGuard: SessionWriteGuard
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(SearchViewModel::class.java)) {
-                return SearchViewModel(repository, historyStore) as T
+                return SearchViewModel(repository, historyStore, writeGuard) as T
             }
             throw IllegalArgumentException("Unknown ViewModel: ${modelClass.name}")
         }

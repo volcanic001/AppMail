@@ -209,9 +209,9 @@ class PdfCacheManagerTest {
         val strayTmp = File(pdfDir, "stray.tmp")
         strayTmp.writeBytes(pdfBytes(32))
 
-        val errors = cacheManager.clearAll()
+        val result = cacheManager.clearAll()
 
-        assertTrue("clearAll must report no errors", errors.isEmpty())
+        assertTrue("clearAll must report success", result is PdfCacheClearResult.Success)
         assertNull("msg_001/att_a must be gone", cacheManager.getCachedFile("msg_001", "att_a"))
         assertNull("msg_001/att_b must be gone", cacheManager.getCachedFile("msg_001", "att_b"))
         assertNull("msg_002/att_a must be gone", cacheManager.getCachedFile("msg_002", "att_a"))
@@ -261,9 +261,9 @@ class PdfCacheManagerTest {
     fun `clearAll returns empty list when pdfDir does not exist`() {
         pdfDirDoesNotExist()
 
-        val errors = cacheManager.clearAll()
+        val result = cacheManager.clearAll()
 
-        assertTrue("clearAll must return empty list when pdfDir is missing", errors.isEmpty())
+        assertTrue("clearAll must succeed when pdfDir is missing", result is PdfCacheClearResult.Success)
     }
 
     @Test
@@ -271,9 +271,32 @@ class PdfCacheManagerTest {
         val pdfDir = File(tempDir, "pdf_attachments")
         pdfDir.mkdirs()
 
-        val errors = cacheManager.clearAll()
+        val result = cacheManager.clearAll()
 
-        assertTrue("clearAll must return empty list on empty dir", errors.isEmpty())
+        assertTrue("clearAll must succeed on empty dir", result is PdfCacheClearResult.Success)
+    }
+
+    @Test
+    fun `clearAll reports failure when cache path cannot be listed`() {
+        val pdfPath = File(tempDir, "pdf_attachments")
+        pdfPath.writeText("not a directory")
+
+        val result = cacheManager.clearAll()
+
+        assertTrue(result is PdfCacheClearResult.Failure)
+        assertTrue((result as PdfCacheClearResult.Failure).errors.isNotEmpty())
+    }
+
+    @Test
+    fun `clearAll reports every file that could not be deleted`() {
+        cacheManager.store("msg_001", "att_a", pdfBytes(64))
+        val failingManager = PdfCacheManager(tempDir, deleteFile = { false })
+
+        val result = failingManager.clearAll()
+
+        assertTrue(result is PdfCacheClearResult.Failure)
+        assertEquals(1, (result as PdfCacheClearResult.Failure).errors.size)
+        assertNotNull(failingManager.getCachedFile("msg_001", "att_a"))
     }
 
     // ── Helpers ──────────────────────────────────────────────────

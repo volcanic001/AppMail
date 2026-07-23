@@ -15,6 +15,7 @@ import com.david.mailapp.domain.model.Email
 import com.david.mailapp.domain.model.EmailFolder
 import com.david.mailapp.domain.model.PaginatedResult
 import com.david.mailapp.domain.model.PdfAttachmentMetadata
+import com.david.mailapp.core.session.SessionWriteGuard
 import com.david.mailapp.feature.emaildetail.components.EmailHtmlCleaner
 import java.io.File
 import java.io.FileInputStream
@@ -40,7 +41,8 @@ private fun repoNow() = SystemClock.elapsedRealtime()
 class EmailRepository(
     private val database: MailDatabase,
     private val providerFactory: () -> EmailProvider?,
-    private val pdfCacheManager: PdfCacheManager
+    private val pdfCacheManager: PdfCacheManager,
+    private val writeGuard: SessionWriteGuard
 ) {
     private val dao = database.emailDao()
 
@@ -69,28 +71,34 @@ class EmailRepository(
 
     /** Fetch from provider and persist to Room. Returns the paginated result for UI pagination. */
     suspend fun refreshInbox(pageToken: String? = null): PaginatedResult<Email> {
+        val lease = writeGuard.capture() ?: return PaginatedResult(emptyList(), null)
         val p = provider ?: return PaginatedResult(emptyList(), null)
         val result = p.fetchInbox(pageToken)
 
         val entities = result.items.map { EmailEntity.fromDomain(it, EmailFolder.Inbox) }
-        if (pageToken == null) {
-            dao.replaceFolder("inbox", entities)
-        } else {
-            dao.upsertPreservingBodies(entities)
+        writeGuard.commit(lease) {
+            if (pageToken == null) {
+                dao.replaceFolder("inbox", entities)
+            } else {
+                dao.upsertPreservingBodies(entities)
+            }
         }
 
         return result
     }
 
     suspend fun refreshTrash(pageToken: String? = null): PaginatedResult<Email> {
+        val lease = writeGuard.capture() ?: return PaginatedResult(emptyList(), null)
         val p = provider ?: return PaginatedResult(emptyList(), null)
         val result = p.fetchTrash(pageToken)
 
         val entities = result.items.map { EmailEntity.fromDomain(it, EmailFolder.Trash) }
-        if (pageToken == null) {
-            dao.replaceFolder("trash", entities)
-        } else {
-            dao.upsertPreservingBodies(entities)
+        writeGuard.commit(lease) {
+            if (pageToken == null) {
+                dao.replaceFolder("trash", entities)
+            } else {
+                dao.upsertPreservingBodies(entities)
+            }
         }
 
         return result
@@ -106,23 +114,51 @@ class EmailRepository(
     }
 
     suspend fun moveToTrash(emailId: String) {
-        dao.moveToFolder(emailId, "trash")
-        try { provider?.moveToTrash(emailId) } catch (_: Exception) {}
+        val lease = writeGuard.capture() ?: return
+        val currentProvider = provider
+        val committed = writeGuard.commit(lease) {
+            dao.moveToFolder(emailId, "trash")
+            true
+        } ?: false
+        if (committed) {
+            try { currentProvider?.moveToTrash(emailId) } catch (_: Exception) {}
+        }
     }
 
     suspend fun restoreFromTrash(emailId: String) {
-        dao.moveToFolder(emailId, "inbox")
-        try { provider?.restoreFromTrash(emailId) } catch (_: Exception) {}
+        val lease = writeGuard.capture() ?: return
+        val currentProvider = provider
+        val committed = writeGuard.commit(lease) {
+            dao.moveToFolder(emailId, "inbox")
+            true
+        } ?: false
+        if (committed) {
+            try { currentProvider?.restoreFromTrash(emailId) } catch (_: Exception) {}
+        }
     }
 
     suspend fun deletePermanently(emailId: String) {
-        dao.deleteById(emailId)
-        try { provider?.deletePermanently(emailId) } catch (_: Exception) {}
+        val lease = writeGuard.capture() ?: return
+        val currentProvider = provider
+        val committed = writeGuard.commit(lease) {
+            dao.deleteById(emailId)
+            true
+        } ?: false
+        if (committed) {
+            try { currentProvider?.deletePermanently(emailId) } catch (_: Exception) {}
+        }
     }
 
     suspend fun markAsRead(emailId: String) {
-        dao.updateReadStatus(emailId, isRead = true)
-        try { provider?.markAsRead(emailId) } catch (_: Exception) {}
+        val lease = writeGuard.capture() ?: return
+        val currentProvider = provider
+        val committed = writeGuard.commit(lease) {
+            dao.updateReadStatus(emailId, isRead = true)
+            true
+        } ?: false
+        if (committed) {
+            try { currentProvider?.markAsRead(emailId) } catch (_: Exception) {}
+        }
     }
 
     /** Fetch the full HTML body along with inline image refs and PDF metadata from the provider,
@@ -131,6 +167,10 @@ class EmailRepository(
         // DEBUG_PERF
         val t0 = repoNow()
         Log.d(REPO_TAG, "[REPO_BODY] START emailId=$emailId")
+        val lease = writeGuard.capture() ?: run {
+            Log.d(REPO_TAG, "[REPO_BODY] GUARD_INVALIDATED emailId=$emailId")
+            return null
+        }
         val result = provider?.fetchBodyWithRefs(emailId) ?: run {
             Log.d(REPO_TAG, "[REPO_BODY] NO_PROVIDER_OR_FAILED emailId=$emailId")
             return null
@@ -149,13 +189,15 @@ class EmailRepository(
         val pdfJson = PdfAttachmentMetadataCodec.encode(result.pdfAttachments)
         val hasAtt = result.pdfAttachments.isNotEmpty()
 
-        dao.updateBodyAndPdfMetadata(
-            emailId = emailId,
-            body = rawBody,
-            cleanBody = cleanBody,
-            pdfAttachmentsJson = pdfJson,
-            hasAttachments = hasAtt
-        )
+        writeGuard.commit(lease) {
+            dao.updateBodyAndPdfMetadata(
+                emailId = emailId,
+                body = rawBody,
+                cleanBody = cleanBody,
+                pdfAttachmentsJson = pdfJson,
+                hasAttachments = hasAtt
+            )
+        }
         Log.d(REPO_TAG, "[REPO_BODY] CACHED emailId=$emailId roomMs=${repoNow() - tFetch} totalMs=${repoNow() - t0}")
         return result
     }
@@ -229,6 +271,11 @@ class EmailRepository(
             return PdfDownloadState.Error(PdfDownloadFailure.TOO_LARGE)
         }
 
+        // Capture before any cache mutation or network request. A lease obtained
+        // after the download could belong to a different, newly signed-in account.
+        val lease = writeGuard.capture()
+            ?: return PdfDownloadState.Error(PdfDownloadFailure.NO_PROVIDER)
+
         // ── Cache check ─────────────────────────────────────────
         val stableId = metadata.stableId
         val cachedFile = pdfCacheManager.getCachedFile(emailId, stableId)
@@ -241,8 +288,14 @@ class EmailRepository(
         if (cachedFile != null) {
             Log.d(REPO_TAG, "[PDF_DOWNLOAD] CACHE_INVALID removing emailId=$emailId " +
                 "attachmentId=${metadata.attachmentId}")
-            cachedFile.delete()
-            pdfCacheManager.delete(emailId, stableId)
+            val removed = writeGuard.commit(lease) {
+                cachedFile.delete()
+                pdfCacheManager.delete(emailId, stableId)
+                true
+            } ?: false
+            if (!removed) {
+                return PdfDownloadState.Error(PdfDownloadFailure.NO_PROVIDER)
+            }
         }
 
         // ── Download ────────────────────────────────────────────
@@ -283,7 +336,8 @@ class EmailRepository(
 
         // ── Store ───────────────────────────────────────────────
         return try {
-            val file = pdfCacheManager.store(emailId, stableId, bytes)
+            val file = writeGuard.commit(lease) { pdfCacheManager.store(emailId, stableId, bytes) }
+                ?: return PdfDownloadState.Error(PdfDownloadFailure.NO_PROVIDER)
             Log.d(REPO_TAG, "[PDF_DOWNLOAD] SUCCESS emailId=$emailId " +
                 "attachmentId=${metadata.attachmentId} size=${file.length()}")
             PdfDownloadState.Ready(file.length())

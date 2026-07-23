@@ -1,6 +1,8 @@
 package com.david.mailapp.core.di
 
 import com.david.mailapp.core.auth.OAuthRevocationService
+import com.david.mailapp.core.session.SessionWriteGuard
+import com.david.mailapp.data.pdf.PdfCacheClearResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
@@ -19,11 +21,13 @@ import java.util.concurrent.atomic.AtomicBoolean
 class SessionCoordinator internal constructor(
     private val clearProvider: suspend () -> Unit,
     private val clearDatabase: suspend () -> Unit,
-    private val clearPdfCache: () -> Unit,
+    private val clearPdfCache: () -> PdfCacheClearResult,
     private val clearSearchHistory: suspend () -> Unit,
     private val clearCredentials: suspend () -> Unit,
     private val isAuthenticated: suspend () -> Boolean,
     private val reactivateProvider: suspend () -> Unit,
+    private val writeGuard: SessionWriteGuard,
+    private val setPendingPdfCleanup: suspend (Boolean) -> Unit = {},
     private val readRefreshToken: suspend () -> String? = { null },
     private val revocationService: OAuthRevocationService? = null,
     private val revocationTimeoutMillis: Long = DEFAULT_REVOCATION_TIMEOUT_MS
@@ -77,10 +81,18 @@ class SessionCoordinator internal constructor(
                     credentialsCommitted = false
                 }
 
+                writeGuard.invalidate()
+
                 try {
                     clearProvider()
                     withContext(Dispatchers.IO) { clearDatabase() }
-                    clearPdfCache()
+
+                    val pdfResult = clearPdfCache()
+                    if (pdfResult is PdfCacheClearResult.Failure) {
+                        safeReactivateProvider()
+                        return@withLock SignOutResult.Failed("No se pudieron eliminar los archivos temporales. Reinténtalo.")
+                    }
+
                     clearSearchHistory()
 
                     val refreshToken = try {
@@ -148,7 +160,16 @@ class SessionCoordinator internal constructor(
                 if (!isAuth) return@withLock InvalidationResult.AlreadySignedOut
                 credentialsCommitted = false
 
+                writeGuard.invalidate()
+
                 credentialsMustBeCleared = true
+
+                withContext(NonCancellable) {
+                    // Persist before any fallible/cancellable cleanup step. If
+                    // automatic termination is interrupted, the next login
+                    // must still retry deletion of the previous account's PDFs.
+                    setPendingPdfCleanup(true)
+                }
 
                 try {
                     clearProvider()
@@ -168,12 +189,18 @@ class SessionCoordinator internal constructor(
                     }
                 }
 
+                var pdfCleanupSucceeded = false
                 try {
-                    clearPdfCache()
+                    val result = clearPdfCache()
+                    pdfCleanupSucceeded = result is PdfCacheClearResult.Success
                 } catch (e: kotlinx.coroutines.CancellationException) {
                     throw e
-                } catch (e: Exception) {
-                    // Fallo al limpiar caché PDF. Continuamos.
+                } catch (_: Exception) {}
+
+                if (pdfCleanupSucceeded) {
+                    withContext(NonCancellable) {
+                        setPendingPdfCleanup(false)
+                    }
                 }
 
                 try {

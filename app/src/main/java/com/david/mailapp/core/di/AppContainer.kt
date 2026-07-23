@@ -14,6 +14,8 @@ import com.david.mailapp.core.auth.OAuthRevocationService
 import com.david.mailapp.core.network.HttpClientFactory
 import com.david.mailapp.data.local.MailDatabase
 import com.david.mailapp.data.pdf.PdfCacheManager
+import com.david.mailapp.core.session.SessionWriteGuard
+import com.david.mailapp.core.session.SessionWriteGuardImpl
 import com.david.mailapp.data.remote.provider.EmailProvider
 import com.david.mailapp.data.repository.EmailRepository
 import io.ktor.client.HttpClient
@@ -89,6 +91,12 @@ object AppContainer {
         PdfCacheManager(appContext.cacheDir)
     }
 
+    // ── Session Guard ──────────────────────────────────────────────
+
+    val sessionWriteGuard: SessionWriteGuard by lazy {
+        SessionWriteGuardImpl()
+    }
+
     // ── Provider (activated after sign-in, coordinated lifecycle) ──────
 
     internal val providerCoordinator: ProviderLifecycleCoordinator<com.david.mailapp.data.remote.provider.EmailProvider> by lazy {
@@ -107,6 +115,9 @@ object AppContainer {
     /** Call after successful OAuth2 sign-in to activate the email provider. */
     suspend fun activateProvider() {
         providerCoordinator.activateProvider()
+        if (providerCoordinator.provider != null) {
+            sessionWriteGuard.activate()
+        }
     }
 
     /** Call on sign-out to tear down the provider and HTTP client. */
@@ -117,7 +128,7 @@ object AppContainer {
     // ── Repository ────────────────────────────────────────────────
 
     val emailRepository: EmailRepository by lazy {
-        EmailRepository(database, { provider }, pdfCacheManager)
+        EmailRepository(database, { provider }, pdfCacheManager, sessionWriteGuard)
     }
 
     // ── Session termination coordinator ────────────────────────────
@@ -131,6 +142,8 @@ object AppContainer {
             clearCredentials = { authClient.signOut() },
             isAuthenticated = { authManager.isAuthenticated() },
             reactivateProvider = ::activateProvider,
+            writeGuard = sessionWriteGuard,
+            setPendingPdfCleanup = { pending -> authManager.setPendingPdfCleanup(pending) },
             readRefreshToken = { authManager.getRefreshToken() },
             revocationService = googleOAuthRevocationService
         )

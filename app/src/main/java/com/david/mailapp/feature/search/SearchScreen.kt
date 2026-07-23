@@ -53,7 +53,8 @@ fun SearchScreen(
     val viewModel: SearchViewModel = viewModel(
         factory = SearchViewModel.Factory(
             AppContainer.emailRepository,
-            AppContainer.searchHistoryStore
+            AppContainer.searchHistoryStore,
+            AppContainer.sessionWriteGuard
         )
     )
 

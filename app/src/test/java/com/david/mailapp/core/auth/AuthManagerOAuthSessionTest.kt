@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -189,5 +190,23 @@ class AuthManagerOAuthSessionTest {
         assertNull("Legacy state must be removed", prefs[stateKey])
         assertNull("Legacy verifier must be removed", prefs[verifierKey])
         assertNull("Legacy timestamp must be removed", prefs[createdAtKey])
+    }
+
+    @Test
+    fun `pending PDF cleanup marker survives token clearing`() = runBlocking {
+        authManager.setPendingPdfCleanup(true)
+
+        authManager.clearTokens()
+
+        assertTrue(authManager.isPendingPdfCleanup())
+    }
+
+    @Test
+    fun `completed PDF cleanup removes pending marker`() = runBlocking {
+        authManager.setPendingPdfCleanup(true)
+
+        authManager.setPendingPdfCleanup(false)
+
+        assertFalse(authManager.isPendingPdfCleanup())
     }
 }

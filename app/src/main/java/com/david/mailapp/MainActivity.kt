@@ -24,8 +24,10 @@ import com.david.mailapp.ui.navigation.MainScreen
 import com.david.mailapp.ui.theme.ColorPalette
 import com.david.mailapp.ui.theme.MailAppTheme
 import android.os.Build
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private enum class OAuthUiState {
     Idle,
@@ -193,6 +195,30 @@ class MainActivity : ComponentActivity() {
         oauthBrowserWasLeft = false
 
         lifecycleScope.launch {
+            try {
+                if (AppContainer.authManager.isPendingPdfCleanup()) {
+                    val pdfResult = withContext(Dispatchers.IO) { AppContainer.pdfCacheManager.clearAll() }
+                    if (pdfResult is com.david.mailapp.data.pdf.PdfCacheClearResult.Failure) {
+                        resetOAuthUiState()
+                        Toast.makeText(
+                            this@MainActivity,
+                            "No se pudieron eliminar los archivos temporales. Reinténtalo.",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        return@launch
+                    }
+                    AppContainer.authManager.setPendingPdfCleanup(false)
+                }
+            } catch (_: Exception) {
+                resetOAuthUiState()
+                Toast.makeText(
+                    this@MainActivity,
+                    "No se pudo comprobar la limpieza local. Reinténtalo.",
+                    Toast.LENGTH_SHORT
+                ).show()
+                return@launch
+            }
+
             when (AppContainer.authClient.launchAuth(this@MainActivity)) {
                 OAuthLaunchResult.Launched -> {
                     oauthUiStateFlow.value = OAuthUiState.AwaitingRedirect

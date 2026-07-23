@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -56,6 +57,7 @@ class AuthManager(
         // ── Encrypted keys ────────────────────────────────────────
         private val KEY_ENCRYPTED_TOKENS = stringPreferencesKey("encrypted_oauth_tokens_v1")
         private val KEY_ENCRYPTED_SESSION = stringPreferencesKey("encrypted_pending_oauth_session_v1")
+        private val KEY_PENDING_PDF_CLEANUP = booleanPreferencesKey("pending_pdf_cleanup")
 
         // ── AAD constants (two distinct domains) ──────────────────
         private val AAD_TOKENS = "mailapp.oauth.tokens.v1".toByteArray()
@@ -179,7 +181,28 @@ class AuthManager(
      * Rule 10: Also removes any pending OAuth session.
      */
     suspend fun clearTokens() {
-        store.edit { it.clear() }
+        store.edit { prefs ->
+            val pendingPdf = prefs[KEY_PENDING_PDF_CLEANUP]
+            prefs.clear()
+            if (pendingPdf == true) {
+                prefs[KEY_PENDING_PDF_CLEANUP] = true
+            }
+        }
+    }
+
+    suspend fun setPendingPdfCleanup(pending: Boolean) {
+        store.edit { prefs ->
+            if (pending) {
+                prefs[KEY_PENDING_PDF_CLEANUP] = true
+            } else {
+                prefs.remove(KEY_PENDING_PDF_CLEANUP)
+            }
+        }
+    }
+
+    suspend fun isPendingPdfCleanup(): Boolean {
+        val prefs = store.data.first()
+        return prefs[KEY_PENDING_PDF_CLEANUP] ?: false
     }
 
     // ── Pending OAuth session management ──────────────────────
