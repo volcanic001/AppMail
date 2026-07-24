@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- PDF attachments count (conservado de strings.xml original) -->
+    <plurals name="pdf_attachments_count">
+        <item quantity="one">%1$d archivo PDF</item>
+        <item quantity="other">%1$d archivos PDF</item>
+    </plurals>
+
+    <!-- Fechas relativas: días atrás -->
+    <plurals name="relative_days_ago">
+        <item quantity="one">Hace %1$d día</item>
+        <item quantity="other">Hace %1$d días</item>
+    </plurals>
+
+    <!-- Fechas relativas: años atrás -->
+    <plurals name="relative_years_ago">
+        <item quantity="one">Hace %1$d año</item>
+        <item quantity="other">Hace %1$d años</item>
+    </plurals>
+
+</resources>

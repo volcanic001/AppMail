@@ -11,6 +11,8 @@ import com.david.mailapp.core.auth.AuthManager
 import com.david.mailapp.core.auth.GmailAuthClient
 import com.david.mailapp.core.auth.GoogleOAuthRevocationService
 import com.david.mailapp.core.auth.OAuthRevocationService
+import com.david.mailapp.core.localization.AndroidStringProvider
+import com.david.mailapp.core.localization.StringProvider
 import com.david.mailapp.core.network.HttpClientFactory
 import com.david.mailapp.data.local.MailDatabase
 import com.david.mailapp.data.pdf.PdfCacheManager
@@ -95,6 +97,12 @@ object AppContainer {
 
     val sessionWriteGuard: SessionWriteGuard by lazy {
         SessionWriteGuardImpl()
+    }
+
+    // ── Localization ──────────────────────────────────────────
+
+    val stringProvider: StringProvider by lazy {
+        AndroidStringProvider(appContext)
     }
 
     // ── Provider (activated after sign-in, coordinated lifecycle) ──────

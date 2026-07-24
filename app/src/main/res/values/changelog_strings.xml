@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!--
+        ================================================================
+        CHANGELOG — Entradas individuales (44 items)
+        Copiadas textualmente de ChangelogSettingsScreen.kt,
+        en el mismo orden, sin correcciones de errores, anglicismos,
+        puntuación o capitalización.
+        formatted="false" para proteger los porcentajes literales.
+        ================================================================
+    -->
+
+    <!-- Versión 1.7.0 (2 items) -->
+    <string name="changelog_1_7_0_item_01" formatted="false">Atenuación de correos leídos: Se mejoró la jerarquía visual de la bandeja de entrada y la pantalla de búsqueda reduciendo la opacidad al 60% en el asunto, el fragmento y la hora de los correos ya leídos, manteniendo el remitente y avatar legibles al 100%.</string>
+    <string name="changelog_1_7_0_item_02" formatted="false">Soporte de fuente personalizada (Google Sans Flex): Integración de la fuente variable original y el mecanismo de Monomail, creando familias dinámicas con control del eje ROND para la redondez y del eje wght (pesos del 400 al 900), activable mediante un switch en la configuración de apariencia.</string>
+
+    <!-- Versión 1.5.0 (2 items) -->
+    <string name="changelog_1_5_0_item_01" formatted="false">Rediseño de cita de respuesta: Simplificación de la cita del correo original al responder, mostrando remitente, asunto y fecha de forma limpia con ajuste de altura dinámico y soporte para un extracto de 2 líneas de texto sanitizado.</string>
+    <string name="changelog_1_5_0_item_02" formatted="false">Acordeón colapsable en reenvíos: Implementación de un contenedor interactivo para ocultar/mostrar el correo original completo al reenviar, manteniendo despejado el espacio de redacción.</string>
+
+    <!-- Versión 1.3.0 (1 item) -->
+    <string name="changelog_1_3_0_item_01" formatted="false">Corrección en responder/reenviar: Se solucionó el bug donde ambas opciones mostraban la misma pantalla debido a la reutilización de caché del ViewModel, y se eliminó el retraso visual de un segundo al abrir la pantalla de redacción.</string>
+
+    <!-- Versión 1.0 (6 items) -->
+    <string name="changelog_1_0_0_item_01" formatted="false">Optimizacion de correos: Se unificó la descarga de red en una única solicitud (format=full), eliminando peticiones remotas duplicadas al servidor de Gmail.</string>
+    <string name="changelog_1_0_0_item_02" formatted="false">Visualización progresiva de emails: El cuerpo del mensaje se muestra inmediatamente en pantalla con el HTML pre-limpiado y seguro, cargando las imágenes inline en segundo plano sin bloquear la lectura.</string>
+    <string name="changelog_1_0_0_item_03" formatted="false">Caché inteligente de HTML limpio: La sanitización y remoción de trackers con Jsoup se realiza una única vez en segundo plano, persistiendo el resultado final en la base de datos local (Room) para cargas instantáneas subsecuentes.</string>
+    <string name="changelog_1_0_0_item_04" formatted="false">Corrección de scroll en refresco: Solucionado el desplazamiento residual del gesto pull-to-refresh que requería scroll manual para ver el último correo recibido.</string>
+    <string name="changelog_1_0_0_item_05" formatted="false">Reestructuración de la pantalla de detalle del correo.</string>
+    <string name="changelog_1_0_0_item_06" formatted="false">Corrección del problema visual al abrir correos usando instrumentación para encontrar el ajuste.</string>
+
+    <!-- Versión 0.9.6 (3 items) -->
+    <string name="changelog_0_9_6_item_01" formatted="false">Integración de imágenes en línea (inline attachments) referenciadas por Content-ID (cid:). Las imágenes ahora se descargan en memoria RAM bajo demanda y se inyectan dinámicamente en el WebView del correo, evitando sobrecargas de almacenamiento en la base de datos local (SQLiteBlobTooBigException).</string>
+    <string name="changelog_0_9_6_item_02" formatted="false">Gestos interactivos en imágenes: Al mantener presionada cualquier imagen dentro del cuerpo del correo, se despliega un menú inferior con opciones personalizadas.</string>
+    <string name="changelog_0_9_6_item_03" formatted="false">Opción para abrir imágenes decodificadas en pantalla completa y guardarlas de forma segura en la galería del dispositivo usando MediaStore.</string>
+
+    <!-- Versión 0.9.0 (1 item) -->
+    <string name="changelog_0_9_0_item_01" formatted="false">El refresco (Pull-to-Refresh) ahora preserva el cuerpo HTML descargado de los correos en la base de datos local, evitando descargas innecesarias.</string>
+
+    <!-- Versión 0.8.0 (4 items) -->
+    <string name="changelog_0_8_0_item_01" formatted="false">Simplificación visual de los correos en la bandeja de entrada y papelera</string>
+    <string name="changelog_0_8_0_item_02" formatted="false">Los correos ahora muestran únicamente el nombre del remitente en lugar de la dirección completa, reduciendo el ruido visual</string>
+    <string name="changelog_0_8_0_item_03" formatted="false">Mejoras en el zoom táctil (pinch-to-zoom) en la vista de detalle, evitando que la pantalla haga scroll vertical de forma involuntaria al pellizcar para ampliar o reducir, además de asegurar que los correos se adapten perfectamente a pantallas móviles (viewport y textZoom fijos)</string>
+    <string name="changelog_0_8_0_item_04" formatted="false">Carga reactiva y resiliente en el detalle de correos: Se eliminaron estados bloqueantes en memoria, garantizando que el indicador de carga no se quede girando infinitamente ante fallos de sincronización</string>
+
+    <!-- Versión 0.7.0 (4 items) -->
+    <string name="changelog_0_7_0_item_01" formatted="false">Rediseño completo del header de detalle de correo en modo colapsable y expandible</string>
+    <string name="changelog_0_7_0_item_02" formatted="false">Formateo inteligente de remitentes (correos largos recortados elegantemente solo en vista colapsada, mostrados completos al expandir)</string>
+    <string name="changelog_0_7_0_item_03" formatted="false">Lógica de fecha relativa a la derecha (hora para hoy, fecha relativa para días/años recientes)</string>
+    <string name="changelog_0_7_0_item_04" formatted="false">Flecha de expansión estática con rotación e inicio de transición animada suave (AnimatedVisibility)</string>
+
+    <!-- Versión 0.6.0 (1 item) -->
+    <string name="changelog_0_6_0_item_01" formatted="false">Corregida la sincronización de la papelera para que al vaciarla desde Gmail también se actualice en MailApp con pull-to-refresh</string>
+
+    <!-- Versión 0.5.0 (3 items) -->
+    <string name="changelog_0_5_0_item_01" formatted="false">Corregido el retorno a la lista de correos para mantener la posición de scroll</string>
+    <string name="changelog_0_5_0_item_02" formatted="false">Ajustado el detalle del email para estabilizar el loading circular y la carga del cuerpo</string>
+    <string name="changelog_0_5_0_item_03" formatted="false">Resaltado tonal suave (800 ms) en el correo recientemente leído al regresar a la lista.</string>
+
+    <!-- Versión 0.4.1 (1 item) -->
+    <string name="changelog_0_4_1_item_01" formatted="false">Corregido el retorno a la lista de correos para mantener la posición de scroll en Inbox, Papelera y Búsqueda</string>
+
+    <!-- Versión 0.4.0 (5 items) -->
+    <string name="changelog_0_4_0_item_01" formatted="false">Implementada la visualización del cuerpo del email mediante un componente WebView optimizado</string>
+    <string name="changelog_0_4_0_item_02" formatted="false">Privacidad y Seguridad: bloqueo automático de trackers, rastreadores y píxeles espía</string>
+    <string name="changelog_0_4_0_item_03" formatted="false">Limpiador HTML mejorado para eliminar atributos y propiedades CSS de fondo (bgcolor, background) en modo oscuro y claro</string>
+    <string name="changelog_0_4_0_item_04" formatted="false">Normalización de contraste tipográfico: texto blanco suave en modo oscuro y negro carbón suave (100% opacidad) en modo claro</string>
+    <string name="changelog_0_4_0_item_05" formatted="false">Sincronización del tema del WebView con la preferencia de la aplicación (LocalThemeConfig)</string>
+
+    <!-- Versión 0.3.0 (5 items) -->
+    <string name="changelog_0_3_0_item_01" formatted="false">Implementada fase 1 del detalle de correos (cabeceras con asunto, remitente, destinatario y fecha)</string>
+    <string name="changelog_0_3_0_item_02" formatted="false">Corregido bug de caché de ViewModel al alternar entre diferentes correos</string>
+    <string name="changelog_0_3_0_item_03" formatted="false">Corregido cierre inesperado (crash) de la aplicación cuando no hay conexión a Internet</string>
+    <string name="changelog_0_3_0_item_04" formatted="false">Conectada la navegación al detalle de correos desde las pantallas de Papelera y Búsqueda</string>
+    <string name="changelog_0_3_0_item_05" formatted="false">Corregido espacio negro inferior (edge-to-edge) en la pantalla de Búsqueda</string>
+
+    <!-- Versión 0.2.0 (3 items) -->
+    <string name="changelog_0_2_0_item_01" formatted="false">Agregado historial de versiones (Changelog)</string>
+    <string name="changelog_0_2_0_item_02" formatted="false">Navegación nativa ajustada para no cerrar la app desde Ajustes</string>
+    <string name="changelog_0_2_0_item_03" formatted="false">Márgenes y tamaños consistentes en tarjetas de configuración</string>
+
+    <!-- Versión 0.1.0 (3 items) -->
+    <string name="changelog_0_1_0_item_01" formatted="false">Lanzamiento inicial de MailApp</string>
+    <string name="changelog_0_1_0_item_02" formatted="false">Soporte para múltiples paletas de colores y modo oscuro</string>
+    <string name="changelog_0_1_0_item_03" formatted="false">Gestos predictivos de navegación suaves</string>
+
+</resources>

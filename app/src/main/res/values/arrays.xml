@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!--
+        ================================================================
+        CHANGELOG — 15 arrays de versiones (44 entradas en total)
+        Cada array referencia sus strings mediante @string/...
+        Convención: changelog_<version>_changes
+        ================================================================
+    -->
+
+    <string-array name="changelog_1_7_0_changes">
+        <item>@string/changelog_1_7_0_item_01</item>
+        <item>@string/changelog_1_7_0_item_02</item>
+    </string-array>
+
+    <string-array name="changelog_1_5_0_changes">
+        <item>@string/changelog_1_5_0_item_01</item>
+        <item>@string/changelog_1_5_0_item_02</item>
+    </string-array>
+
+    <string-array name="changelog_1_3_0_changes">
+        <item>@string/changelog_1_3_0_item_01</item>
+    </string-array>
+
+    <string-array name="changelog_1_0_0_changes">
+        <item>@string/changelog_1_0_0_item_01</item>
+        <item>@string/changelog_1_0_0_item_02</item>
+        <item>@string/changelog_1_0_0_item_03</item>
+        <item>@string/changelog_1_0_0_item_04</item>
+        <item>@string/changelog_1_0_0_item_05</item>
+        <item>@string/changelog_1_0_0_item_06</item>
+    </string-array>
+
+    <string-array name="changelog_0_9_6_changes">
+        <item>@string/changelog_0_9_6_item_01</item>
+        <item>@string/changelog_0_9_6_item_02</item>
+        <item>@string/changelog_0_9_6_item_03</item>
+    </string-array>
+
+    <string-array name="changelog_0_9_0_changes">
+        <item>@string/changelog_0_9_0_item_01</item>
+    </string-array>
+
+    <string-array name="changelog_0_8_0_changes">
+        <item>@string/changelog_0_8_0_item_01</item>
+        <item>@string/changelog_0_8_0_item_02</item>
+        <item>@string/changelog_0_8_0_item_03</item>
+        <item>@string/changelog_0_8_0_item_04</item>
+    </string-array>
+
+    <string-array name="changelog_0_7_0_changes">
+        <item>@string/changelog_0_7_0_item_01</item>
+        <item>@string/changelog_0_7_0_item_02</item>
+        <item>@string/changelog_0_7_0_item_03</item>
+        <item>@string/changelog_0_7_0_item_04</item>
+    </string-array>
+
+    <string-array name="changelog_0_6_0_changes">
+        <item>@string/changelog_0_6_0_item_01</item>
+    </string-array>
+
+    <string-array name="changelog_0_5_0_changes">
+        <item>@string/changelog_0_5_0_item_01</item>
+        <item>@string/changelog_0_5_0_item_02</item>
+        <item>@string/changelog_0_5_0_item_03</item>
+    </string-array>
+
+    <string-array name="changelog_0_4_1_changes">
+        <item>@string/changelog_0_4_1_item_01</item>
+    </string-array>
+
+    <string-array name="changelog_0_4_0_changes">
+        <item>@string/changelog_0_4_0_item_01</item>
+        <item>@string/changelog_0_4_0_item_02</item>
+        <item>@string/changelog_0_4_0_item_03</item>
+        <item>@string/changelog_0_4_0_item_04</item>
+        <item>@string/changelog_0_4_0_item_05</item>
+    </string-array>
+
+    <string-array name="changelog_0_3_0_changes">
+        <item>@string/changelog_0_3_0_item_01</item>
+        <item>@string/changelog_0_3_0_item_02</item>
+        <item>@string/changelog_0_3_0_item_03</item>
+        <item>@string/changelog_0_3_0_item_04</item>
+        <item>@string/changelog_0_3_0_item_05</item>
+    </string-array>
+
+    <string-array name="changelog_0_2_0_changes">
+        <item>@string/changelog_0_2_0_item_01</item>
+        <item>@string/changelog_0_2_0_item_02</item>
+        <item>@string/changelog_0_2_0_item_03</item>
+    </string-array>
+
+    <string-array name="changelog_0_1_0_changes">
+        <item>@string/changelog_0_1_0_item_01</item>
+        <item>@string/changelog_0_1_0_item_02</item>
+        <item>@string/changelog_0_1_0_item_03</item>
+    </string-array>
+
+</resources>

@@ -1,39 +1,297 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">MailApp</string>
+    <!-- ================================================================ -->
+    <!-- APLICACIÓN, NAVEGACIÓN Y ACCIONES                                -->
+    <!-- ================================================================ -->
 
-    <!-- Navigation -->
-    <string name="nav_inbox">Inbox</string>
-    <string name="nav_trash">Trash</string>
-    <string name="nav_settings">Settings</string>
+    <!-- App (non_translatable: app_name) -->
 
-    <!-- Actions -->
-    <string name="action_compose">Compose</string>
-    <string name="action_delete">Delete</string>
-    <string name="action_restore">Restore</string>
-    <string name="action_delete_permanently">Delete permanently</string>
-    <string name="action_pull_to_refresh">Pull to refresh</string>
+    <string name="app_tagline">Tu cliente de correo personal</string>
 
-    <!-- States -->
-    <string name="inbox_empty">Your inbox is empty</string>
-    <string name="trash_empty">Trash is empty</string>
-    <string name="loading">Loading…</string>
-    <string name="error_generic">Something went wrong</string>
-    <string name="error_no_connection">No internet connection</string>
+    <!-- Navegación -->
+    <string name="nav_inbox">Bandeja</string>
+    <string name="nav_trash">Papelera</string>
+    <string name="nav_settings">Ajustes</string>
+    <string name="nav_search">Buscar</string>
+    <string name="nav_email_detail">Detalle</string>
 
-    <!-- Auth -->
-    <string name="auth_sign_in">Sign in</string>
-    <string name="auth_sign_out">Sign out</string>
-    <string name="auth_gmail">Sign in with Google</string>
-    <string name="auth_outlook">Sign in with Microsoft</string>
+    <!-- Acciones -->
+    <string name="action_compose">Redactar</string>
+    <string name="action_delete">Eliminar</string>
+    <string name="action_restore">Restaurar</string>
+    <string name="action_delete_permanently">Eliminar permanentemente</string>
+    <string name="action_pull_to_refresh">Desliza para actualizar</string>
+    <string name="action_back">Volver</string>
+    <string name="action_menu">Menú</string>
+    <string name="action_search">Buscar</string>
+    <string name="action_clear">Borrar</string>
+    <string name="action_close">Cerrar</string>
+    <string name="action_cancel">Cancelar</string>
+    <string name="action_retry">Reintentar</string>
+    <string name="action_undo">Deshacer</string>
+    <string name="action_send">Enviar</string>
+    <string name="action_reply">Responder</string>
+    <string name="action_forward">Reenviar</string>
 
-    <!-- PDF Attachments -->
-    <plurals name="pdf_attachments_count">
-        <item quantity="one">%1$d archivo PDF</item>
-        <item quantity="other">%1$d archivos PDF</item>
-    </plurals>
+    <!-- Estados generales -->
+    <string name="loading">Cargando…</string>
+    <string name="error_generic">Algo salió mal</string>
+    <string name="error_no_connection">Sin conexión a Internet</string>
+    <string name="error_no_active_account">No hay una cuenta activa. Inicia sesión nuevamente.</string>
+    <string name="error_sender_address_unavailable">No se pudo obtener la dirección del remitente</string>
+
+    <!-- Símbolos / emojis -->
+    <string name="error_symbol">⚠️</string>
+    <string name="inbox_empty_symbol">📭</string>
+    <string name="trash_empty_symbol">🗑️</string>
+
+    <!-- Accesibilidad -->
+    <string name="accessibility_starred">Destacado</string>
+
+    <!-- ================================================================ -->
+    <!-- AUTENTICACIÓN Y SESIÓN                                            -->
+    <!-- ================================================================ -->
+
+    <string name="auth_sign_in">Iniciar sesión</string>
+    <string name="auth_sign_out">Cerrar sesión</string>
+    <string name="auth_gmail">Iniciar sesión con Google</string>
+    <!-- auth_outlook eliminado: no existe flujo Microsoft -->
+
+    <string name="login_logo_description">Icono de MailApp</string>
+    <string name="login_privacy_note">Privado por diseño. Tus datos permanecen en tu dispositivo.\nSin anuncios. Sin seguimiento.</string>
+
+    <!-- Mensajes de sesión -->
+    <string name="session_expired">Tu sesión expiró. Inicia sesión nuevamente.</string>
+    <string name="session_temp_cleanup_failed">No se pudieron eliminar los archivos temporales. Reinténtalo.</string>
+    <string name="session_local_cleanup_check_failed">No se pudo comprobar la limpieza local. Reinténtalo.</string>
+    <string name="session_no_browser">No se encontró un navegador compatible.</string>
+    <string name="session_auth_launch_failed">No se pudo abrir el inicio de sesión.</string>
+    <string name="session_auth_cancelled">Inicio de sesión cancelado.</string>
+    <string name="session_oauth_invalid">La sesión de inicio de sesión no es válida. Inténtalo nuevamente.</string>
+    <string name="session_signin_failed">No se pudo iniciar sesión. Inténtalo nuevamente.</string>
+    <string name="session_signout_in_progress">Ya hay un cierre de sesión en curso.</string>
+    <string name="session_signout_failed">No se pudo cerrar sesión. Inténtalo nuevamente.</string>
+
+    <!-- ================================================================ -->
+    <!-- AJUSTES                                                           -->
+    <!-- ================================================================ -->
+
+    <!-- Categorías -->
+    <string name="settings_appearance">Apariencia</string>
+    <string name="settings_account">Cuenta</string>
+    <string name="settings_notifications">Notificaciones</string>
+    <string name="settings_privacy">Privacidad</string>
+    <string name="settings_security">Seguridad</string>
+    <string name="settings_about">Acerca de</string>
+
+    <!-- Estados -->
+    <string name="settings_connected">Conectada</string>
+    <string name="settings_disconnected">Sin conectar</string>
+    <string name="settings_coming_soon">Próximamente</string>
+
+    <!-- Resumen apariencia -->
+    <string name="settings_appearance_summary">%1$s · Tema %2$s</string>
+
+    <!-- Tema -->
+    <string name="theme_title">Tema</string>
+    <string name="theme_system">Sistema</string>
+    <string name="theme_light">Claro</string>
+    <string name="theme_dark">Oscuro</string>
+
+    <!-- AMOLED -->
+    <string name="amoled_title">Modo AMOLED</string>
+    <string name="amoled_description_dark">Fondo negro puro para pantallas OLED</string>
+    <string name="amoled_description_light">Activa el modo oscuro para usar esta opción</string>
+
+    <!-- Tipografía -->
+    <string name="font_google_sans_title">Usar Google Sans</string>
+    <string name="font_google_sans_description">Aplica la fuente en la aplicación</string>
+
+    <!-- Colores -->
+    <string name="color_dynamic_title">Color dinámico</string>
+    <string name="color_dynamic_description">Adapta el tema a tu fondo (Android 12+)</string>
+    <string name="color_basic_title">Colores básicos</string>
+    <string name="color_basic_description">Elige un tono sólido de Material Design 3</string>
+
+    <!-- Paletas -->
+    <string name="palette_dynamic">Dinámico</string>
+    <string name="palette_blue">Azul</string>
+    <string name="palette_green">Verde</string>
+    <string name="palette_purple">Morado</string>
+    <string name="palette_orange">Naranja</string>
+    <string name="palette_pink">Rosa</string>
+    <string name="palette_teal">Cian</string>
+    <string name="palette_yellow">Amarillo</string>
+    <string name="palette_monochrome">Neutro</string>
+
+    <!-- Cuenta -->
+    <string name="account_title">Cuentas de Correo</string>
+    <string name="account_linked">Cuenta Vinculada</string>
+    <string name="account_loading">Cargando…</string>
+    <string name="account_google_connected">Cuenta de Google conectada</string>
+    <string name="account_status_active">Activa</string>
+
+    <!-- Diálogo de cierre de sesión -->
+    <string name="signout_dialog_title">¿Cerrar sesión?</string>
+    <string name="signout_dialog_body">Se eliminarán los datos locales de esta cuenta</string>
+    <string name="signout_dialog_cancel">Cancelar</string>
+    <string name="signout_dialog_confirm">Cerrar sesión</string>
+
+    <!-- Acerca de -->
+    <string name="about_title">Acerca de</string>
+    <string name="about_version_label">Versión</string>
+    <string name="about_architecture_label">Arquitectura</string>
+    <string name="about_credits_title">Créditos</string>
+    <string name="about_credits_author">Desarrollado por David</string>
+    <string name="about_changelog_title">Historial de versiones</string>
+    <string name="about_changelog_subtitle">Ver cambios y novedades</string>
+
+    <!-- ================================================================ -->
+    <!-- BANDEJA, PAPELERA Y BÚSQUEDA                                      -->
+    <!-- ================================================================ -->
+
+    <string name="inbox_title">Bandeja</string>
+    <string name="trash_title">Papelera</string>
+
+    <!-- Estados vacíos -->
+    <string name="inbox_empty">Tu bandeja está vacía</string>
+    <string name="trash_empty">La papelera está vacía</string>
+
+    <!-- Snackbars -->
+    <string name="snackbar_moved_to_trash">Movido a la papelera</string>
+    <string name="snackbar_deleted_permanently">Eliminado permanentemente</string>
+    <string name="snackbar_restored_to_inbox">Restaurado en la bandeja</string>
+
+    <!-- Búsqueda -->
+    <string name="search_recent">Recientes</string>
+    <string name="search_clear_history">Borrar</string>
+    <string name="search_history_empty">Tus búsquedas recientes aparecerán aquí</string>
+    <string name="search_placeholder">Buscar en correos…</string>
+    <string name="search_empty_format">Sin resultados para «%1$s»</string>
+    <string name="search_empty_hint">Intenta con otras palabras o verifica la ortografía.</string>
+    <string name="search_connection_error">Error de conexión</string>
+
+    <!-- Descripciones de accesibilidad en búsqueda -->
+    <string name="search_back_description">Volver</string>
+    <string name="search_clear_query_description">Borrar</string>
+
+    <!-- Fallbacks de datos -->
+    <string name="fallback_unknown_sender">Desconocido</string>
+    <string name="fallback_no_subject">(Sin asunto)</string>
+
+    <!-- ================================================================ -->
+    <!-- REDACCIÓN Y CONTENIDO GENERADO                                    -->
+    <!-- ================================================================ -->
+
+    <!-- Títulos de modo -->
+    <string name="compose_title_write">Redactar</string>
+    <string name="compose_title_reply">Responder</string>
+    <string name="compose_title_forward">Reenviar</string>
+
+    <!-- Etiquetas de campos -->
+    <string name="compose_field_from">De</string>
+    <string name="compose_field_to">Para</string>
+    <string name="compose_field_subject">Asunto</string>
+
+    <!-- Placeholders -->
+    <string name="compose_placeholder_recipient">Destinatario</string>
+    <string name="compose_placeholder_write">Escribe tu mensaje…</string>
+    <string name="compose_placeholder_reply">Escribe tu respuesta…</string>
+    <string name="compose_placeholder_forward">Añade un mensaje…</string>
+    <string name="compose_from_loading">Cargando…</string>
+
+    <!-- Cc/Bcc toggle -->
+    <string name="compose_cc_bcc_hide">Ocultar</string>
+
+    <!-- Mensaje original adjunto / quote -->
+    <string name="compose_original_message_attached">Mensaje original adjunto</string>
+    <string name="compose_show">Mostrar ↓</string>
+    <string name="compose_hide">Ocultar ↑</string>
+    <string name="compose_no_subject_quote_fallback">Sin Asunto</string>
+
+    <!-- Resultado de envío -->
+    <string name="compose_sent">Email enviado</string>
+    <string name="compose_send_error">Error al enviar</string>
+
+    <!-- Formatos de respuesta/reenvío -->
+    <!-- Los prefijos Re: y Fwd: están en non_translatable.xml -->
+    <string name="compose_reply_body_format">El %1$s, %2$s escribió:\n&gt; %3$s</string>
+    <string name="compose_forward_header">---------- Mensaje reenviado ----------</string>
+    <string name="compose_forward_field_from">De: %1$s</string>
+    <string name="compose_forward_field_date">Fecha: %1$s</string>
+    <string name="compose_forward_field_subject">Asunto: %1$s</string>
+    <string name="compose_forward_field_to">Para: %1$s</string>
+
+    <!-- Patrones de fecha (como referencia, se usan en formato SimpleDateFormat) -->
+    <string name="date_pattern_time" translatable="false">h:mm a</string>
+    <string name="date_pattern_short" translatable="false">d MMM yyyy, HH:mm</string>
+    <string name="date_pattern_long" translatable="false">d \'de\' MMMM \'de\' yyyy, HH:mm</string>
+    <string name="date_pattern_day_month" translatable="false">d \'de\' MMMM</string>
+
+    <!-- ================================================================ -->
+    <!-- DETALLE, IMÁGENES Y PDF                                           -->
+    <!-- ================================================================ -->
+
+    <!-- Detalle de correo -->
+    <string name="detail_title">Detalle</string>
+    <string name="detail_back">Volver</string>
+    <string name="detail_reply">Responder</string>
+    <string name="detail_forward">Reenviar</string>
+    <string name="detail_field_from_label">De</string>
+    <string name="detail_field_to_label">Para</string>
+    <string name="detail_field_date_label">Fecha</string>
+    <string name="detail_expand_header">Expandir detalles</string>
+    <string name="detail_collapse_header">Colapsar detalles</string>
+
+    <!-- Estados de contenido -->
+    <string name="detail_email_not_found">Email no encontrado</string>
+    <string name="detail_body_load_error">No se pudo cargar el contenido del email</string>
+    <string name="detail_body_pdfs_only">Este correo contiene PDF adjuntos pero no se pudo cargar el contenido del mensaje</string>
+    <string name="detail_subject_missing">(Sin asunto)</string>
+
+    <!-- Imágenes -->
+    <string name="image_open">Abrir imagen</string>
+    <string name="image_save">Guardar imagen</string>
+    <string name="image_fullscreen">Imagen a pantalla completa</string>
+    <string name="image_load_error">Error al cargar la imagen</string>
+    <string name="image_invalid_format">Formato de imagen inválido</string>
+    <string name="image_saved_to_gallery">Imagen guardada en Galería</string>
+    <string name="image_save_error">Error al guardar imagen</string>
+
+    <!-- Fechas relativas -->
+    <string name="relative_yesterday">Ayer</string>
+    <string name="today_time_format" translatable="false">HH:mm</string>
+
+    <!-- PDF existentes (conservar) -->
     <string name="pdf_attachments_sheet_title">Archivos PDF</string>
     <string name="pdf_attachments_show_all">Mostrar todos (%1$d)</string>
     <string name="pdf_attachment_unknown_size">Tamaño desconocido</string>
     <string name="pdf_attachment_icon_description">Archivo PDF</string>
+
+    <!-- PDF: acciones -->
+    <string name="pdf_save_as">Guardar PDF como</string>
+    <string name="pdf_downloaded">Descargado</string>
+    <string name="pdf_error">Error</string>
+    <string name="pdf_downloading">Descargando…</string>
+    <string name="pdf_ready">Listo</string>
+    <string name="pdf_too_large">El PDF supera el límite de 25 MB</string>
+    <string name="pdf_invalid">El archivo descargado no es un PDF válido</string>
+    <string name="pdf_download_failed">No se pudo descargar. Toca para reintentar</string>
+    <string name="pdf_cache_expired">El PDF ya no está en caché. Toca para descargarlo nuevamente.</string>
+    <string name="pdf_saved">PDF guardado correctamente.</string>
+    <string name="pdf_save_failed">No se pudo guardar el PDF.</string>
+    <string name="pdf_no_file_picker">No hay un selector de archivos disponible.</string>
+    <string name="pdf_picker_open_failed">No se pudo abrir el selector de archivos.</string>
+    <string name="pdf_no_viewer">No hay una aplicación instalada para abrir archivos PDF.</string>
+    <string name="pdf_open_failed">No se pudo abrir el PDF.</string>
+
+    <!-- Nombre predeterminado -->
+    <string name="pdf_default_filename">documento.pdf</string>
+
+    <!-- Formatos de tamaño -->
+    <string name="size_bytes">%1$d B</string>
+    <string name="size_kb">%1$s KB</string>
+    <string name="size_mb">%1$s MB</string>
+    <string name="size_gb">%1$s GB</string>
+
 </resources>
