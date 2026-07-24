@@ -1,9 +1,11 @@
 package com.david.mailapp.ui.theme
 
+import androidx.annotation.StringRes
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
+import com.david.mailapp.R
 
 /**
  * Color palette definitions for the manual palette picker (Settings screen).
@@ -13,31 +15,34 @@ import androidx.compose.ui.graphics.Color
  * from the seed using Material3's tonal palette algorithm.
  *
  * Dynamic = use the device wallpaper colors (Android 12+).
+ *
+ * [labelResId] se resuelve únicamente en Compose. [name] se conserva como
+ * identificador técnico para [AppSettingsManager].
  */
 enum class ColorPalette(
-    val displayName: String,
+    @StringRes val labelResId: Int,
     val seedColor: Color,
     val previewTop: Color,
     val previewBottomLeft: Color,
     val previewBottomRight: Color
 ) {
-    Dynamic("Dinámico", Color.Unspecified,
+    Dynamic(R.string.palette_dynamic, Color.Unspecified,
         Color(0xFFD3E3FD), Color(0xFF6750A4), Color(0xFF386A20)),
-    Blue("Azul", Color(0xFF1A73E8),
+    Blue(R.string.palette_blue, Color(0xFF1A73E8),
         Color(0xFFD3E3FD), Color(0xFF004583), Color(0xFF1A73E8)),
-    Green("Verde", Color(0xFF386A20),
+    Green(R.string.palette_green, Color(0xFF386A20),
         Color(0xFFC2E7C9), Color(0xFF0F5223), Color(0xFF386A20)),
-    Purple("Morado", Color(0xFF6750A4),
+    Purple(R.string.palette_purple, Color(0xFF6750A4),
         Color(0xFFE8DEF8), Color(0xFF4A4458), Color(0xFF6750A4)),
-    Orange("Naranja", Color(0xFF9C4145),
+    Orange(R.string.palette_orange, Color(0xFF9C4145),
         Color(0xFFFFDAD9), Color(0xFF7E5260), Color(0xFF9C4145)),
-    Pink("Rosa", Color(0xFFB3261E),
+    Pink(R.string.palette_pink, Color(0xFFB3261E),
         Color(0xFFFFDAD6), Color(0xFF855355), Color(0xFFB3261E)),
-    Teal("Cian", Color(0xFF006874),
+    Teal(R.string.palette_teal, Color(0xFF006874),
         Color(0xFF97F0FF), Color(0xFF004F58), Color(0xFF006874)),
-    Yellow("Amarillo", Color(0xFF695F00),
+    Yellow(R.string.palette_yellow, Color(0xFF695F00),
         Color(0xFFEBE295), Color(0xFF4E4400), Color(0xFF695F00)),
-    Monochrome("Neutro", Color(0xFF5E5E5E),
+    Monochrome(R.string.palette_monochrome, Color(0xFF5E5E5E),
         Color(0xFFE2E2E2), Color(0xFF474747), Color(0xFF5E5E5E));
 }
 

@@ -16,14 +16,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
 import com.david.mailapp.ui.theme.MotionTokens
 import kotlinx.coroutines.launch
 
 /**
  * Individual drawer item with spring press animation and haptic feedback.
- *
- * Reuses the same spring tokens as the old NavBarItem for consistent feel:
- * press 0.97 → overshoot 1.02 → settle 1.0.
  */
 @Composable
 fun DrawerItem(
@@ -35,15 +33,16 @@ fun DrawerItem(
     val scope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
     val scale = remember { Animatable(1f) }
+    val label = stringResource(screen.labelResId)
 
     NavigationDrawerItem(
         icon = {
             Icon(
                 imageVector = if (isSelected) screen.filledIcon else screen.outlinedIcon,
-                contentDescription = screen.label
+                contentDescription = null
             )
         },
-        label = { Text(screen.label) },
+        label = { Text(label) },
         selected = isSelected,
         onClick = {
             haptic.performHapticFeedback(HapticFeedbackType.LongPress)

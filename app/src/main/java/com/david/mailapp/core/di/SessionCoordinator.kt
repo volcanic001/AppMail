@@ -1,6 +1,7 @@
 package com.david.mailapp.core.di
 
 import com.david.mailapp.core.auth.OAuthRevocationService
+import com.david.mailapp.core.localization.UiErrorReason
 import com.david.mailapp.core.session.SessionWriteGuard
 import com.david.mailapp.data.pdf.PdfCacheClearResult
 import kotlinx.coroutines.Dispatchers
@@ -46,7 +47,7 @@ class SessionCoordinator internal constructor(
 
     sealed interface SignOutResult {
         data object Success : SignOutResult
-        data class Failed(val message: String) : SignOutResult
+        data class Failed(val reason: UiErrorReason) : SignOutResult
     }
 
     /**
@@ -63,7 +64,7 @@ class SessionCoordinator internal constructor(
 
     suspend fun signOut(): SignOutResult {
         if (!isManualSigningOut.compareAndSet(false, true)) {
-            return SignOutResult.Failed("Ya hay un cierre de sesión en curso.")
+            return SignOutResult.Failed(UiErrorReason.SIGN_OUT_IN_PROGRESS)
         }
         return try {
             terminationMutex.withLock {
@@ -90,7 +91,7 @@ class SessionCoordinator internal constructor(
                     val pdfResult = clearPdfCache()
                     if (pdfResult is PdfCacheClearResult.Failure) {
                         safeReactivateProvider()
-                        return@withLock SignOutResult.Failed("No se pudieron eliminar los archivos temporales. Reinténtalo.")
+                        return@withLock SignOutResult.Failed(UiErrorReason.TEMP_CLEANUP_FAILED)
                     }
 
                     clearSearchHistory()
@@ -123,7 +124,7 @@ class SessionCoordinator internal constructor(
                     throw e
                 } catch (e: Exception) {
                     safeReactivateProvider()
-                    SignOutResult.Failed("No se pudo cerrar sesión. Inténtalo nuevamente.")
+                    SignOutResult.Failed(UiErrorReason.SIGN_OUT_FAILED)
                 }
             }
         } finally {

@@ -45,9 +45,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.david.mailapp.R
 import com.david.mailapp.core.di.AppContainer
 import kotlinx.coroutines.launch
 
@@ -78,12 +80,12 @@ fun AccountSettingsScreen(
         modifier = modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
-                title = { Text("Cuentas de Correo", style = MaterialTheme.typography.titleLarge) },
+                title = { Text(stringResource(R.string.account_title), style = MaterialTheme.typography.titleLarge) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Volver"
+                            contentDescription = stringResource(R.string.action_back)
                         )
                     }
                 },
@@ -103,7 +105,7 @@ fun AccountSettingsScreen(
             // ── Sección 1: Cuenta Activa ─────────────────────────────
             item(key = "section_active") {
                 Text(
-                    text = "Cuenta Vinculada",
+                    text = stringResource(R.string.account_linked),
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
@@ -143,22 +145,22 @@ fun AccountSettingsScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = when {
-                                    isEmailLoading -> "Cargando..."
+                                    isEmailLoading -> stringResource(R.string.account_loading)
                                     !userEmail.isNullOrBlank() -> userEmail.orEmpty()
-                                    else -> "Cuenta de Google conectada"
+                                    else -> stringResource(R.string.account_google_connected)
                                 },
                                 style = MaterialTheme.typography.bodyLarge,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "Google (Gmail)",
+                                text = stringResource(R.string.brand_gmail_provider_label),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                         Text(
-                            text = "Activa",
+                            text = stringResource(R.string.account_status_active),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Bold,
@@ -197,7 +199,7 @@ fun AccountSettingsScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                     }
-                    Text("Cerrar sesión")
+                    Text(stringResource(R.string.auth_sign_out))
                 }
             }
         }
@@ -218,7 +220,6 @@ fun AccountSettingsScreen(
                         .padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Ícono con contenedor circular semántico
                     Box(
                         modifier = Modifier
                             .size(52.dp)
@@ -239,7 +240,7 @@ fun AccountSettingsScreen(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Text(
-                        text = "¿Cerrar sesión?",
+                        text = stringResource(R.string.signout_dialog_title),
                         style = MaterialTheme.typography.headlineSmall,
                         color = MaterialTheme.colorScheme.onSurface,
                         textAlign = TextAlign.Center
@@ -248,7 +249,7 @@ fun AccountSettingsScreen(
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Text(
-                        text = "Se eliminarán los datos locales de esta cuenta",
+                        text = stringResource(R.string.signout_dialog_body),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center
@@ -263,7 +264,7 @@ fun AccountSettingsScreen(
                             contentColor = MaterialTheme.colorScheme.onSurface
                         )
                     ) {
-                        Text("Cancelar")
+                        Text(stringResource(R.string.signout_dialog_cancel))
                     }
 
                     Spacer(modifier = Modifier.height(4.dp))
@@ -289,7 +290,7 @@ fun AccountSettingsScreen(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                         }
-                        Text("Cerrar sesión")
+                        Text(stringResource(R.string.signout_dialog_confirm))
                     }
                 }
             }

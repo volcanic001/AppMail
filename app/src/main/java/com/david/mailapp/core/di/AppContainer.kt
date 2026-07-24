@@ -13,6 +13,7 @@ import com.david.mailapp.core.auth.GoogleOAuthRevocationService
 import com.david.mailapp.core.auth.OAuthRevocationService
 import com.david.mailapp.core.localization.AndroidStringProvider
 import com.david.mailapp.core.localization.StringProvider
+import com.david.mailapp.core.localization.UiErrorReason
 import com.david.mailapp.core.network.HttpClientFactory
 import com.david.mailapp.data.local.MailDatabase
 import com.david.mailapp.data.pdf.PdfCacheManager
@@ -160,7 +161,7 @@ object AppContainer {
     /** Resultado de [signOut]. */
     sealed interface SignOutResult {
         data object Success : SignOutResult
-        data class Failed(val message: String) : SignOutResult
+        data class Failed(val reason: UiErrorReason) : SignOutResult
     }
 
     /**
@@ -169,7 +170,7 @@ object AppContainer {
     suspend fun signOut(): SignOutResult {
         return when (val r = sessionCoordinator.signOut()) {
             is SessionCoordinator.SignOutResult.Success -> SignOutResult.Success
-            is SessionCoordinator.SignOutResult.Failed -> SignOutResult.Failed(r.message)
+            is SessionCoordinator.SignOutResult.Failed -> SignOutResult.Failed(r.reason)
         }
     }
 

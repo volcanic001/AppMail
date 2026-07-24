@@ -18,6 +18,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -26,9 +29,6 @@ import com.david.mailapp.R
 
 /**
  * Branded welcome screen shown when the user is not authenticated.
- *
- * OAuth state and actions are owned by the activity so browser redirects can
- * complete or cancel the loading state deterministically.
  */
 @Composable
 fun LoginScreen(
@@ -50,14 +50,14 @@ fun LoginScreen(
             // ── Branding ─────────────────────────────────────────
             Image(
                 painter = painterResource(id = R.drawable.mail),
-                contentDescription = "MailApp Icon",
+                contentDescription = stringResource(R.string.login_logo_description),
                 modifier = Modifier.size(250.dp)
             )
 
             Spacer(modifier = Modifier.height(24.dp))
 
             Text(
-                text = "MailApp",
+                text = stringResource(R.string.app_name),
                 style = MaterialTheme.typography.displaySmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground
@@ -66,7 +66,7 @@ fun LoginScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "Your personal email client",
+                text = stringResource(R.string.app_tagline),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -74,10 +74,20 @@ fun LoginScreen(
             Spacer(modifier = Modifier.height(48.dp))
 
             // ── Sign in button ────────────────────────────────────
+            val loadingDescription = stringResource(R.string.loading)
+            val buttonModifier = if (isLaunching) {
+                Modifier
+                    .height(52.dp)
+                    .semantics {
+                        stateDescription = loadingDescription
+                    }
+            } else {
+                Modifier.height(52.dp)
+            }
             Button(
                 onClick = onSignInClick,
                 enabled = !isLaunching,
-                modifier = Modifier.height(52.dp),
+                modifier = buttonModifier,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.primary
                 ),
@@ -92,14 +102,14 @@ fun LoginScreen(
                     Spacer(modifier = Modifier.size(12.dp))
                 } else {
                     Text(
-                        text = "G",
+                        text = stringResource(R.string.monogram_g),
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.size(12.dp))
                 }
                 Text(
-                    text = "Sign in with Google",
+                    text = stringResource(R.string.auth_gmail),
                     style = MaterialTheme.typography.labelLarge
                 )
             }
@@ -108,7 +118,7 @@ fun LoginScreen(
 
             // ── Privacy note ──────────────────────────────────────
             Text(
-                text = "Private by design. Your data stays on your device.\nNo ads. No tracking.",
+                text = stringResource(R.string.login_privacy_note),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center

@@ -30,7 +30,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
+import com.david.mailapp.R
 import com.david.mailapp.feature.settings.components.PalettePreview
 import com.david.mailapp.feature.settings.components.SettingsCard
 import com.david.mailapp.feature.settings.components.SettingsCardPosition
@@ -59,12 +63,12 @@ fun AppearanceSettingsScreen(
         modifier = modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
-                title = { Text("Apariencia", style = MaterialTheme.typography.titleLarge) },
+                title = { Text(stringResource(R.string.settings_appearance), style = MaterialTheme.typography.titleLarge) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Volver"
+                            contentDescription = stringResource(R.string.action_back)
                         )
                     }
                 },
@@ -86,7 +90,7 @@ fun AppearanceSettingsScreen(
                 SettingsCard(position = SettingsCardPosition.First) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            "Tema",
+                            stringResource(R.string.theme_title),
                             style = MaterialTheme.typography.titleSmall,
                             color = MaterialTheme.colorScheme.onSurface
                         )
@@ -96,7 +100,7 @@ fun AppearanceSettingsScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             ThemeChip(
-                                label = "Sistema",
+                                label = stringResource(R.string.theme_system),
                                 icon = Icons.Default.PhoneAndroid,
                                 selected = false,
                                 onClick = {
@@ -106,7 +110,7 @@ fun AppearanceSettingsScreen(
                                 modifier = Modifier.weight(1f)
                             )
                             ThemeChip(
-                                label = "Claro",
+                                label = stringResource(R.string.theme_light),
                                 icon = Icons.Default.LightMode,
                                 selected = !isDarkMode,
                                 onClick = {
@@ -116,7 +120,7 @@ fun AppearanceSettingsScreen(
                                 modifier = Modifier.weight(1f)
                             )
                             ThemeChip(
-                                label = "Oscuro",
+                                label = stringResource(R.string.theme_dark),
                                 icon = Icons.Default.DarkMode,
                                 selected = isDarkMode,
                                 onClick = {
@@ -134,11 +138,11 @@ fun AppearanceSettingsScreen(
             item(key = "amoled") {
                 SettingsCard(position = SettingsCardPosition.Middle) {
                     SettingsListItem(
-                        headline = "Modo AMOLED",
+                        headline = stringResource(R.string.amoled_title),
                         supporting = if (isDarkMode)
-                            "Fondo negro puro para pantallas OLED"
+                            stringResource(R.string.amoled_description_dark)
                         else
-                            "Activa el modo oscuro para usar esta opción",
+                            stringResource(R.string.amoled_description_light),
                         trailingSwitch = true,
                         checked = isAmoled && isDarkMode,
                         onCheckedChange = { checked ->
@@ -152,8 +156,8 @@ fun AppearanceSettingsScreen(
             item(key = "typography") {
                 SettingsCard(position = SettingsCardPosition.Middle) {
                     SettingsListItem(
-                        headline = "Usar Google Sans",
-                        supporting = "Aplica la fuente en la aplicación",
+                        headline = stringResource(R.string.font_google_sans_title),
+                        supporting = stringResource(R.string.font_google_sans_description),
                         trailingSwitch = true,
                         checked = useCustomFont,
                         onCheckedChange = { checked ->
@@ -167,8 +171,8 @@ fun AppearanceSettingsScreen(
             item(key = "dynamic_colors") {
                 SettingsCard(position = SettingsCardPosition.Middle) {
                     SettingsListItem(
-                        headline = "Color dinámico",
-                        supporting = "Adapta el tema a tu fondo (Android 12+)",
+                        headline = stringResource(R.string.color_dynamic_title),
+                        supporting = stringResource(R.string.color_dynamic_description),
                         trailingSwitch = true,
                         checked = isDynamic,
                         onCheckedChange = { checked ->
@@ -188,13 +192,13 @@ fun AppearanceSettingsScreen(
                 SettingsCard(position = SettingsCardPosition.Last) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            "Colores básicos",
+                            stringResource(R.string.color_basic_title),
                             style = MaterialTheme.typography.titleSmall,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            "Elige un tono sólido de Material Design 3",
+                            stringResource(R.string.color_basic_description),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -211,6 +215,7 @@ fun AppearanceSettingsScreen(
                         ) {
                             items(basicPalettes) { palette ->
                                 val selected = palette == currentPalette
+                                val paletteDescription = stringResource(palette.labelResId)
                                 PalettePreview(
                                     palette = palette,
                                     isSelected = selected,
@@ -220,6 +225,9 @@ fun AppearanceSettingsScreen(
                                             newPalette = palette
                                         )
                                         onPaletteChange(palette)
+                                    },
+                                    modifier = Modifier.semantics {
+                                        contentDescription = paletteDescription
                                     }
                                 )
                             }

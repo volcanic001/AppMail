@@ -1,6 +1,7 @@
 package com.david.mailapp.core.di
 
 import com.david.mailapp.core.auth.OAuthRevocationService
+import com.david.mailapp.core.localization.UiErrorReason
 import com.david.mailapp.core.session.SessionWriteGuardImpl
 import com.david.mailapp.data.pdf.PdfCacheClearResult
 import kotlinx.coroutines.CancellationException
@@ -560,7 +561,7 @@ class SessionInvalidationTest {
         val job2 = async { coordinator.signOut() }
         val result2 = job2.await()
         assertTrue(result2 is SessionCoordinator.SignOutResult.Failed)
-        assertEquals("Ya hay un cierre de sesión en curso.", (result2 as SessionCoordinator.SignOutResult.Failed).message)
+        assertEquals(UiErrorReason.SIGN_OUT_IN_PROGRESS, (result2 as SessionCoordinator.SignOutResult.Failed).reason)
 
         blockMutex.complete(Unit)
         val result1 = job1.await()
@@ -772,7 +773,7 @@ class SessionInvalidationTest {
 
         val result = coordinator.signOut()
         assertTrue(result is SessionCoordinator.SignOutResult.Failed)
-        assertEquals("No se pudo cerrar sesión. Inténtalo nuevamente.", (result as SessionCoordinator.SignOutResult.Failed).message)
+        assertEquals(UiErrorReason.SIGN_OUT_FAILED, (result as SessionCoordinator.SignOutResult.Failed).reason)
         assertEquals(1, reactivateCount.get())
         assertEquals(0, credCount.get())
         assertEquals(0, fakeRevocation.revokeCount.get())

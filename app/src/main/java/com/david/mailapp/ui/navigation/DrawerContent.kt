@@ -12,18 +12,14 @@ import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.david.mailapp.BuildConfig
+import com.david.mailapp.R
 
 /**
  * Content of the ModalNavigationDrawer.
- *
- * Layout (top to bottom):
- * - Header: "MailApp" branding
- * - Divider
- * - Navigation items: Inbox / Trash / Settings
- * - Spacer (pushes footer to bottom)
- * - Footer: version info
  */
 @Composable
 fun DrawerContent(
@@ -36,7 +32,7 @@ fun DrawerContent(
     ) {
         // ── Header ────────────────────────────────────────────
         Text(
-            text = "MailApp",
+            text = stringResource(R.string.app_name),
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface,
@@ -73,7 +69,7 @@ fun DrawerContent(
         )
 
         Text(
-            text = "MailApp v1.0",
+            text = stringResource(R.string.about_version_format, BuildConfig.VERSION_NAME),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(

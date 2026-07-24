@@ -1,5 +1,6 @@
 package com.david.mailapp.ui.navigation
 
+import androidx.annotation.StringRes
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -14,6 +15,7 @@ import androidx.compose.material.icons.outlined.Inbox
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.ui.graphics.vector.ImageVector
+import com.david.mailapp.R
 import com.david.mailapp.feature.compose.ComposeArgs
 
 /**
@@ -27,27 +29,27 @@ import com.david.mailapp.feature.compose.ComposeArgs
  */
 sealed class Screen(
     val route: String,
-    val label: String,
+    @StringRes val labelResId: Int,
     val outlinedIcon: ImageVector,
     val filledIcon: ImageVector
 ) {
     data object Inbox : Screen(
         route = "inbox",
-        label = "Inbox",
+        labelResId = R.string.nav_inbox,
         outlinedIcon = Icons.Outlined.Inbox,
         filledIcon = Icons.Filled.Inbox
     )
 
     data object Trash : Screen(
         route = "trash",
-        label = "Trash",
+        labelResId = R.string.nav_trash,
         outlinedIcon = Icons.Outlined.Delete,
         filledIcon = Icons.Filled.Delete
     )
 
     data object Settings : Screen(
         route = "settings",
-        label = "Settings",
+        labelResId = R.string.nav_settings,
         outlinedIcon = Icons.Outlined.Settings,
         filledIcon = Icons.Filled.Settings
     )
@@ -55,7 +57,7 @@ sealed class Screen(
     /** Search screen — activated only via the search icon in TopAppBar. Not shown in drawer. */
     data object Search : Screen(
         route = "search",
-        label = "Search",
+        labelResId = R.string.nav_search,
         outlinedIcon = Icons.Outlined.Search,
         filledIcon = Icons.Filled.Search
     )
@@ -63,7 +65,7 @@ sealed class Screen(
     /** Email detail screen — programmatic-only, carries [emailId]. Not shown in drawer. */
     data class EmailDetail(val emailId: String) : Screen(
         route = "email_detail",
-        label = "Detalle",
+        labelResId = R.string.nav_email_detail,
         outlinedIcon = Icons.Outlined.Email,
         filledIcon = Icons.Filled.Email
     )
@@ -71,7 +73,7 @@ sealed class Screen(
     /** Email composition screen — programmatic-only, carries [ComposeArgs]. Not shown in drawer. */
     data class Compose(val args: ComposeArgs) : Screen(
         route = "compose",
-        label = "Redactar",
+        labelResId = R.string.action_compose,
         outlinedIcon = Icons.Outlined.Edit,
         filledIcon = Icons.Filled.Edit
     )

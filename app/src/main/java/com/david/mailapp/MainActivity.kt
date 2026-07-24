@@ -19,7 +19,12 @@ import androidx.lifecycle.lifecycleScope
 import com.david.mailapp.core.auth.OAuthLaunchResult
 import com.david.mailapp.core.auth.OAuthRedirectResult
 import com.david.mailapp.core.di.AppContainer
+import com.david.mailapp.core.localization.UiErrorReason
+import com.david.mailapp.core.localization.UiText
+import com.david.mailapp.core.localization.resolve
+import com.david.mailapp.core.localization.toUiText
 import com.david.mailapp.feature.auth.LoginScreen
+import com.david.mailapp.feature.auth.toUiTextOrNull
 import com.david.mailapp.ui.navigation.MainScreen
 import com.david.mailapp.ui.theme.ColorPalette
 import com.david.mailapp.ui.theme.MailAppTheme
@@ -64,11 +69,7 @@ class MainActivity : ComponentActivity() {
                 if (expired) {
                     viewModelStore.clear()
                     isSignedInFlow.value = false
-                    Toast.makeText(
-                        this@MainActivity,
-                        "Tu sesión expiró. Inicia sesión nuevamente.",
-                        Toast.LENGTH_LONG
-                    ).show()
+                    showToast(UiErrorReason.SESSION_EXPIRED.toUiText(), Toast.LENGTH_LONG)
                     AppContainer.sessionExpiredSignal.value = false
                 }
             }
@@ -143,11 +144,7 @@ class MainActivity : ComponentActivity() {
                                     }
                                     is AppContainer.SignOutResult.Failed -> {
                                         isSigningOut = false
-                                        Toast.makeText(
-                                            this@MainActivity,
-                                            result.message,
-                                            Toast.LENGTH_SHORT
-                                        ).show()
+                                        showToast(result.reason.toUiText())
                                     }
                                 }
                             }
@@ -200,44 +197,27 @@ class MainActivity : ComponentActivity() {
                     val pdfResult = withContext(Dispatchers.IO) { AppContainer.pdfCacheManager.clearAll() }
                     if (pdfResult is com.david.mailapp.data.pdf.PdfCacheClearResult.Failure) {
                         resetOAuthUiState()
-                        Toast.makeText(
-                            this@MainActivity,
-                            "No se pudieron eliminar los archivos temporales. Reinténtalo.",
-                            Toast.LENGTH_SHORT
-                        ).show()
+                        showToast(UiErrorReason.TEMP_CLEANUP_FAILED.toUiText())
                         return@launch
                     }
                     AppContainer.authManager.setPendingPdfCleanup(false)
                 }
             } catch (_: Exception) {
                 resetOAuthUiState()
-                Toast.makeText(
-                    this@MainActivity,
-                    "No se pudo comprobar la limpieza local. Reinténtalo.",
-                    Toast.LENGTH_SHORT
-                ).show()
+                showToast(UiErrorReason.LOCAL_CLEANUP_CHECK_FAILED.toUiText())
                 return@launch
             }
 
-            when (AppContainer.authClient.launchAuth(this@MainActivity)) {
+            when (val result = AppContainer.authClient.launchAuth(this@MainActivity)) {
                 OAuthLaunchResult.Launched -> {
                     oauthUiStateFlow.value = OAuthUiState.AwaitingRedirect
                 }
-                OAuthLaunchResult.NoBrowserAvailable -> {
+                else -> {
                     resetOAuthUiState()
-                    Toast.makeText(
-                        this@MainActivity,
-                        "No se encontró un navegador compatible.",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-                OAuthLaunchResult.Failed -> {
-                    resetOAuthUiState()
-                    Toast.makeText(
-                        this@MainActivity,
-                        "No se pudo abrir el inicio de sesión.",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    val uiText = result.toUiTextOrNull()
+                    if (uiText != null) {
+                        showToast(uiText)
+                    }
                 }
             }
         }
@@ -251,11 +231,7 @@ class MainActivity : ComponentActivity() {
                 AppContainer.authClient.cancelPendingAuth()
             } finally {
                 resetOAuthUiState()
-                Toast.makeText(
-                    this@MainActivity,
-                    "Inicio de sesión cancelado.",
-                    Toast.LENGTH_SHORT
-                ).show()
+                showToast(UiText.Resource(com.david.mailapp.R.string.session_auth_cancelled))
             }
         }
     }
@@ -280,39 +256,30 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch {
             try {
                 val result = AppContainer.authClient.handleOAuthRedirect(uri)
+                val uiText = result.toUiTextOrNull()
                 when (result) {
                     OAuthRedirectResult.Success -> {
                         AppContainer.activateProvider()
                         isSignedInFlow.value = true
                     }
-                    OAuthRedirectResult.UserCancelled -> {
-                        Toast.makeText(
-                            this@MainActivity,
-                            "Inicio de sesión cancelado.",
-                            Toast.LENGTH_SHORT
-                        ).show()
+                    else -> {
+                        if (uiText != null) {
+                            showToast(uiText)
+                        }
                     }
-                    OAuthRedirectResult.InvalidSession,
-                    OAuthRedirectResult.ExpiredSession -> {
-                        Toast.makeText(
-                            this@MainActivity,
-                            "La sesión de inicio de sesión no es válida. Inténtalo nuevamente.",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    }
-                    OAuthRedirectResult.MissingAuthorizationCode,
-                    OAuthRedirectResult.TokenExchangeFailed -> {
-                        Toast.makeText(
-                            this@MainActivity,
-                            "No se pudo iniciar sesión. Inténtalo nuevamente.",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    }
-                    OAuthRedirectResult.NotOAuthRedirect -> Unit
                 }
             } finally {
                 resetOAuthUiState()
             }
         }
+    }
+
+    /**
+     * Helper para mostrar un [Toast] a partir de un [UiText].
+     * Resuelve el texto mediante [AppContainer.stringProvider].
+     */
+    private fun showToast(text: UiText, duration: Int = Toast.LENGTH_SHORT) {
+        val message = text.resolve(AppContainer.stringProvider)
+        Toast.makeText(this, message, duration).show()
     }
 }

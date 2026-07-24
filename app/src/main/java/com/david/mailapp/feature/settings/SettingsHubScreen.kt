@@ -28,9 +28,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.dp
+import com.david.mailapp.BuildConfig
+import com.david.mailapp.R
 import com.david.mailapp.feature.settings.components.SettingsCard
 import com.david.mailapp.feature.settings.components.SettingsCardPosition
 import com.david.mailapp.feature.settings.components.SettingsListItem
@@ -38,16 +40,6 @@ import com.david.mailapp.ui.theme.ColorPalette
 
 /**
  * Settings hub — hierarchical navigation entry point.
- *
- * Each row is a [SettingsCard] wrapping a [SettingsListItem].
- * Tapping a card dispatches [onNavigateTo] with the corresponding
- * [SettingsRoute] so the parent [SettingsNavHost] handles the transition.
- *
- * @param currentPalette  Active palette, used in the Appearance card subtitle.
- * @param isDarkMode      Whether dark theme is active, used in the Appearance subtitle.
- * @param isSignedIn      Whether a mail account is connected, shown in Account subtitle.
- * @param onNavigateTo    Called with the target route when a card is tapped.
- * @param onBack          Navigates back to the previous screen (Inbox).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -62,7 +54,10 @@ fun SettingsHubScreen(
     BackHandler(onBack = onBack)
 
     val appearanceSummary = buildAppearanceSummary(currentPalette, isDarkMode)
-    val accountSummary = if (isSignedIn) "Conectada" else "Sin conectar"
+    val accountSummary = if (isSignedIn)
+        stringResource(R.string.settings_connected)
+    else
+        stringResource(R.string.settings_disconnected)
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -77,10 +72,10 @@ fun SettingsHubScreen(
                     onClick = onBack,
                     modifier = Modifier.padding(start = 4.dp, top = 8.dp)
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
                 }
                 Text(
-                    text = "Ajustes",
+                    text = stringResource(R.string.nav_settings),
                     style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
                     modifier = Modifier.padding(start = 16.dp, top = 4.dp, bottom = 16.dp)
                 )
@@ -101,7 +96,7 @@ fun SettingsHubScreen(
                     position = SettingsCardPosition.First
                 ) {
                     SettingsListItem(
-                        headline = "Apariencia",
+                        headline = stringResource(R.string.settings_appearance),
                         supporting = appearanceSummary,
                         icon = Icons.Default.Palette
                     )
@@ -115,7 +110,7 @@ fun SettingsHubScreen(
                     position = SettingsCardPosition.Middle
                 ) {
                     SettingsListItem(
-                        headline = "Cuenta",
+                        headline = stringResource(R.string.settings_account),
                         supporting = accountSummary,
                         icon = Icons.AutoMirrored.Filled.Logout
                     )
@@ -129,8 +124,8 @@ fun SettingsHubScreen(
                     position = SettingsCardPosition.Middle
                 ) {
                     SettingsListItem(
-                        headline = "Notificaciones",
-                        supporting = "Próximamente",
+                        headline = stringResource(R.string.settings_notifications),
+                        supporting = stringResource(R.string.settings_coming_soon),
                         icon = Icons.Default.Notifications
                     )
                 }
@@ -143,8 +138,8 @@ fun SettingsHubScreen(
                     position = SettingsCardPosition.Middle
                 ) {
                     SettingsListItem(
-                        headline = "Privacidad",
-                        supporting = "Próximamente",
+                        headline = stringResource(R.string.settings_privacy),
+                        supporting = stringResource(R.string.settings_coming_soon),
                         icon = Icons.Default.Lock
                     )
                 }
@@ -157,8 +152,8 @@ fun SettingsHubScreen(
                     position = SettingsCardPosition.Middle
                 ) {
                     SettingsListItem(
-                        headline = "Seguridad",
-                        supporting = "Próximamente",
+                        headline = stringResource(R.string.settings_security),
+                        supporting = stringResource(R.string.settings_coming_soon),
                         icon = Icons.Default.Security
                     )
                 }
@@ -171,8 +166,8 @@ fun SettingsHubScreen(
                     position = SettingsCardPosition.Last
                 ) {
                     SettingsListItem(
-                        headline = "Acerca de",
-                        supporting = "MailApp v1.0",
+                        headline = stringResource(R.string.settings_about),
+                        supporting = stringResource(R.string.about_version_format, BuildConfig.VERSION_NAME),
                         icon = Icons.Default.Info
                     )
                 }
@@ -181,15 +176,16 @@ fun SettingsHubScreen(
     }
 }
 
+@Composable
 private fun buildAppearanceSummary(palette: ColorPalette, isDark: Boolean): String {
-    val themeName = when {
-        isDark -> "Oscuro"
-        else -> "Claro"
-    }
+    val themeName = if (isDark)
+        stringResource(R.string.theme_dark)
+    else
+        stringResource(R.string.theme_light)
     val paletteName = if (palette == ColorPalette.Dynamic) {
-        "Color dinámico"
+        stringResource(R.string.color_dynamic_title)
     } else {
-        palette.displayName
+        stringResource(palette.labelResId)
     }
-    return "$paletteName · Tema $themeName"
+    return stringResource(R.string.settings_appearance_summary, paletteName, themeName)
 }

@@ -18,7 +18,7 @@ object ThemeDebug {
 
     fun logPaletteSelection(oldPalette: ColorPalette, newPalette: ColorPalette) {
         Log.d(TAG, "--------------------------------------------------")
-        Log.d(TAG, "🎨 [PALETTE CLICK] User selected palette: ${newPalette.displayName} (was: ${oldPalette.displayName})")
+        Log.d(TAG, "🎨 [PALETTE CLICK] User selected palette: ${newPalette.name} (was: ${oldPalette.name})")
         Log.d(TAG, "   Seed Color: ${newPalette.seedColor.toHex()}")
         Log.d(TAG, "   Preview Colors -> Top: ${newPalette.previewTop.toHex()} | BL: ${newPalette.previewBottomLeft.toHex()} | BR: ${newPalette.previewBottomRight.toHex()}")
     }
@@ -30,7 +30,7 @@ object ThemeDebug {
         colorScheme: ColorScheme
     ) {
         Log.d(TAG, "--------------------------------------------------")
-        Log.d(TAG, "⚡ [THEME EVALUATED] Palette: ${palette.displayName} | DarkMode: $isDark | DynamicMonet: $isDynamic")
+        Log.d(TAG, "⚡ [THEME EVALUATED] Palette: ${palette.name} | DarkMode: $isDark | DynamicMonet: $isDynamic")
         Log.d(TAG, "   [Active ColorScheme Hex Values]:")
         Log.d(TAG, "   • primary:            ${colorScheme.primary.toHex()}")
         Log.d(TAG, "   • onPrimary:          ${colorScheme.onPrimary.toHex()}")

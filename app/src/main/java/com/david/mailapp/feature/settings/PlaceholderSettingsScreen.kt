@@ -1,5 +1,6 @@
 package com.david.mailapp.feature.settings
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -20,22 +21,19 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.david.mailapp.R
 import com.david.mailapp.feature.settings.components.SettingsCard
 
 /**
  * Generic placeholder screen for future Settings categories.
- *
- * Renders a [TopAppBar] with back button and a centered "Próximamente"
- * message inside a [SettingsCard].
- *
- * @param title  Displayed in the TopAppBar and as the card headline.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlaceholderSettingsScreen(
-    title: String,
+    @StringRes titleResId: Int,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -43,12 +41,12 @@ fun PlaceholderSettingsScreen(
         modifier = modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
-                title = { Text(title, style = MaterialTheme.typography.titleLarge) },
+                title = { Text(stringResource(titleResId), style = MaterialTheme.typography.titleLarge) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Volver"
+                            contentDescription = stringResource(R.string.action_back)
                         )
                     }
                 },
@@ -74,7 +72,7 @@ fun PlaceholderSettingsScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            "Próximamente",
+                            stringResource(R.string.settings_coming_soon),
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center

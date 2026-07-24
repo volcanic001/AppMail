@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.david.mailapp.R
 import com.david.mailapp.core.di.AppContainer
 import com.david.mailapp.ui.theme.ColorPalette
 
@@ -113,21 +114,21 @@ fun SettingsNavHost(
 
         composable<SettingsRoute.Notifications> {
             PlaceholderSettingsScreen(
-                title = "Notificaciones",
+                titleResId = R.string.settings_notifications,
                 onBack = { navController.popBackStack() }
             )
         }
 
         composable<SettingsRoute.Privacy> {
             PlaceholderSettingsScreen(
-                title = "Privacidad",
+                titleResId = R.string.settings_privacy,
                 onBack = { navController.popBackStack() }
             )
         }
 
         composable<SettingsRoute.Security> {
             PlaceholderSettingsScreen(
-                title = "Seguridad",
+                titleResId = R.string.settings_security,
                 onBack = { navController.popBackStack() }
             )
         }
