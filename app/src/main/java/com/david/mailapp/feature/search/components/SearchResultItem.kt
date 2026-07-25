@@ -31,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -45,9 +46,6 @@ import com.david.mailapp.ui.theme.MotionTokens
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Date
-import java.util.Locale
-
-private val timeFormat = SimpleDateFormat("h:mm a", Locale.getDefault())
 
 /**
  * Search result row with query highlighting and staggered entrance.
@@ -78,6 +76,12 @@ fun SearchResultItem(
         animationSpec = MotionTokens.resultStagger,
         label = "resultScale"
     )
+
+    val timePattern = stringResource(R.string.date_pattern_time)
+    val locale = LocalLocale.current.platformLocale
+    val timeFormat = remember(timePattern, locale) {
+        SimpleDateFormat(timePattern, locale)
+    }
 
     LaunchedEffect(Unit) {
         delay(delayMs.toLong())
@@ -209,9 +213,10 @@ private fun highlightQuery(text: String, query: String, isRead: Boolean) = build
         return@buildAnnotatedString
     }
 
+    val locale = LocalLocale.current.platformLocale
     var current = 0
-    val lowerText = text.lowercase(Locale.getDefault())
-    val lowerQuery = query.lowercase(Locale.getDefault())
+    val lowerText = text.lowercase(locale)
+    val lowerQuery = query.lowercase(locale)
 
     while (current < text.length) {
         val index = lowerText.indexOf(lowerQuery, current)

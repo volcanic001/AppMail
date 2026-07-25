@@ -39,6 +39,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -50,11 +51,8 @@ import com.david.mailapp.ui.theme.MotionTokens
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
-import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.sign
-
-private val timeFormat = SimpleDateFormat("h:mm a", Locale.getDefault())
 
 /**
  * Email row with custom physics-driven swipe gesture handler.
@@ -190,8 +188,10 @@ fun EmailListItem(
                 )
             }
     ) {
-        val formattedTime = remember(email.timestamp) {
-            timeFormat.format(Date(email.timestamp))
+        val timePattern = stringResource(R.string.date_pattern_time)
+        val locale = LocalLocale.current.platformLocale
+        val formattedTime = remember(email.timestamp, timePattern, locale) {
+            SimpleDateFormat(timePattern, locale).format(Date(email.timestamp))
         }
         val parsedSender = remember(email.from) { parseEmailSender(email.from) }
 

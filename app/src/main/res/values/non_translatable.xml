@@ -13,8 +13,6 @@
     <string name="compose_cc_bcc_label" translatable="false">Cc/Cco</string>
 
     <!-- Marcas comerciales -->
-    <string name="brand_google" translatable="false">Google</string>
-    <string name="brand_gmail" translatable="false">Gmail</string>
     <string name="brand_gmail_provider_label" translatable="false">Google (Gmail)</string>
 
     <!-- Arquitectura técnica -->
@@ -26,12 +24,6 @@
 
     <!-- Formato técnico de versión -->
     <string name="about_version_format" translatable="false">MailApp v%1$s</string>
-
-    <!-- Unidades de tamaño -->
-    <string name="unit_bytes" translatable="false">B</string>
-    <string name="unit_kilobytes" translatable="false">KB</string>
-    <string name="unit_megabytes" translatable="false">MB</string>
-    <string name="unit_gigabytes" translatable="false">GB</string>
 
     <!-- Formatos técnicos de nombre de archivo -->
     <string name="image_filename_format" translatable="false">MailApp_Image_%1$d.%2$s</string>

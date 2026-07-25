@@ -38,6 +38,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -333,9 +334,10 @@ private fun StatusLine(
     state: PdfDownloadState,
     metadataSizeBytes: Long?
 ) {
+    val pdfLocale = LocalLocale.current.platformLocale
     when (state) {
         is PdfDownloadState.Idle -> {
-            val sizeText = formatPdfAttachmentSize(metadataSizeBytes)
+            val sizeText = formatPdfAttachmentSize(metadataSizeBytes, pdfLocale)
                 ?.asString()
                 ?: stringResource(R.string.pdf_attachment_unknown_size)
             Text(

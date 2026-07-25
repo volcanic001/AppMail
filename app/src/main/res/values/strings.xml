@@ -17,21 +17,13 @@
 
     <!-- Acciones -->
     <string name="action_compose">Redactar</string>
-    <string name="action_delete">Eliminar</string>
-    <string name="action_restore">Restaurar</string>
-    <string name="action_delete_permanently">Eliminar permanentemente</string>
-    <string name="action_pull_to_refresh">Desliza para actualizar</string>
     <string name="action_back">Volver</string>
     <string name="action_menu">Menú</string>
     <string name="action_search">Buscar</string>
-    <string name="action_clear">Borrar</string>
     <string name="action_close">Cerrar</string>
-    <string name="action_cancel">Cancelar</string>
     <string name="action_retry">Reintentar</string>
     <string name="action_undo">Deshacer</string>
     <string name="action_send">Enviar</string>
-    <string name="action_reply">Responder</string>
-    <string name="action_forward">Reenviar</string>
 
     <!-- Estados generales -->
     <string name="loading">Cargando…</string>
@@ -52,7 +44,6 @@
     <!-- AUTENTICACIÓN Y SESIÓN                                            -->
     <!-- ================================================================ -->
 
-    <string name="auth_sign_in">Iniciar sesión</string>
     <string name="auth_sign_out">Cerrar sesión</string>
     <string name="auth_gmail">Iniciar sesión con Google</string>
     <!-- auth_outlook eliminado: no existe flujo Microsoft -->
@@ -226,7 +217,6 @@
     <string name="date_pattern_time" translatable="false">h:mm a</string>
     <string name="date_pattern_short" translatable="false">d MMM yyyy, HH:mm</string>
     <string name="date_pattern_long" translatable="false">d \'de\' MMMM \'de\' yyyy, HH:mm</string>
-    <string name="date_pattern_day_month" translatable="false">d \'de\' MMMM</string>
 
     <!-- ================================================================ -->
     <!-- DETALLE, IMÁGENES Y PDF                                           -->
@@ -257,10 +247,6 @@
     <string name="image_invalid_format">Formato de imagen inválido</string>
     <string name="image_saved_to_gallery">Imagen guardada en Galería</string>
     <string name="image_save_error">Error al guardar imagen</string>
-
-    <!-- Fechas relativas -->
-    <string name="relative_yesterday">Ayer</string>
-    <string name="today_time_format" translatable="false">HH:mm</string>
 
     <!-- PDF existentes (conservar) -->
     <string name="pdf_attachments_sheet_title">Archivos PDF</string>

@@ -922,49 +922,6 @@ private fun rememberDateFormat(): SimpleDateFormat {
     }
 }
 
-private fun getRelativeDateString(timestamp: Long): String {
-    val now = System.currentTimeMillis()
-    val diff = now - timestamp
-    val oneMinute = 60 * 1000L
-    val oneHour = 60 * oneMinute
-    val oneDay = 24 * oneHour
-    val oneYear = 365 * oneDay
-
-    val emailCal = java.util.Calendar.getInstance().apply { timeInMillis = timestamp }
-    val nowCal = java.util.Calendar.getInstance().apply { timeInMillis = now }
-    val isToday = emailCal.get(java.util.Calendar.YEAR) == nowCal.get(java.util.Calendar.YEAR) &&
-            emailCal.get(java.util.Calendar.DAY_OF_YEAR) == nowCal.get(java.util.Calendar.DAY_OF_YEAR)
-
-    if (isToday) {
-        val sdf = SimpleDateFormat("HH:mm", Locale.getDefault())
-        return sdf.format(Date(timestamp))
-    }
-
-    val yesterdayCal = java.util.Calendar.getInstance().apply {
-        timeInMillis = now
-        add(java.util.Calendar.DAY_OF_YEAR, -1)
-    }
-    val isYesterday = emailCal.get(java.util.Calendar.YEAR) == yesterdayCal.get(java.util.Calendar.YEAR) &&
-            emailCal.get(java.util.Calendar.DAY_OF_YEAR) == yesterdayCal.get(java.util.Calendar.DAY_OF_YEAR)
-
-    if (isYesterday) {
-        return "Ayer"
-    }
-
-    val daysDiff = diff / oneDay
-    if (daysDiff in 2..13) {
-        return "Hace $daysDiff días"
-    }
-
-    val yearsDiff = diff / oneYear
-    if (yearsDiff >= 1) {
-        return if (yearsDiff == 1L) "Hace 1 año" else "Hace $yearsDiff años"
-    }
-
-    val sdf = SimpleDateFormat("d 'de' MMMM", Locale.forLanguageTag("es"))
-    return sdf.format(Date(timestamp))
-}
-
 // ── PDF open request handling ──────────────────────────────────
 
 /**

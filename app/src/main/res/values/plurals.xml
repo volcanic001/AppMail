@@ -7,16 +7,4 @@
         <item quantity="other">%1$d archivos PDF</item>
     </plurals>
 
-    <!-- Fechas relativas: días atrás -->
-    <plurals name="relative_days_ago">
-        <item quantity="one">Hace %1$d día</item>
-        <item quantity="other">Hace %1$d días</item>
-    </plurals>
-
-    <!-- Fechas relativas: años atrás -->
-    <plurals name="relative_years_ago">
-        <item quantity="one">Hace %1$d año</item>
-        <item quantity="other">Hace %1$d años</item>
-    </plurals>
-
 </resources>
