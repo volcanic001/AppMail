@@ -12,6 +12,19 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
+ * Etiquetas ya resueltas para el flujo de guardado de imágenes.
+ *
+ * Resuélvelas en el ámbito composable (stringResource) antes de pasarlas
+ * a [ImageUtils.saveImageToGallery].
+ */
+data class ImageSaveLabels(
+    val invalidFormatMessage: String,
+    val savedToGalleryMessage: String,
+    val saveErrorMessage: String,
+    val filenameTemplate: String
+)
+
+/**
  * Helper object to parse data URIs and interact with MediaStore for image saving.
  */
 object ImageUtils {
@@ -34,35 +47,57 @@ object ImageUtils {
         }
     }
 
+    // ── Pure helpers (no-Context, testable) ────────────────────
+
+    /** Mapea un MIME type de imagen a su extensión de archivo. */
+    internal fun mimeTypeToExtension(mimeType: String): String {
+        return when (mimeType) {
+            "image/png" -> "png"
+            "image/webp" -> "webp"
+            else -> "jpg"
+        }
+    }
+
+    /**
+     * Construye el nombre de archivo desde la plantilla localizada.
+     *
+     * @param template  Plantilla con formato (ej. "MailApp_Image_%1$d.%2$s").
+     * @param timestamp Marca de tiempo actual en ms.
+     * @param extension Extensión de archivo (png, webp, jpg).
+     */
+    internal fun buildImageFilename(template: String, timestamp: Long, extension: String): String {
+        return String.format(java.util.Locale.ROOT, template, timestamp, extension)
+    }
+
+    // ── Save to gallery ────────────────────────────────────────
+
     /**
      * Saves a "data:image/xxx;base64,..." string to the device's public gallery (MediaStore).
-     * Automatically handles the MIME type and file extension based on the URI.
+     *
+     * @param labels Etiquetas ya resueltas desde el ámbito composable.
      */
-    suspend fun saveImageToGallery(context: Context, dataUri: String) = withContext(Dispatchers.IO) {
+    suspend fun saveImageToGallery(
+        context: Context,
+        dataUri: String,
+        labels: ImageSaveLabels
+    ) = withContext(Dispatchers.IO) {
         try {
             if (!dataUri.startsWith("data:image/")) {
-                showToast(context, "Formato de imagen inválido")
+                showToast(context, labels.invalidFormatMessage)
                 return@withContext
             }
 
-            // Extract MIME type, e.g., "image/jpeg"
             val mimeTypeEndIndex = dataUri.indexOf(";")
             if (mimeTypeEndIndex == -1) return@withContext
             val mimeType = dataUri.substring(5, mimeTypeEndIndex)
 
-            // Extract base64
             val base64StartIndex = dataUri.indexOf("base64,")
             if (base64StartIndex == -1) return@withContext
             val base64Data = dataUri.substring(base64StartIndex + 7)
 
             val bytes = Base64.decode(base64Data, Base64.DEFAULT)
-
-            val extension = when (mimeType) {
-                "image/png" -> "png"
-                "image/webp" -> "webp"
-                else -> "jpg"
-            }
-            val filename = "MailApp_Image_${System.currentTimeMillis()}.$extension"
+            val extension = mimeTypeToExtension(mimeType)
+            val filename = buildImageFilename(labels.filenameTemplate, System.currentTimeMillis(), extension)
 
             val contentValues = ContentValues().apply {
                 put(MediaStore.MediaColumns.DISPLAY_NAME, filename)
@@ -80,19 +115,19 @@ object ImageUtils {
                 resolver.openOutputStream(uri)?.use { outputStream ->
                     outputStream.write(bytes)
                 }
-                
+
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     contentValues.clear()
                     contentValues.put(MediaStore.MediaColumns.IS_PENDING, 0)
                     resolver.update(uri, contentValues, null, null)
                 }
-                showToast(context, "Imagen guardada en Galería")
+                showToast(context, labels.savedToGalleryMessage)
             } else {
-                showToast(context, "Error al guardar imagen")
+                showToast(context, labels.saveErrorMessage)
             }
         } catch (e: Exception) {
             e.printStackTrace()
-            showToast(context, "Error al guardar imagen")
+            showToast(context, labels.saveErrorMessage)
         }
     }
 

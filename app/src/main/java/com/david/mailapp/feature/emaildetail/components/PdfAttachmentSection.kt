@@ -45,7 +45,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.filled.SaveAlt
 import com.david.mailapp.R
-import com.david.mailapp.data.pdf.PdfDownloadFailure
+import com.david.mailapp.core.localization.UiText
+import com.david.mailapp.core.localization.asString
+import com.david.mailapp.core.localization.toUiErrorReason
+import com.david.mailapp.core.localization.toUiText
 import com.david.mailapp.data.pdf.PdfDownloadState
 import com.david.mailapp.domain.model.PdfAttachmentMetadata
 import java.util.Locale
@@ -266,7 +269,7 @@ private fun PdfAttachmentItem(
                     ) {
                         Icon(
                             imageVector = Icons.Filled.SaveAlt,
-                            contentDescription = "Guardar PDF como",
+                            contentDescription = stringResource(R.string.pdf_save_as),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(20.dp)
                         )
@@ -305,7 +308,7 @@ private fun LeadingIcon(
         is PdfDownloadState.Ready -> {
             Icon(
                 imageVector = Icons.Filled.CheckCircle,
-                contentDescription = "Descargado",
+                contentDescription = stringResource(R.string.pdf_downloaded),
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(24.dp)
             )
@@ -313,7 +316,7 @@ private fun LeadingIcon(
         is PdfDownloadState.Error -> {
             Icon(
                 imageVector = Icons.Filled.ErrorOutline,
-                contentDescription = "Error",
+                contentDescription = stringResource(R.string.pdf_error),
                 tint = MaterialTheme.colorScheme.error,
                 modifier = Modifier.size(24.dp)
             )
@@ -333,6 +336,7 @@ private fun StatusLine(
     when (state) {
         is PdfDownloadState.Idle -> {
             val sizeText = formatPdfAttachmentSize(metadataSizeBytes)
+                ?.asString()
                 ?: stringResource(R.string.pdf_attachment_unknown_size)
             Text(
                 text = sizeText,
@@ -342,14 +346,14 @@ private fun StatusLine(
         }
         is PdfDownloadState.Downloading -> {
             Text(
-                text = "Descargando…",
+                text = stringResource(R.string.pdf_downloading),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
         is PdfDownloadState.Ready -> {
             Text(
-                text = "Listo",
+                text = stringResource(R.string.pdf_ready),
                 style = MaterialTheme.typography.bodySmall.copy(
                     fontWeight = FontWeight.SemiBold
                 ),
@@ -357,7 +361,9 @@ private fun StatusLine(
             )
         }
         is PdfDownloadState.Error -> {
-            val message = pdfDownloadErrorMessage(state.reason)
+            val message = stringResource(
+                state.reason.toUiErrorReason().toUiText().resId
+            )
             Text(
                 text = message,
                 style = MaterialTheme.typography.bodySmall,
@@ -368,62 +374,54 @@ private fun StatusLine(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PdfDownloadFailure → human-readable message
+// formatPdfAttachmentSize — returns UiText.Resource, formatted with default locale
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Mensaje de error legible para cada [PdfDownloadFailure].
- * Función pura para testabilidad.
- */
-internal fun pdfDownloadErrorMessage(failure: PdfDownloadFailure): String {
-    return when (failure) {
-        PdfDownloadFailure.TOO_LARGE -> "El PDF supera el límite de 25 MB"
-        PdfDownloadFailure.INVALID_PDF, PdfDownloadFailure.EMPTY_CONTENT ->
-            "El archivo descargado no es un PDF válido"
-        PdfDownloadFailure.NO_PROVIDER,
-        PdfDownloadFailure.NETWORK,
-        PdfDownloadFailure.CACHE_WRITE -> "No se pudo descargar. Toca para reintentar"
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// formatPdfAttachmentSize — pure JVM function, no Android dependencies
-// ─────────────────────────────────────────────────────────────────────────────
-
-internal fun formatPdfAttachmentSize(sizeBytes: Long?): String? {
+internal fun formatPdfAttachmentSize(sizeBytes: Long?, locale: Locale = Locale.getDefault()): UiText.Resource? {
     if (sizeBytes == null || sizeBytes < 0) return null
     return when {
-        sizeBytes < 1024 -> "$sizeBytes B"
-        sizeBytes < 1024 * 1024 -> formatKb(sizeBytes)
-        sizeBytes < 1024L * 1024 * 1024 -> formatMb(sizeBytes)
-        else -> formatGb(sizeBytes)
+        sizeBytes < 1024 -> UiText.Resource(
+            R.string.size_bytes,
+            listOf(sizeBytes)
+        )
+        sizeBytes < 1024 * 1024 -> formatKb(sizeBytes, locale)
+        sizeBytes < 1024L * 1024 * 1024 -> formatMb(sizeBytes, locale)
+        else -> formatGb(sizeBytes, locale)
     }
 }
 
-private fun formatKb(bytes: Long): String {
+private fun formatKb(bytes: Long, locale: Locale): UiText.Resource {
     val kb = bytes / 1024.0
-    return formatSize(kb, "KB")
+    return UiText.Resource(
+        R.string.size_kb,
+        listOf(formatSizeDecimal(kb, locale))
+    )
 }
 
-private fun formatMb(bytes: Long): String {
+private fun formatMb(bytes: Long, locale: Locale): UiText.Resource {
     val mb = bytes / (1024.0 * 1024.0)
-    return formatSize(mb, "MB")
+    return UiText.Resource(
+        R.string.size_mb,
+        listOf(formatSizeDecimal(mb, locale))
+    )
 }
 
-private fun formatGb(bytes: Long): String {
+private fun formatGb(bytes: Long, locale: Locale): UiText.Resource {
     val gb = bytes / (1024.0 * 1024.0 * 1024.0)
-    return formatSize(gb, "GB")
+    return UiText.Resource(
+        R.string.size_gb,
+        listOf(formatSizeDecimal(gb, locale))
+    )
 }
 
-private fun formatSize(value: Double, unit: String): String {
-    val rounded = (value * 10).toLong() / 10.0  // one decimal, no rounding
+/** Trunca a un decimal usando el locale dado. */
+internal fun formatSizeDecimal(value: Double, locale: Locale): String {
+    val rounded = (value * 10).toLong() / 10.0
     val asLong = rounded.toLong()
     return if (rounded == asLong.toDouble()) {
-        "$asLong $unit"
+        asLong.toString()
     } else {
-        // Remove trailing .0 if present (defensive)
-        val formatted = "%.1f".format(Locale.ROOT, rounded)
-        if (formatted.endsWith(".0")) "${formatted.dropLast(2)} $unit"
-        else "$formatted $unit"
+        val formatted = "%.1f".format(locale, rounded)
+        if (formatted.endsWith(".0")) formatted.dropLast(2) else formatted
     }
 }

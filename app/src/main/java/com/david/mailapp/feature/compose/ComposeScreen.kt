@@ -28,12 +28,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.david.mailapp.R
 import com.david.mailapp.core.di.AppContainer
+import com.david.mailapp.core.localization.resolve
+import com.david.mailapp.core.localization.toUiText
 import com.david.mailapp.feature.compose.components.ComposeTopBar
 import com.david.mailapp.feature.compose.components.ForwardedMessageBlock
 import com.david.mailapp.feature.compose.components.OriginalMessageQuote
@@ -46,9 +50,10 @@ fun ComposeScreen(
 ) {
     val repository = AppContainer.emailRepository
     val authManager = AppContainer.authManager
+    val stringProvider = AppContainer.stringProvider
     val viewModel: ComposeViewModel = viewModel(
         key = "compose_${args::class.simpleName}_${args.hashCode()}",
-        factory = ComposeViewModel.Factory(args, repository, authManager)
+        factory = ComposeViewModel.Factory(args, repository, authManager, stringProvider)
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -57,12 +62,12 @@ fun ComposeScreen(
     LaunchedEffect(uiState.sendResult) {
         when (val result = uiState.sendResult) {
             is SendResult.Success -> {
-                snackbarHostState.showSnackbar("Email enviado")
+                snackbarHostState.showSnackbar(stringProvider.getString(R.string.compose_sent))
                 viewModel.onDismissSendResult()
                 onClose()
             }
             is SendResult.Error -> {
-                snackbarHostState.showSnackbar(result.message)
+                snackbarHostState.showSnackbar(result.reason.toUiText().resolve(stringProvider))
                 viewModel.onDismissSendResult()
             }
             null -> {}
@@ -99,11 +104,11 @@ fun ComposeScreen(
         ) {
             // ── De (solo lectura) ─────────────────────────────
             FieldRow(
-                label = "De",
+                label = stringResource(R.string.compose_field_from),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
-                    text = uiState.fromAddress.ifBlank { "Cargando…" },
+                    text = uiState.fromAddress.ifBlank { stringResource(R.string.compose_from_loading) },
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier
@@ -116,13 +121,18 @@ fun ComposeScreen(
 
             // ── Para + botón Cc/Cco integrado a la derecha ────
             FieldRow(
-                label = "Para",
+                label = stringResource(R.string.compose_field_to),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 TextField(
                     value = uiState.toField,
                     onValueChange = viewModel::onToChanged,
-                    placeholder = { Text("Destinatario", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)) },
+                    placeholder = {
+                        Text(
+                            stringResource(R.string.compose_placeholder_recipient),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        )
+                    },
                     textStyle = MaterialTheme.typography.bodyLarge,
                     colors = transparentFieldColors,
                     keyboardOptions = KeyboardOptions(
@@ -133,7 +143,11 @@ fun ComposeScreen(
                     modifier = Modifier.weight(1f)
                 )
                 Text(
-                    text = if (uiState.isCcBccExpanded) "Ocultar" else "Cc/Cco",
+                    text = if (uiState.isCcBccExpanded) {
+                        stringResource(R.string.compose_cc_bcc_hide)
+                    } else {
+                        stringResource(R.string.compose_cc_bcc_label)
+                    },
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier
@@ -148,13 +162,18 @@ fun ComposeScreen(
             AnimatedVisibility(visible = uiState.isCcBccExpanded) {
                 Column {
                     FieldRow(
-                        label = "Cc",
+                        label = stringResource(R.string.compose_field_cc),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         TextField(
                             value = uiState.ccField,
                             onValueChange = viewModel::onCcChanged,
-                            placeholder = { Text("Cc", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)) },
+                            placeholder = {
+                                Text(
+                                    stringResource(R.string.compose_field_cc),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                )
+                            },
                             textStyle = MaterialTheme.typography.bodyLarge,
                             colors = transparentFieldColors,
                             keyboardOptions = KeyboardOptions(
@@ -167,13 +186,18 @@ fun ComposeScreen(
                     }
                     HorizontalDivider(modifier = Modifier.padding(start = 68.dp), color = subtleDividerColor)
                     FieldRow(
-                        label = "Cco",
+                        label = stringResource(R.string.compose_field_bcc),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         TextField(
                             value = uiState.bccField,
                             onValueChange = viewModel::onBccChanged,
-                            placeholder = { Text("Cco", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)) },
+                            placeholder = {
+                                Text(
+                                    stringResource(R.string.compose_field_bcc),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                )
+                            },
                             textStyle = MaterialTheme.typography.bodyLarge,
                             colors = transparentFieldColors,
                             keyboardOptions = KeyboardOptions(
@@ -190,13 +214,18 @@ fun ComposeScreen(
 
             // ── Asunto ────────────────────────────────────────
             FieldRow(
-                label = "Asunto",
+                label = stringResource(R.string.compose_field_subject),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 TextField(
                     value = uiState.subject,
                     onValueChange = viewModel::onSubjectChanged,
-                    placeholder = { Text("Asunto", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)) },
+                    placeholder = {
+                        Text(
+                            stringResource(R.string.compose_field_subject),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        )
+                    },
                     textStyle = MaterialTheme.typography.bodyLarge,
                     colors = transparentFieldColors,
                     keyboardOptions = KeyboardOptions(
@@ -216,7 +245,12 @@ fun ComposeScreen(
                     TextField(
                         value = uiState.bodyText,
                         onValueChange = viewModel::onBodyChanged,
-                        placeholder = { Text("Escribe tu mensaje…", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)) },
+                        placeholder = {
+                            Text(
+                                stringResource(R.string.compose_placeholder_write),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                            )
+                        },
                         textStyle = MaterialTheme.typography.bodyLarge,
                         colors = transparentFieldColors,
                         keyboardOptions = KeyboardOptions(
@@ -233,7 +267,12 @@ fun ComposeScreen(
                     TextField(
                         value = uiState.bodyText,
                         onValueChange = viewModel::onBodyChanged,
-                        placeholder = { Text("Escribe tu respuesta…", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)) },
+                        placeholder = {
+                            Text(
+                                stringResource(R.string.compose_placeholder_reply),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                            )
+                        },
                         textStyle = MaterialTheme.typography.bodyLarge,
                         colors = transparentFieldColors,
                         keyboardOptions = KeyboardOptions(
@@ -259,7 +298,12 @@ fun ComposeScreen(
                     TextField(
                         value = uiState.bodyText,
                         onValueChange = viewModel::onBodyChanged,
-                        placeholder = { Text("Añade un mensaje…", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)) },
+                        placeholder = {
+                            Text(
+                                stringResource(R.string.compose_placeholder_forward),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                            )
+                        },
                         textStyle = MaterialTheme.typography.bodyLarge,
                         colors = transparentFieldColors,
                         keyboardOptions = KeyboardOptions(

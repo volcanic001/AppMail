@@ -3,12 +3,14 @@ package com.david.mailapp.feature.emaildetail
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.david.mailapp.core.localization.UiErrorReason
 import com.david.mailapp.data.pdf.PdfDownloadFailure
 import com.david.mailapp.data.pdf.PdfDownloadState
 import com.david.mailapp.data.remote.provider.InlineImageRef
 import com.david.mailapp.data.repository.EmailRepository
 import com.david.mailapp.domain.model.Email
 import com.david.mailapp.domain.model.PdfAttachmentMetadata
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -173,7 +175,7 @@ class EmailDetailViewModel(
                     if (!delivered) {
                         delivered = true
                         EmailRenderTrace.d(traceMail, "VM", "VM_STATE_ERROR", "reason=email_not_found")
-                        _uiState.value = EmailDetailUiState.BodyError(null, "Email no encontrado")
+                        _uiState.value = EmailDetailUiState.BodyError(null, UiErrorReason.EMAIL_NOT_FOUND)
                     }
                 }
             }
@@ -196,7 +198,7 @@ class EmailDetailViewModel(
                         "VM_REMOTE_FAILURE",
                         "reason=null_result durationMs=${EmailRenderTrace.now() - startedAt}"
                     )
-                    _uiState.value = EmailDetailUiState.BodyError(email, "No se pudo cargar el contenido del email")
+                    _uiState.value = EmailDetailUiState.BodyError(email, UiErrorReason.EMAIL_BODY_LOAD_FAILED)
                 }
             } else if (fetchedResult.rawBody.isNullOrBlank() && fetchedResult.pdfAttachments.isEmpty()) {
                 // No body AND no PDFs → genuinely empty
@@ -208,7 +210,7 @@ class EmailDetailViewModel(
                         "VM_REMOTE_FAILURE",
                         "reason=empty_body_no_pdfs durationMs=${EmailRenderTrace.now() - startedAt}"
                     )
-                    _uiState.value = EmailDetailUiState.BodyError(email, "No se pudo cargar el contenido del email")
+                    _uiState.value = EmailDetailUiState.BodyError(email, UiErrorReason.EMAIL_BODY_LOAD_FAILED)
                 }
             } else if (fetchedResult.rawBody.isNullOrBlank() && fetchedResult.pdfAttachments.isNotEmpty()) {
                 // No body but PDF metadata was found — deliver BodyError with metadata preserved
@@ -224,7 +226,7 @@ class EmailDetailViewModel(
                         "VM_REMOTE_PDF_METADATA",
                         "pdfCount=${fetchedResult.pdfAttachments.size} durationMs=${EmailRenderTrace.now() - startedAt}"
                     )
-                    _uiState.value = EmailDetailUiState.BodyError(pdfEmail, "Este correo contiene PDF adjuntos pero no se pudo cargar el contenido del mensaje")
+                    _uiState.value = EmailDetailUiState.BodyError(pdfEmail, UiErrorReason.EMAIL_BODY_PDFS_ONLY)
                 }
             } else {
                 cachedInlineRefs = fetchedResult.inlineRefs
@@ -238,6 +240,7 @@ class EmailDetailViewModel(
             // On success Room will re-emit with the fetched body — the collect
             // lambda will pick it up and proceed to inline-image resolution.
         } catch (error: Exception) {
+            if (error is CancellationException) throw error
             if (!delivered) {
                 delivered = true
                 EmailRenderTrace.d(
@@ -246,7 +249,7 @@ class EmailDetailViewModel(
                     "VM_REMOTE_FAILURE",
                     "reason=${error.javaClass.simpleName} durationMs=${EmailRenderTrace.now() - startedAt}"
                 )
-                _uiState.value = EmailDetailUiState.BodyError(email, "No se pudo cargar el contenido del email")
+                _uiState.value = EmailDetailUiState.BodyError(email, UiErrorReason.EMAIL_BODY_LOAD_FAILED)
             }
         } finally {
             isFetchingRemoteBody = false

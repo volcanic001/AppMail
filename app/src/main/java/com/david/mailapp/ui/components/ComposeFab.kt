@@ -14,7 +14,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.david.mailapp.R
 import com.david.mailapp.ui.theme.ShapeTokens
 
 /**
@@ -42,13 +44,13 @@ fun ComposeFab(
         ) {
             Icon(
                 imageVector = Icons.Default.Edit,
-                contentDescription = "Compose",
+                contentDescription = stringResource(R.string.action_compose),
                 tint = MaterialTheme.colorScheme.onPrimaryContainer,
                 modifier = Modifier.size(22.dp)
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = "Redactar",
+                text = stringResource(R.string.action_compose),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onPrimaryContainer
             )

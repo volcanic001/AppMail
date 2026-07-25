@@ -4,7 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.david.mailapp.core.auth.AuthManager
+import com.david.mailapp.core.localization.StringProvider
 import com.david.mailapp.data.repository.EmailRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -13,9 +15,11 @@ import kotlinx.coroutines.launch
 class ComposeViewModel(
     private val args: ComposeArgs,
     private val repository: EmailRepository,
-    private val authManager: AuthManager
+    private val authManager: AuthManager,
+    private val stringProvider: StringProvider
 ) : ViewModel() {
 
+    private val composeFormatUtils = ComposeFormatUtils(stringProvider)
     private val _uiState = MutableStateFlow(ComposeUiState())
     val uiState: StateFlow<ComposeUiState> = _uiState.asStateFlow()
 
@@ -29,7 +33,7 @@ class ComposeViewModel(
                 val email = args.originalEmail
                 ComposeUiState(
                     toField = ComposeFormatUtils.extractEmailAddress(email.from),
-                    subject = ComposeFormatUtils.buildReplySubject(email.subject),
+                    subject = composeFormatUtils.buildReplySubject(email.subject),
                     originalEmail = email,
                     composeMode = ComposeMode.REPLY
                 )
@@ -37,7 +41,7 @@ class ComposeViewModel(
             is ComposeArgs.Forward -> {
                 val email = args.originalEmail
                 ComposeUiState(
-                    subject = ComposeFormatUtils.buildForwardSubject(email.subject),
+                    subject = composeFormatUtils.buildForwardSubject(email.subject),
                     originalEmail = email,
                     composeMode = ComposeMode.FORWARD
                 )
@@ -89,20 +93,13 @@ class ComposeViewModel(
                     ComposeMode.REPLY -> {
                         val orig = state.originalEmail
                         if (orig != null) {
-                            val cleanText = ComposeFormatUtils.htmlToPlainText(orig.cleanBody.ifBlank { orig.snippet })
-                            val quoted = cleanText.lines().joinToString("\n> ")
-                            "${state.bodyText}\n\nEl ${ComposeFormatUtils.formatTimestamp(orig.timestamp)}, ${orig.from} escribió:\n> $quoted"
+                            composeFormatUtils.buildReplyBody(state.bodyText, orig, orig.snippet)
                         } else state.bodyText
                     }
                     ComposeMode.FORWARD -> {
                         val orig = state.originalEmail
                         if (orig != null) {
-                            val cleanText = ComposeFormatUtils.htmlToPlainText(orig.cleanBody.ifBlank { orig.snippet })
-                            "${state.bodyText}\n\n---------- Mensaje reenviado ----------\n" +
-                                "De: ${orig.from}\n" +
-                                "Fecha: ${ComposeFormatUtils.formatTimestamp(orig.timestamp)}\n" +
-                                "Asunto: ${orig.subject}\n" +
-                                "Para: ${orig.to}\n\n$cleanText"
+                            composeFormatUtils.buildForwardBody(state.bodyText, orig, orig.snippet)
                         } else state.bodyText
                     }
                 }
@@ -121,9 +118,10 @@ class ComposeViewModel(
                     sendResult = SendResult.Success
                 )
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _uiState.value = _uiState.value.copy(
                     isSending = false,
-                    sendResult = SendResult.Error(e.message ?: "Error al enviar")
+                    sendResult = SendResult.Error(e.toComposeSendErrorReason())
                 )
             }
         }
@@ -138,12 +136,13 @@ class ComposeViewModel(
     class Factory(
         private val args: ComposeArgs,
         private val repository: EmailRepository,
-        private val authManager: AuthManager
+        private val authManager: AuthManager,
+        private val stringProvider: StringProvider
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(ComposeViewModel::class.java)) {
-                return ComposeViewModel(args, repository, authManager) as T
+                return ComposeViewModel(args, repository, authManager, stringProvider) as T
             }
             throw IllegalArgumentException("Unknown ViewModel: ${modelClass.name}")
         }

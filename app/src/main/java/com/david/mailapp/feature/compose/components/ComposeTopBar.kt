@@ -10,13 +10,15 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.ui.Alignment
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.david.mailapp.R
 import com.david.mailapp.feature.compose.ComposeMode
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -28,21 +30,21 @@ fun ComposeTopBar(
     onSend: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val title = when (mode) {
-        ComposeMode.WRITE -> "Redactar"
-        ComposeMode.REPLY -> "Responder"
-        ComposeMode.FORWARD -> "Reenviar"
+    val titleRes = when (mode) {
+        ComposeMode.WRITE -> R.string.compose_title_write
+        ComposeMode.REPLY -> R.string.compose_title_reply
+        ComposeMode.FORWARD -> R.string.compose_title_forward
     }
 
     TopAppBar(
         title = {
-            Text(title, style = MaterialTheme.typography.titleLarge)
+            Text(stringResource(titleRes), style = MaterialTheme.typography.titleLarge)
         },
         navigationIcon = {
             IconButton(onClick = onClose) {
                 Icon(
                     Icons.Default.Close,
-                    contentDescription = "Cerrar"
+                    contentDescription = stringResource(R.string.action_close)
                 )
             }
         },
@@ -62,7 +64,7 @@ fun ComposeTopBar(
                 IconButton(onClick = onSend) {
                     Icon(
                         Icons.AutoMirrored.Filled.Send,
-                        contentDescription = "Enviar"
+                        contentDescription = stringResource(R.string.action_send)
                     )
                 }
             }

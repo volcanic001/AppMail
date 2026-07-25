@@ -1,5 +1,6 @@
 package com.david.mailapp.feature.emaildetail
 
+import com.david.mailapp.core.localization.UiErrorReason
 import com.david.mailapp.domain.model.Email
 
 /**
@@ -37,5 +38,5 @@ sealed interface EmailDetailUiState {
      * Body-level error. [email] may be non-null when metadata was already
      * available before the fetch failed.
      */
-    data class BodyError(val email: Email?, val message: String) : EmailDetailUiState
+    data class BodyError(val email: Email?, val reason: UiErrorReason) : EmailDetailUiState
 }

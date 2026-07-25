@@ -80,6 +80,7 @@ import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -88,11 +89,15 @@ import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.Image
+import com.david.mailapp.R
 import com.david.mailapp.core.di.AppContainer
+import com.david.mailapp.core.localization.asString
+import com.david.mailapp.core.localization.toUiText
 import com.david.mailapp.data.pdf.PdfDownloadState
 import com.david.mailapp.domain.model.Email
 import com.david.mailapp.domain.model.PdfAttachmentMetadata
 import com.david.mailapp.feature.emaildetail.components.EmailBodyWebView
+import com.david.mailapp.feature.emaildetail.components.ImageSaveLabels
 import com.david.mailapp.feature.emaildetail.components.ImageUtils
 import com.david.mailapp.feature.emaildetail.components.PdfAttachmentSection
 import com.david.mailapp.ui.theme.LocalThemeConfig
@@ -146,6 +151,18 @@ fun EmailDetailScreen(
     var savedSaveStableId by rememberSaveable { mutableStateOf("") }
     var savedSaveDisplayName by rememberSaveable { mutableStateOf("") }
 
+    // ── Resolved labels for PDF callbacks (non-Composable helpers) ──
+    val pdfLabels = PdfActionLabels(
+        cacheExpired = stringResource(R.string.pdf_cache_expired),
+        saved = stringResource(R.string.pdf_saved),
+        saveFailed = stringResource(R.string.pdf_save_failed),
+        noFilePicker = stringResource(R.string.pdf_no_file_picker),
+        pickerOpenFailed = stringResource(R.string.pdf_picker_open_failed),
+        noViewer = stringResource(R.string.pdf_no_viewer),
+        openFailed = stringResource(R.string.pdf_open_failed)
+    )
+    val defaultPdfFilename = stringResource(R.string.pdf_default_filename)
+
     val savePdfLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/pdf")
     ) { uri ->
@@ -173,7 +190,7 @@ fun EmailDetailScreen(
             if (file == null) {
                 viewModel.onPdfCacheExpired(stableId)
                 snackbarHostState.showSnackbar(
-                    message = "El PDF ya no está en caché. Toca para descargarlo nuevamente."
+                    message = pdfLabels.cacheExpired
                 )
                 savingStableIds.remove(stableId)
                 savingState.value = savingStableIds.toSet()
@@ -185,7 +202,7 @@ fun EmailDetailScreen(
             }
             if (success) {
                 snackbarHostState.showSnackbar(
-                    message = "PDF guardado correctamente."
+                    message = pdfLabels.saved
                 )
             } else {
                 // Try to clean up partial document
@@ -193,7 +210,7 @@ fun EmailDetailScreen(
                     screenContext.contentResolver.delete(uri, null, null)
                 } catch (_: Exception) { /* best-effort */ }
                 snackbarHostState.showSnackbar(
-                    message = "No se pudo guardar el PDF."
+                    message = pdfLabels.saveFailed
                 )
             }
             savingStableIds.remove(stableId)
@@ -211,16 +228,16 @@ fun EmailDetailScreen(
                             context = screenContext,
                             request = request,
                             viewModel = viewModel,
-                            snackbarHostState = snackbarHostState
+                            snackbarHostState = snackbarHostState,
+                            labels = pdfLabels,
+                            defaultPdfFilename = defaultPdfFilename
                         )
                     }
                     is PdfExternalActionRequest.Save -> {
                         savedSaveEmailId = request.emailId
                         savedSaveStableId = request.stablePartId
                         savedSaveDisplayName = request.displayName
-                        val suggestedName = sanitizeDisplayName(request.displayName).let {
-                            if (!it.endsWith(".pdf", ignoreCase = true)) "$it.pdf" else it
-                        }
+                        val suggestedName = buildPdfSuggestedName(request.displayName, defaultPdfFilename)
                         try {
                             savePdfLauncher.launch(suggestedName)
                         } catch (_: ActivityNotFoundException) {
@@ -228,14 +245,14 @@ fun EmailDetailScreen(
                             savedSaveStableId = ""
                             savedSaveDisplayName = ""
                             snackbarHostState.showSnackbar(
-                                message = "No hay un selector de archivos disponible."
+                                message = pdfLabels.noFilePicker
                             )
                         } catch (_: SecurityException) {
                             savedSaveEmailId = ""
                             savedSaveStableId = ""
                             savedSaveDisplayName = ""
                             snackbarHostState.showSnackbar(
-                                message = "No se pudo abrir el selector de archivos."
+                                message = pdfLabels.pickerOpenFailed
                             )
                         }
                     }
@@ -283,12 +300,12 @@ fun EmailDetailScreen(
         modifier = modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
-                title = { Text("Detalle", style = MaterialTheme.typography.titleLarge) },
+                title = { Text(stringResource(R.string.detail_title), style = MaterialTheme.typography.titleLarge) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Volver"
+                            contentDescription = stringResource(R.string.detail_back)
                         )
                     }
                 },
@@ -303,7 +320,7 @@ fun EmailDetailScreen(
                     ) {
                         Icon(
                             MaterialSymbolsReply,
-                            contentDescription = "Responder",
+                            contentDescription = stringResource(R.string.detail_reply),
                             tint = if (currentEmail != null) MaterialTheme.colorScheme.onSurfaceVariant
                                    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
                         )
@@ -316,7 +333,7 @@ fun EmailDetailScreen(
                     ) {
                         Icon(
                             TablerArrowForwardUpDouble,
-                            contentDescription = "Reenviar",
+                            contentDescription = stringResource(R.string.detail_forward),
                             tint = if (currentEmail != null) MaterialTheme.colorScheme.onSurfaceVariant
                                    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
                         )
@@ -357,7 +374,7 @@ fun EmailDetailScreen(
                                 )
                                 Spacer(Modifier.height(16.dp))
                                 Text(
-                                    text = state.message,
+                                    text = state.reason.toUiText().asString(),
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -431,6 +448,12 @@ fun EmailDetailScreen(
 
             // ── Image action sheet (overlay) ───────────────────────
             if (activeImageUrl != null) {
+                val saveLabels = ImageSaveLabels(
+                    invalidFormatMessage = stringResource(R.string.image_invalid_format),
+                    savedToGalleryMessage = stringResource(R.string.image_saved_to_gallery),
+                    saveErrorMessage = stringResource(R.string.image_save_error),
+                    filenameTemplate = stringResource(R.string.image_filename_format)
+                )
                 ModalBottomSheet(
                     onDismissRequest = { activeImageUrl = null },
                     sheetState = rememberModalBottomSheetState(),
@@ -442,7 +465,7 @@ fun EmailDetailScreen(
                             .padding(top = 2.dp, bottom = 12.dp) // Tightens top/bottom spacing
                     ) {
                         ListItem(
-                            headlineContent = { Text("Abrir imagen") },
+                            headlineContent = { Text(stringResource(R.string.image_open)) },
                             leadingContent = {
                                 Icon(
                                     imageVector = Icons.Filled.Image,
@@ -456,7 +479,7 @@ fun EmailDetailScreen(
                             }
                         )
                         ListItem(
-                            headlineContent = { Text("Guardar imagen") },
+                            headlineContent = { Text(stringResource(R.string.image_save)) },
                             leadingContent = {
                                 Icon(
                                     imageVector = Icons.Filled.Save,
@@ -466,9 +489,10 @@ fun EmailDetailScreen(
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent), // Eliminates background shadow box
                             modifier = Modifier.clickable {
                                 val urlToSave = activeImageUrl
+                                val resolvedLabels = saveLabels
                                 if (urlToSave != null) {
                                     coroutineScope.launch {
-                                        ImageUtils.saveImageToGallery(context, urlToSave)
+                                        ImageUtils.saveImageToGallery(context, urlToSave, resolvedLabels)
                                     }
                                 }
                                 activeImageUrl = null
@@ -502,11 +526,11 @@ fun EmailDetailScreen(
                     if (bitmap != null) {
                         Image(
                             bitmap = bitmap.asImageBitmap(),
-                            contentDescription = "Imagen a pantalla completa",
+                            contentDescription = stringResource(R.string.image_fullscreen),
                             modifier = Modifier.fillMaxWidth()
                         )
                     } else {
-                        Text("Error al cargar la imagen", color = MaterialTheme.colorScheme.error)
+                        Text(stringResource(R.string.image_load_error), color = MaterialTheme.colorScheme.error)
                     }
                 }
             }
@@ -597,7 +621,7 @@ private fun FloatingHeaderPanel(
                 ) {
                     // Subject — prominent
                     Text(
-                        text = email.subject.ifBlank { "(Sin asunto)" },
+                        text = email.subject.ifBlank { stringResource(R.string.detail_subject_missing) },
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold
                         ),
@@ -614,21 +638,21 @@ private fun FloatingHeaderPanel(
                     // Metadata rows
                     HeaderDetailRow(
                         icon = Icons.Outlined.Mail,
-                        label = "De",
+                        label = stringResource(R.string.detail_field_from_label),
                         value = email.from
                     )
                     if (email.to.isNotBlank()) {
                         Spacer(Modifier.height(8.dp))
                         HeaderDetailRow(
                             icon = Icons.Outlined.Person,
-                            label = "Para",
+                            label = stringResource(R.string.detail_field_to_label),
                             value = email.to
                         )
                     }
                     Spacer(Modifier.height(8.dp))
                     HeaderDetailRow(
                         icon = Icons.Outlined.CalendarToday,
-                        label = "Fecha",
+                        label = stringResource(R.string.detail_field_date_label),
                         value = dateFormat.format(Date(email.timestamp))
                     )
                 }
@@ -655,7 +679,7 @@ private fun FloatingHeaderPanel(
             ) {
                 Icon(
                     imageVector = Icons.Filled.KeyboardArrowUp,
-                    contentDescription = if (isExpanded) "Colapsar detalles" else "Expandir detalles",
+                    contentDescription = if (isExpanded) stringResource(R.string.detail_collapse_header) else stringResource(R.string.detail_expand_header),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier
                         .size(18.dp)
@@ -892,8 +916,9 @@ private fun EmailDetailLoading(modifier: Modifier = Modifier) {
 
 @Composable
 private fun rememberDateFormat(): SimpleDateFormat {
-    return remember {
-        SimpleDateFormat("d 'de' MMMM 'de' yyyy, HH:mm", Locale.forLanguageTag("es"))
+    val pattern = stringResource(R.string.date_pattern_long)
+    return remember(pattern) {
+        SimpleDateFormat(pattern, Locale.getDefault())
     }
 }
 
@@ -943,15 +968,16 @@ private fun getRelativeDateString(timestamp: Long): String {
 // ── PDF open request handling ──────────────────────────────────
 
 /**
- * Resuelve el archivo cacheadodesde [request], genera un URI con FileProvider
- * y lanza ACTION_VIEW (Open) o copia a través de SAF (Save).
- * Muestra Snackbar en caso de error.
+ * Resuelve el archivo cacheado desde [request], genera un URI con FileProvider
+ * y lanza ACTION_VIEW (Open). Muestra Snackbar en caso de error.
  */
 private suspend fun handlePdfExternalActionRequest(
     context: android.content.Context,
     request: PdfExternalActionRequest,
     viewModel: EmailDetailViewModel,
-    snackbarHostState: SnackbarHostState
+    snackbarHostState: SnackbarHostState,
+    labels: PdfActionLabels,
+    defaultPdfFilename: String
 ) {
     val repository = com.david.mailapp.core.di.AppContainer.emailRepository
     val file = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
@@ -959,18 +985,17 @@ private suspend fun handlePdfExternalActionRequest(
     }
 
     if (file == null) {
-        // Caché eliminado entre Ready y el toque
         viewModel.onPdfCacheExpired(request.stablePartId)
         snackbarHostState.showSnackbar(
-            message = "El PDF ya no está en caché. Toca para descargarlo nuevamente."
+            message = labels.cacheExpired
         )
         return
     }
 
-    val displayName = sanitizeDisplayName(request.displayName)
+    val displayName = sanitizeDisplayName(request.displayName, defaultPdfFilename)
 
     openPdfIntent(
-        context, file, displayName, snackbarHostState
+        context, file, displayName, snackbarHostState, labels
     )
 }
 
@@ -978,7 +1003,8 @@ private suspend fun openPdfIntent(
     context: android.content.Context,
     file: java.io.File,
     displayName: String,
-    snackbarHostState: SnackbarHostState
+    snackbarHostState: SnackbarHostState,
+    labels: PdfActionLabels
 ) {
     val uri = FileProvider.getUriForFile(
         context,
@@ -996,15 +1022,15 @@ private suspend fun openPdfIntent(
         context.startActivity(intent)
     } catch (e: ActivityNotFoundException) {
         snackbarHostState.showSnackbar(
-            message = "No hay una aplicación instalada para abrir archivos PDF."
+            message = labels.noViewer
         )
     } catch (e: IllegalArgumentException) {
         snackbarHostState.showSnackbar(
-            message = "No se pudo abrir el PDF."
+            message = labels.openFailed
         )
     } catch (e: SecurityException) {
         snackbarHostState.showSnackbar(
-            message = "No se pudo abrir el PDF."
+            message = labels.openFailed
         )
     }
 }
@@ -1012,15 +1038,24 @@ private suspend fun openPdfIntent(
 /**
  * Sanitiza el nombre visible para el visor externo:
  * elimina separadores de ruta, caracteres de control y espacios extremos.
- * Si queda vacío, usa "documento.pdf".
+ * Si queda vacío, usa [defaultName].
  */
-internal fun sanitizeDisplayName(name: String): String {
+internal fun sanitizeDisplayName(name: String, defaultName: String): String {
     val sanitized = name
         .replace("/", "_")
         .replace("\\", "_")
         .replace(Regex("[\\x00-\\x1f\\x7f]"), "")
         .trim()
-    return sanitized.ifBlank { "documento.pdf" }
+    return sanitized.ifBlank { defaultName }
+}
+
+/**
+ * Construye el nombre sugerido para el selector SAF.
+ * Sanitiza [displayName] y garantiza que termine en `.pdf`.
+ */
+internal fun buildPdfSuggestedName(displayName: String, defaultName: String): String {
+    val sanitized = sanitizeDisplayName(displayName, defaultName)
+    return if (sanitized.endsWith(".pdf", ignoreCase = true)) sanitized else "$sanitized.pdf"
 }
 
 /**
@@ -1155,3 +1190,15 @@ val TablerArrowForwardUpDouble: ImageVector
     }
 
 private var _TablerArrowForwardUpDouble: ImageVector? = null
+
+// ── PdfActionLabels — etiquetas resueltas para callbacks no composables ──
+
+internal data class PdfActionLabels(
+    val cacheExpired: String,
+    val saved: String,
+    val saveFailed: String,
+    val noFilePicker: String,
+    val pickerOpenFailed: String,
+    val noViewer: String,
+    val openFailed: String
+)

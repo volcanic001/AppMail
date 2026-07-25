@@ -1,12 +1,13 @@
 package com.david.mailapp.feature.compose
 
+import com.david.mailapp.core.localization.UiErrorReason
 import com.david.mailapp.domain.model.Email
 
 enum class ComposeMode { WRITE, REPLY, FORWARD }
 
 sealed class SendResult {
     data object Success : SendResult()
-    data class Error(val message: String) : SendResult()
+    data class Error(val reason: UiErrorReason) : SendResult()
 }
 
 /**

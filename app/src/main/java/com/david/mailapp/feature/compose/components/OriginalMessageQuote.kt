@@ -16,9 +16,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.david.mailapp.R
 import com.david.mailapp.domain.model.Email
 import com.david.mailapp.feature.compose.ComposeFormatUtils
 
@@ -66,12 +68,15 @@ fun OriginalMessageQuote(
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = email.subject.ifBlank { "Sin Asunto" },
+                    text = email.subject.ifBlank { stringResource(R.string.compose_no_subject_quote_fallback) },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    text = ComposeFormatUtils.formatTimestamp(email.timestamp),
+                    text = ComposeFormatUtils.formatTimestamp(
+                        email.timestamp,
+                        stringResource(R.string.date_pattern_short)
+                    ),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                 )
