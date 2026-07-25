@@ -60,9 +60,13 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.david.mailapp.R
 import com.david.mailapp.core.di.AppContainer
+import com.david.mailapp.core.localization.asString
+import com.david.mailapp.core.localization.toUiText
 import com.david.mailapp.feature.inbox.components.EmailListItem
 import com.david.mailapp.ui.theme.MotionTokens
 import androidx.compose.runtime.mutableStateOf
@@ -92,6 +96,11 @@ fun TrashScreen(
     val scope = rememberCoroutineScope()
     var snackbarJob by remember { mutableStateOf<Job?>(null) }
 
+    // ── Snackbar strings (captured at composable scope) ─────
+    val snackbarDeletedPermanently = stringResource(R.string.snackbar_deleted_permanently)
+    val snackbarUndo = stringResource(R.string.action_undo)
+    val snackbarRestoredToInbox = stringResource(R.string.snackbar_restored_to_inbox)
+
     LaunchedEffect(highlightedEmailId) {
         if (highlightedEmailId != null) {
             delay(2500)
@@ -103,10 +112,10 @@ fun TrashScreen(
         modifier = modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
-                title = { Text("Papelera", style = MaterialTheme.typography.titleLarge) },
+                title = { Text(stringResource(R.string.trash_title), style = MaterialTheme.typography.titleLarge) },
                 navigationIcon = {
                     IconButton(onClick = onMenuClick) {
-                        Icon(Icons.Default.Menu, contentDescription = "Menú")
+                        Icon(Icons.Default.Menu, contentDescription = stringResource(R.string.action_menu))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -130,15 +139,15 @@ fun TrashScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
-                    Text("⚠️", fontSize = 48.sp)
+                    Text(stringResource(R.string.error_symbol), fontSize = 48.sp)
                     Spacer(Modifier.height(16.dp))
                     Text(
-                        state.message,
+                        state.reason.toUiText().asString(),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.height(16.dp))
-                    Button(onClick = { viewModel.refresh() }) { Text("Retry") }
+                    Button(onClick = { viewModel.refresh() }) { Text(stringResource(R.string.action_retry)) }
                 }
             }
 
@@ -196,8 +205,8 @@ fun TrashScreen(
                                         snackbarJob = scope.launch {
                                             viewModel.deletePermanently(email.id)
                                             val result = snackbarHostState.showSnackbar(
-                                                message = "Deleted permanently",
-                                                actionLabel = "Undo",
+                                                message = snackbarDeletedPermanently,
+                                                actionLabel = snackbarUndo,
                                                 duration = SnackbarDuration.Short
                                             )
                                             if (result == SnackbarResult.ActionPerformed) {
@@ -211,7 +220,7 @@ fun TrashScreen(
                                         snackbarJob?.cancel()
                                         snackbarJob = scope.launch {
                                             viewModel.restoreToInbox(email.id)
-                                            snackbarHostState.showSnackbar("Restored to inbox")
+                                            snackbarHostState.showSnackbar(snackbarRestoredToInbox)
                                         }
                                     }
                                 }
@@ -280,10 +289,10 @@ private fun EmptyTrash() {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text("🗑️", fontSize = 48.sp)
+        Text(stringResource(R.string.trash_empty_symbol), fontSize = 48.sp)
         Spacer(Modifier.height(16.dp))
         Text(
-            "Trash is empty",
+            stringResource(R.string.trash_empty),
             style = MaterialTheme.typography.headlineSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )

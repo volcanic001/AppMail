@@ -33,10 +33,12 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.david.mailapp.ui.theme.MotionTokens
+import com.david.mailapp.R
 import kotlinx.coroutines.delay
 
 /**
@@ -94,7 +96,7 @@ fun SearchTopBar(
             IconButton(onClick = onBack) {
                 Icon(
                     Icons.Default.ArrowBack,
-                    contentDescription = "Back"
+                    contentDescription = stringResource(R.string.search_back_description)
                 )
             }
 
@@ -129,7 +131,7 @@ fun SearchTopBar(
                         }
                         if (query.isEmpty()) {
                             Text(
-                                "Buscar en correos…",
+                                stringResource(R.string.search_placeholder),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 18.sp
                             )
@@ -147,7 +149,7 @@ fun SearchTopBar(
                 IconButton(onClick = onClear) {
                     Icon(
                         Icons.Default.Close,
-                        contentDescription = "Clear"
+                        contentDescription = stringResource(R.string.search_clear_query_description)
                     )
                 }
             }

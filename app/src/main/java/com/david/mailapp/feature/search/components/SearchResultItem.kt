@@ -31,12 +31,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import com.david.mailapp.R
 import com.david.mailapp.domain.model.Email
 import com.david.mailapp.feature.inbox.components.EmailAvatar
 import com.david.mailapp.ui.theme.MotionTokens
@@ -149,7 +151,7 @@ fun SearchResultItem(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = email.from,
+                        text = email.from.ifEmpty { stringResource(R.string.fallback_unknown_sender) },
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = if (email.isRead) FontWeight.Normal else FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
@@ -165,9 +167,10 @@ fun SearchResultItem(
                     )
                 }
                 Spacer(Modifier.height(2.dp))
+                val displaySubject = email.subject.ifEmpty { stringResource(R.string.fallback_no_subject) }
                 // Subject with highlight
                 Text(
-                    text = highlightQuery(email.subject, query, email.isRead),
+                    text = highlightQuery(displaySubject, query, email.isRead),
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = if (email.isRead) FontWeight.Normal else FontWeight.Medium,
                     color = if (email.isRead) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurface,

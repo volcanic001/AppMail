@@ -23,9 +23,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.david.mailapp.ui.theme.MotionTokens
+import com.david.mailapp.R
 
 @Composable
 fun SearchEmptyState(
@@ -64,14 +66,14 @@ fun SearchEmptyState(
         )
         Spacer(Modifier.height(16.dp))
         Text(
-            "Sin resultados para «$query»",
+            stringResource(R.string.search_empty_format, query),
             style = MaterialTheme.typography.headlineSmall,
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurface
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            "Intenta con otras palabras o verifica la ortografía.",
+            stringResource(R.string.search_empty_hint),
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurfaceVariant

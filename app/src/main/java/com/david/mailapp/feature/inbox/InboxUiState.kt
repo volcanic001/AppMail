@@ -1,5 +1,6 @@
 package com.david.mailapp.feature.inbox
 
+import com.david.mailapp.core.localization.UiErrorReason
 import com.david.mailapp.domain.model.Email
 
 /**
@@ -27,6 +28,6 @@ sealed interface InboxUiState {
         val isLoadingNextPage: Boolean = false
     ) : InboxUiState
 
-    /** Network or unexpected error. [message] is user-facing. */
-    data class Error(val message: String) : InboxUiState
+    /** Network or unexpected error. [reason] maps to a localized resource. */
+    data class Error(val reason: UiErrorReason) : InboxUiState
 }

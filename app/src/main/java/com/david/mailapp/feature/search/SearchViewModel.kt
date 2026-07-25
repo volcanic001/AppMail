@@ -8,9 +8,15 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.david.mailapp.core.localization.toUiErrorReason
 import com.david.mailapp.core.session.SessionWriteGuard
 import com.david.mailapp.data.repository.EmailRepository
 import com.david.mailapp.domain.model.Email
+import com.david.mailapp.domain.model.PaginatedResult
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -20,16 +26,26 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
 
+/**
+ * Internal contract for testable email search.
+ */
+fun interface SearchEmailSource {
+    suspend fun search(query: String, pageToken: String?): PaginatedResult<Email>
+}
+
+@OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 class SearchViewModel(
-    private val repository: EmailRepository,
+    private val source: SearchEmailSource,
     private val historyStore: DataStore<Preferences>,
     private val writeGuard: SessionWriteGuard
 ) : ViewModel() {
 
     companion object {
         private val HISTORY_KEY = stringPreferencesKey("search_history")
+        private const val TAG = "SearchVM"
     }
 
     // ── Query ──────────────────────────────────────────────────
@@ -38,6 +54,10 @@ class SearchViewModel(
 
     /** The current search query text. */
     val query: StateFlow<String> = _queryFlow.asStateFlow()
+
+    // ── Retry signal (bypasses debounce) ───────────────────────
+
+    private val _retryFlow = MutableSharedFlow<String>(extraBufferCapacity = 1)
 
     // ── UI State ───────────────────────────────────────────────
 
@@ -60,14 +80,12 @@ class SearchViewModel(
 
     init {
         viewModelScope.launch {
-            _queryFlow
-                .debounce(300)
-                .filter {
-                    Log.d("SearchDebug", "[ViewModel] Filter check: '$it' (len: ${it.length})")
-                    it.length >= 2
-                }
+            merge(
+                _queryFlow.debounce(300).filter { it.length >= 2 },
+                _retryFlow
+            )
                 .flatMapLatest { query ->
-                    Log.d("SearchDebug", "[ViewModel] Starting search pipeline for: '$query'")
+                    Log.d(TAG, "Starting search pipeline for: '$query'")
                     _uiState.value = SearchUiState.Loading
 
                     flow {
@@ -78,16 +96,12 @@ class SearchViewModel(
                         }
 
                         try {
-                            Log.d("SearchDebug", "[ViewModel] Calling repository.searchEmails('$query')...")
-                            val result = repository.searchEmails(query)
-                            Log.d("SearchDebug", "[ViewModel] Repo returned ${result.items.size} items. nextPageToken: ${result.nextPageToken}")
+                            val result = source.search(query, null)
                             nextPageToken = result.nextPageToken
 
                             val state = if (result.items.isEmpty()) {
-                                Log.d("SearchDebug", "[ViewModel] State -> Empty for: '$query'")
                                 SearchUiState.Empty(query)
                             } else {
-                                Log.d("SearchDebug", "[ViewModel] State -> Results (${result.items.size} emails)")
                                 SearchUiState.Results(
                                     emails = result.items,
                                     query = query,
@@ -97,14 +111,20 @@ class SearchViewModel(
                             emit(state)
 
                             // Save to history only on successful search
-                            writeGuard.commit(lease) {
-                                saveToHistory(query)
+                            try {
+                                writeGuard.commit(lease) {
+                                    saveToHistory(query)
+                                }
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Failed to save search history for '$query'", e)
                             }
+                        } catch (e: CancellationException) {
+                            throw e
                         } catch (e: Exception) {
-                            Log.e("SearchDebug", "[ViewModel] Exception searching for '$query': ${e.message}", e)
+                            Log.e(TAG, "Search failed for '$query'", e)
                             emit(
                                 SearchUiState.Error(
-                                    message = e.message ?: "Something went wrong",
+                                    reason = e.toUiErrorReason(),
                                     query = query
                                 )
                             )
@@ -112,7 +132,6 @@ class SearchViewModel(
                     }
                 }
                 .collect { state ->
-                    Log.d("SearchDebug", "[ViewModel] UI State emitted: ${state::class.simpleName}")
                     _uiState.value = state
                 }
         }
@@ -121,7 +140,6 @@ class SearchViewModel(
     // ── Public actions ─────────────────────────────────────────
 
     fun onQueryChange(newQuery: String) {
-        Log.d("SearchDebug", "[ViewModel] onQueryChange: '$newQuery'")
         _queryFlow.value = newQuery
         if (newQuery.length < 2) {
             _uiState.value = SearchUiState.Idle
@@ -147,7 +165,7 @@ class SearchViewModel(
             }
 
             try {
-                val result = repository.searchEmails(currentQuery, nextPageToken)
+                val result = source.search(currentQuery, nextPageToken)
                 nextPageToken = result.nextPageToken
 
                 val after = _uiState.value
@@ -158,19 +176,24 @@ class SearchViewModel(
                         isLoadingNextPage = false
                     )
                 }
-            } catch (_: Exception) {
-                // Silently fail — existing results stay visible
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e(TAG, "loadNextPage failed for '$currentQuery'", e)
             } finally {
                 isLoadingNextPage = false
+                val after = _uiState.value
+                if (after is SearchUiState.Results) {
+                    _uiState.value = after.copy(isLoadingNextPage = false)
+                }
             }
         }
     }
 
     fun retry() {
-        // Re-trigger the search by re-emitting the current query
         val current = _queryFlow.value
         if (current.length >= 2) {
-            _queryFlow.value = current
+            _retryFlow.tryEmit(current)
         }
     }
 
@@ -193,9 +216,15 @@ class SearchViewModel(
 
     fun clearHistory() {
         viewModelScope.launch {
-            val lease = writeGuard.capture() ?: return@launch
-            writeGuard.commit(lease) {
-                historyStore.edit { it.remove(HISTORY_KEY) }
+            try {
+                val lease = writeGuard.capture() ?: return@launch
+                writeGuard.commit(lease) {
+                    historyStore.edit { it.remove(HISTORY_KEY) }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e(TAG, "clearHistory failed", e)
             }
         }
     }
@@ -210,7 +239,13 @@ class SearchViewModel(
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(SearchViewModel::class.java)) {
-                return SearchViewModel(repository, historyStore, writeGuard) as T
+                return SearchViewModel(
+                    source = SearchEmailSource { query, pageToken ->
+                        repository.searchEmails(query, pageToken)
+                    },
+                    historyStore = historyStore,
+                    writeGuard = writeGuard
+                ) as T
             }
             throw IllegalArgumentException("Unknown ViewModel: ${modelClass.name}")
         }

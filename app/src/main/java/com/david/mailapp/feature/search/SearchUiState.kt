@@ -1,5 +1,6 @@
 package com.david.mailapp.feature.search
 
+import com.david.mailapp.core.localization.UiErrorReason
 import com.david.mailapp.domain.model.Email
 
 /**
@@ -29,5 +30,5 @@ sealed interface SearchUiState {
     data class Empty(val query: String) : SearchUiState
 
     /** Network or unexpected error during search. [query] preserved for retry. */
-    data class Error(val message: String, val query: String) : SearchUiState
+    data class Error(val reason: UiErrorReason, val query: String) : SearchUiState
 }

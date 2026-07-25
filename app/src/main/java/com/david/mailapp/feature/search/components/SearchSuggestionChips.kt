@@ -29,7 +29,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.david.mailapp.R
 import com.david.mailapp.ui.theme.MotionTokens
 import kotlinx.coroutines.delay
 
@@ -54,7 +56,7 @@ fun SearchSuggestionChips(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                "Recientes",
+                stringResource(R.string.search_recent),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(1f)
@@ -65,7 +67,7 @@ fun SearchSuggestionChips(
                 exit = fadeOut()
             ) {
                 TextButton(onClick = onClearHistory) {
-                    Text("Borrar", style = MaterialTheme.typography.labelSmall)
+                    Text(stringResource(R.string.search_clear_history), style = MaterialTheme.typography.labelSmall)
                 }
             }
         }
@@ -74,7 +76,7 @@ fun SearchSuggestionChips(
 
         if (history.isEmpty()) {
             Text(
-                "Tus búsquedas recientes aparecerán aquí",
+                stringResource(R.string.search_history_empty),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

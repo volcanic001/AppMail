@@ -150,7 +150,7 @@ fun SearchScreen(
 
                 is SearchUiState.Error -> {
                     SearchErrorState(
-                        message = state.message,
+                        reason = state.reason,
                         onRetry = viewModel::retry
                     )
                 }

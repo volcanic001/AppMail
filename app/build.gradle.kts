@@ -122,6 +122,7 @@ dependencies {
     // Unit testing
     testImplementation(libs.junit)
     testImplementation(libs.ktor.client.mock)
+    testImplementation(libs.coroutines.test)
 
     // Instrumented testing
     androidTestImplementation(libs.androidx.test.core)

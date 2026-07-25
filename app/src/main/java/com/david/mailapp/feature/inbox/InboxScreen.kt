@@ -66,9 +66,13 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.david.mailapp.R
 import com.david.mailapp.core.di.AppContainer
+import com.david.mailapp.core.localization.asString
+import com.david.mailapp.core.localization.toUiText
 import com.david.mailapp.feature.inbox.components.EmailListItem
 import com.david.mailapp.ui.components.ContainedLoadingIndicator
 import com.david.mailapp.ui.theme.MotionTokens
@@ -97,6 +101,10 @@ fun InboxScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var snackbarJob by remember { mutableStateOf<Job?>(null) }
+
+    // ── Snackbar strings (captured at composable scope) ─────
+    val snackbarMovedToTrash = stringResource(R.string.snackbar_moved_to_trash)
+    val snackbarUndo = stringResource(R.string.action_undo)
 
     // ── Pull-to-refresh UX state ───────────────────────────────
     // Tracks whether the list was at the top when the user started refreshing.
@@ -146,17 +154,17 @@ fun InboxScreen(
         modifier = modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
-                title = { Text("Bandeja", style = MaterialTheme.typography.titleLarge) },
+                title = { Text(stringResource(R.string.inbox_title), style = MaterialTheme.typography.titleLarge) },
                 navigationIcon = {
                     IconButton(onClick = onMenuClick) {
-                        Icon(imageVector = Icons.Default.Menu, contentDescription = "Menú")
+                        Icon(imageVector = Icons.Default.Menu, contentDescription = stringResource(R.string.action_menu))
                     }
                 },
                 actions = {
                     IconButton(onClick = onSearchTap) {
                         Icon(
                             imageVector = Icons.Default.Search,
-                            contentDescription = "Buscar",
+                            contentDescription = stringResource(R.string.action_search),
                             modifier = Modifier.scale(searchIconScale.value)
                         )
                     }
@@ -184,16 +192,16 @@ fun InboxScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
-                    Text(text = "⚠️", fontSize = 48.sp)
+                    Text(text = stringResource(R.string.error_symbol), fontSize = 48.sp)
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        text = state.message,
+                        text = state.reason.toUiText().asString(),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Button(onClick = { viewModel.refresh() }) {
-                        Text("Retry")
+                        Text(stringResource(R.string.action_retry))
                     }
                 }
             }
@@ -263,8 +271,8 @@ fun InboxScreen(
                                         snackbarJob = scope.launch {
                                             viewModel.moveToTrash(email.id)
                                             val result = snackbarHostState.showSnackbar(
-                                                message = "Moved to trash",
-                                                actionLabel = "Undo",
+                                                message = snackbarMovedToTrash,
+                                                actionLabel = snackbarUndo,
                                                 duration = SnackbarDuration.Short
                                             )
                                             if (result == SnackbarResult.ActionPerformed) {
@@ -347,10 +355,10 @@ private fun EmptyInbox() {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text(text = "📭", fontSize = 48.sp)
+        Text(text = stringResource(R.string.inbox_empty_symbol), fontSize = 48.sp)
         Spacer(modifier = Modifier.height(16.dp))
         Text(
-            text = "Your inbox is empty",
+            text = stringResource(R.string.inbox_empty),
             style = MaterialTheme.typography.headlineSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )

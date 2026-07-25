@@ -1,5 +1,6 @@
 package com.david.mailapp.feature.trash
 
+import com.david.mailapp.core.localization.UiErrorReason
 import com.david.mailapp.domain.model.Email
 
 sealed interface TrashUiState {
@@ -10,5 +11,5 @@ sealed interface TrashUiState {
         val isRefreshing: Boolean = false,
         val isLoadingNextPage: Boolean = false
     ) : TrashUiState
-    data class Error(val message: String) : TrashUiState
+    data class Error(val reason: UiErrorReason) : TrashUiState
 }

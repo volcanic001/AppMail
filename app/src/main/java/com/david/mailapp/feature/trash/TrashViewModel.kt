@@ -1,9 +1,13 @@
 package com.david.mailapp.feature.trash
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.david.mailapp.core.localization.UiErrorReason
+import com.david.mailapp.core.localization.toUiErrorReason
 import com.david.mailapp.data.repository.EmailRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -56,14 +60,15 @@ class TrashViewModel(
                 if (after is TrashUiState.Success) {
                     _uiState.value = after.copy(isRefreshing = false)
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
+                Log.e("TrashVM", "refresh failed", e)
                 val after = _uiState.value
                 if (after is TrashUiState.Success) {
                     _uiState.value = after.copy(isRefreshing = false)
                 } else {
-                    _uiState.value = TrashUiState.Error(
-                        e.message ?: "Something went wrong"
-                    )
+                    _uiState.value = TrashUiState.Error(e.toUiErrorReason())
                 }
             }
         }
@@ -79,8 +84,11 @@ class TrashViewModel(
             }
             try {
                 nextPageToken = repository.refreshTrash(nextPageToken).nextPageToken
-            } catch (_: Exception) { }
-            finally {
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e("TrashVM", "loadNextPage failed", e)
+            } finally {
                 isLoadingNextPage = false
                 val after = _uiState.value
                 if (after is TrashUiState.Success) {

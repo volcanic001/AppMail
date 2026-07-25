@@ -16,15 +16,27 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.david.mailapp.R
+import com.david.mailapp.core.localization.UiErrorReason
+import com.david.mailapp.core.localization.asString
+import com.david.mailapp.core.localization.toUiText
 
 @Composable
 fun SearchErrorState(
-    message: String,
+    reason: UiErrorReason,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val header = if (reason == UiErrorReason.NO_CONNECTION) {
+        stringResource(R.string.search_connection_error)
+    } else {
+        stringResource(R.string.error_generic)
+    }
+    val body = reason.toUiText().asString()
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -40,20 +52,20 @@ fun SearchErrorState(
         )
         Spacer(Modifier.height(16.dp))
         Text(
-            "Error de conexión",
+            header,
             style = MaterialTheme.typography.headlineSmall,
             color = MaterialTheme.colorScheme.onSurface
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            message,
+            body,
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(Modifier.height(24.dp))
         Button(onClick = onRetry) {
-            Text("Reintentar")
+            Text(stringResource(R.string.action_retry))
         }
     }
 }

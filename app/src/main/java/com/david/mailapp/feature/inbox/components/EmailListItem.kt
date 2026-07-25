@@ -39,9 +39,11 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.david.mailapp.R
 import com.david.mailapp.domain.model.Email
 import com.david.mailapp.domain.model.parseEmailSender
 import com.david.mailapp.ui.theme.MotionTokens
@@ -255,7 +257,7 @@ fun EmailListItem(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = parsedSender.displayCollapsed,
+                            text = parsedSender.displayCollapsed.ifEmpty { stringResource(R.string.fallback_unknown_sender) },
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = if (email.isRead) FontWeight.Normal else FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface,
@@ -276,7 +278,7 @@ fun EmailListItem(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = email.subject,
+                            text = email.subject.ifEmpty { stringResource(R.string.fallback_no_subject) },
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = if (email.isRead) FontWeight.Normal else FontWeight.Medium,
                             color = if (email.isRead) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurface,
@@ -288,7 +290,7 @@ fun EmailListItem(
                             Spacer(modifier = Modifier.width(4.dp))
                             Icon(
                                 imageVector = Icons.Filled.Star,
-                                contentDescription = "Starred",
+                                contentDescription = stringResource(R.string.accessibility_starred),
                                 tint = MaterialTheme.colorScheme.tertiary,
                                 modifier = Modifier.size(16.dp)
                             )

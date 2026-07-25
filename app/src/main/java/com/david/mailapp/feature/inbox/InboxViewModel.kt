@@ -1,9 +1,13 @@
 package com.david.mailapp.feature.inbox
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.david.mailapp.core.localization.UiErrorReason
+import com.david.mailapp.core.localization.toUiErrorReason
 import com.david.mailapp.data.repository.EmailRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -68,15 +72,18 @@ class InboxViewModel(
                 val start = System.currentTimeMillis()
                 val result = repository.refreshInbox(null)
                 nextPageToken = result.nextPageToken
-                
+
                 val elapsed = System.currentTimeMillis() - start
                 if (elapsed < 800) {
                     delay(800 - elapsed)
                 }
-                
+
                 isInitialRefresh = false
                 mergeRefreshSuccess(result.items)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
+                Log.e("InboxVM", "refresh failed", e)
                 isInitialRefresh = false
                 mergeRefreshError(e)
             }
@@ -96,8 +103,10 @@ class InboxViewModel(
             try {
                 val token = nextPageToken
                 nextPageToken = repository.refreshInbox(token).nextPageToken
-            } catch (_: Exception) {
-                // silently fail — emails already visible from cache
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e("InboxVM", "loadNextPage failed", e)
             } finally {
                 isLoadingNextPage = false
                 val after = _uiState.value
@@ -149,9 +158,7 @@ class InboxViewModel(
         if (current is InboxUiState.Success) {
             _uiState.value = current.copy(isRefreshing = false)
         } else {
-            _uiState.value = InboxUiState.Error(
-                e.message ?: "Something went wrong"
-            )
+            _uiState.value = InboxUiState.Error(e.toUiErrorReason())
         }
     }
 
