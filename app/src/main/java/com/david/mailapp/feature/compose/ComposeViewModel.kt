@@ -14,8 +14,7 @@ import kotlinx.coroutines.launch
 
 class ComposeViewModel(
     private val args: ComposeArgs,
-    private val repository: EmailRepository,
-    private val authManager: AuthManager,
+    private val emailSource: ComposeEmailSource,
     private val stringProvider: StringProvider
 ) : ViewModel() {
 
@@ -50,7 +49,7 @@ class ComposeViewModel(
 
         // Only the sender address requires a suspend call — load it async.
         viewModelScope.launch {
-            val fromAddress = repository.getUserEmail().orEmpty()
+            val fromAddress = emailSource.getUserEmail().orEmpty()
             _uiState.value = _uiState.value.copy(fromAddress = fromAddress)
         }
     }
@@ -104,7 +103,7 @@ class ComposeViewModel(
                     }
                 }
 
-                repository.sendEmail(
+                emailSource.sendEmail(
                     to = state.toField,
                     cc = state.ccField.ifBlank { null },
                     bcc = state.bccField.ifBlank { null },
@@ -142,7 +141,15 @@ class ComposeViewModel(
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(ComposeViewModel::class.java)) {
-                return ComposeViewModel(args, repository, authManager, stringProvider) as T
+                val emailSource = object : ComposeEmailSource {
+                    override suspend fun getUserEmail(): String? = repository.getUserEmail()
+                    override suspend fun sendEmail(
+                        to: String, cc: String?, bcc: String?,
+                        subject: String, body: String,
+                        inReplyToId: String?, references: String?
+                    ) = repository.sendEmail(to, cc, bcc, subject, body, inReplyToId, references)
+                }
+                return ComposeViewModel(args, emailSource, stringProvider) as T
             }
             throw IllegalArgumentException("Unknown ViewModel: ${modelClass.name}")
         }

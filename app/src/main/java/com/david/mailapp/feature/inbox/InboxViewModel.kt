@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class InboxViewModel(
-    private val repository: EmailRepository
+    private val source: InboxEmailSource
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<InboxUiState>(InboxUiState.Loading)
@@ -35,7 +35,7 @@ class InboxViewModel(
 
     private fun observeRoom() {
         viewModelScope.launch {
-            repository.getInbox().collect { emails ->
+            source.observeInbox().collect { emails ->
                 lastSeenEmails = emails
                 val current = _uiState.value
                 when (current) {
@@ -70,7 +70,7 @@ class InboxViewModel(
 
             try {
                 val start = System.currentTimeMillis()
-                val result = repository.refreshInbox(null)
+                val result = source.refreshInbox(null)
                 nextPageToken = result.nextPageToken
 
                 val elapsed = System.currentTimeMillis() - start
@@ -102,7 +102,7 @@ class InboxViewModel(
 
             try {
                 val token = nextPageToken
-                nextPageToken = repository.refreshInbox(token).nextPageToken
+                nextPageToken = source.refreshInbox(token).nextPageToken
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -119,19 +119,19 @@ class InboxViewModel(
 
     fun moveToTrash(emailId: String) {
         viewModelScope.launch {
-            repository.moveToTrash(emailId)
+            source.moveToTrash(emailId)
         }
     }
 
     fun undoMoveToTrash(emailId: String) {
         viewModelScope.launch {
-            repository.restoreFromTrash(emailId)
+            source.restoreFromTrash(emailId)
         }
     }
 
     fun markAsRead(emailId: String) {
         viewModelScope.launch {
-            repository.markAsRead(emailId)
+            source.markAsRead(emailId)
         }
     }
 
@@ -170,7 +170,7 @@ class InboxViewModel(
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(InboxViewModel::class.java)) {
-                return InboxViewModel(repository) as T
+                return InboxViewModel(RepositoryInboxEmailSource(repository)) as T
             }
             throw IllegalArgumentException("Unknown ViewModel: ${modelClass.name}")
         }

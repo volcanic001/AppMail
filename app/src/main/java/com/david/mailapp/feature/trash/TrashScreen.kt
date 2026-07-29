@@ -10,7 +10,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,40 +18,24 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
-import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.graphicsLayer
-import com.david.mailapp.ui.components.ContainedLoadingIndicator
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -67,14 +50,6 @@ import com.david.mailapp.R
 import com.david.mailapp.core.di.AppContainer
 import com.david.mailapp.core.localization.asString
 import com.david.mailapp.core.localization.toUiText
-import com.david.mailapp.feature.inbox.components.EmailListItem
-import com.david.mailapp.ui.theme.MotionTokens
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -93,21 +68,6 @@ fun TrashScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     val snackbarHostState = remember { SnackbarHostState() }
-    val scope = rememberCoroutineScope()
-    var snackbarJob by remember { mutableStateOf<Job?>(null) }
-
-    // ── Snackbar strings (captured at composable scope) ─────
-    val snackbarDeletedPermanently = stringResource(R.string.snackbar_deleted_permanently)
-    val snackbarUndo = stringResource(R.string.action_undo)
-    val snackbarRestoredToInbox = stringResource(R.string.snackbar_restored_to_inbox)
-
-    LaunchedEffect(highlightedEmailId) {
-        if (highlightedEmailId != null) {
-            delay(2500)
-            onClearHighlight()
-        }
-    }
-
     Scaffold(
         modifier = modifier.fillMaxSize(),
         topBar = {
@@ -155,127 +115,22 @@ fun TrashScreen(
                 if (state.emails.isEmpty() && !state.isRefreshing) {
                     EmptyTrash()
                 } else {
-                    val ptrState = rememberPullToRefreshState()
-                    PullToRefreshBox(
-                        state = ptrState,
-                        isRefreshing = state.isRefreshing,
-                        onRefresh = { viewModel.refresh() },
-                        modifier = Modifier.fillMaxSize(),
-                        indicator = {
-                            val isVisible = state.isRefreshing || ptrState.distanceFraction > 0f
-                            if (isVisible) {
-                                Box(
-                                    modifier = Modifier
-                                        .align(Alignment.TopCenter)
-                                        .graphicsLayer {
-                                            val fraction = ptrState.distanceFraction.coerceIn(0f, 1.5f)
-                                            translationY = if (state.isRefreshing) 24.dp.toPx() else (fraction * 40.dp.toPx())
-                                            val scale = if (state.isRefreshing) 1f else (fraction * 1.2f).coerceIn(0f, 1f)
-                                            scaleX = scale
-                                            scaleY = scale
-                                            alpha = if (state.isRefreshing) 1f else fraction.coerceIn(0f, 1f)
-                                        }
-                                ) {
-                                    ContainedLoadingIndicator(
-                                        containerSize = 48.dp,
-                                        indicatorSize = 32.dp,
-                                        progress = if (state.isRefreshing) null else ptrState.distanceFraction.coerceIn(0f, 1f)
-                                    )
-                                }
-                            }
-                        }
-                    ) {
-                        LazyColumn(
-                            state = listState,
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(
-                                bottom = paddingValues.calculateBottomPadding() + 24.dp
-                            )
-                        ) {
-                            items(
-                                items = state.emails,
-                                key = { it.id }
-                            ) { email ->
-                                val onClickRemembered = remember(email.id) {
-                                    { onEmailClick(email.id) }
-                                }
-                                val onDeleteRemembered = remember(email.id) {
-                                    {
-                                        snackbarJob?.cancel()
-                                        snackbarJob = scope.launch {
-                                            viewModel.deletePermanently(email.id)
-                                            val result = snackbarHostState.showSnackbar(
-                                                message = snackbarDeletedPermanently,
-                                                actionLabel = snackbarUndo,
-                                                duration = SnackbarDuration.Short
-                                            )
-                                            if (result == SnackbarResult.ActionPerformed) {
-                                                viewModel.restoreToInbox(email.id)
-                                            }
-                                        }
-                                    }
-                                }
-                                val onRestoreRemembered = remember(email.id) {
-                                    {
-                                        snackbarJob?.cancel()
-                                        snackbarJob = scope.launch {
-                                            viewModel.restoreToInbox(email.id)
-                                            snackbarHostState.showSnackbar(snackbarRestoredToInbox)
-                                        }
-                                    }
-                                }
-                                EmailListItem(
-                                    email = email,
-                                    onClick = onClickRemembered,
-                                    onDelete = onDeleteRemembered,
-                                    onRestore = onRestoreRemembered,
-                                    isHighlighted = (email.id == highlightedEmailId),
-                                    onClearHighlight = onClearHighlight,
-                                    modifier = Modifier.animateItem(
-                                        placementSpec = MotionTokens.listReorganize
-                                    )
-                                )
-                            }
-
-                            if (state.isLoadingNextPage) {
-                                item(key = "loader") {
-                                    Box(
-                                        Modifier.fillMaxWidth().padding(16.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        ContainedLoadingIndicator(
-                                            containerSize = 44.dp,
-                                            indicatorSize = 28.dp
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    LaunchedEffect(listState) {
-                        snapshotFlow {
-                            val layout = listState.layoutInfo
-                            val lastIdx = layout.visibleItemsInfo.lastOrNull()?.index ?: 0
-                            lastIdx to layout.totalItemsCount
-                        }
-                            .distinctUntilChanged()
-                            .collect { (last, total) ->
-                                if (total > 0 && last >= total - 3) {
-                                    viewModel.loadNextPage()
-                                }
-                            }
-                    }
+                    TrashContent(
+                        state = state,
+                        listState = listState,
+                        snackbarHostState = snackbarHostState,
+                        highlightedEmailId = highlightedEmailId,
+                        onEmailClick = onEmailClick,
+                        onDeletePermanently = viewModel::deletePermanently,
+                        onRestoreToInbox = viewModel::restoreToInbox,
+                        onRefresh = viewModel::refresh,
+                        onLoadNextPage = viewModel::loadNextPage,
+                        onClearHighlight = onClearHighlight,
+                        bottomPadding = paddingValues.calculateBottomPadding()
+                    )
                 }
             }
         }
-
-        SnackbarHost(
-            hostState = snackbarHostState,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 24.dp)
-        )
     }
     }
 }

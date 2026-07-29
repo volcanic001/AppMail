@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class TrashViewModel(
-    private val repository: EmailRepository
+    private val source: TrashEmailSource
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<TrashUiState>(TrashUiState.Loading)
@@ -31,7 +31,7 @@ class TrashViewModel(
 
     private fun observeRoom() {
         viewModelScope.launch {
-            repository.getTrash().collect { emails ->
+            source.observeTrash().collect { emails ->
                 val current = _uiState.value
                 when (current) {
                     is TrashUiState.Loading -> {
@@ -55,7 +55,7 @@ class TrashViewModel(
             }
             try {
                 if (isManualRefresh) delay(800)
-                nextPageToken = repository.refreshTrash(null).nextPageToken
+                nextPageToken = source.refreshTrash(null).nextPageToken
                 val after = _uiState.value
                 if (after is TrashUiState.Success) {
                     _uiState.value = after.copy(isRefreshing = false)
@@ -83,7 +83,7 @@ class TrashViewModel(
                 _uiState.value = current.copy(isLoadingNextPage = true)
             }
             try {
-                nextPageToken = repository.refreshTrash(nextPageToken).nextPageToken
+                nextPageToken = source.refreshTrash(nextPageToken).nextPageToken
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -100,13 +100,13 @@ class TrashViewModel(
 
     fun deletePermanently(emailId: String) {
         viewModelScope.launch {
-            repository.deletePermanently(emailId)
+            source.deletePermanently(emailId)
         }
     }
 
     fun restoreToInbox(emailId: String) {
         viewModelScope.launch {
-            repository.restoreFromTrash(emailId)
+            source.restoreFromTrash(emailId)
         }
     }
 
@@ -116,7 +116,7 @@ class TrashViewModel(
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(TrashViewModel::class.java)) {
-                return TrashViewModel(repository) as T
+                return TrashViewModel(RepositoryTrashEmailSource(repository)) as T
             }
             throw IllegalArgumentException("Unknown ViewModel: ${modelClass.name}")
         }

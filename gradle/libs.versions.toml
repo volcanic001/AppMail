@@ -45,7 +45,6 @@ compose-material-icons = { group = "androidx.compose.material", name = "material
 compose-animation = { group = "androidx.compose.animation", name = "animation" }
 compose-animation-core = { group = "androidx.compose.animation", name = "animation-core" }
 compose-activity = { group = "androidx.activity", name = "activity-compose", version.ref = "compose-activity" }
-
 # Lifecycle
 lifecycle-runtime = { group = "androidx.lifecycle", name = "lifecycle-runtime-compose", version.ref = "lifecycle" }
 lifecycle-viewmodel = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecycle" }
@@ -54,6 +53,7 @@ lifecycle-viewmodel = { group = "androidx.lifecycle", name = "lifecycle-viewmode
 room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
 room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
 room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
+room-testing = { group = "androidx.room", name = "room-testing", version.ref = "room" }
 
 # Ktor
 ktor-client-core = { group = "io.ktor", name = "ktor-client-core", version.ref = "ktor" }

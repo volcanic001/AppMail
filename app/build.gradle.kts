@@ -123,9 +123,13 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.ktor.client.mock)
     testImplementation(libs.coroutines.test)
+    testImplementation(libs.room.testing)
 
     // Instrumented testing
     androidTestImplementation(libs.androidx.test.core)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.coroutines.test)
+    androidTestImplementation(libs.ktor.client.mock)
+    androidTestImplementation(libs.room.testing)
 }
