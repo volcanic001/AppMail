@@ -15,6 +15,10 @@ android {
         schemaDirectory("$projectDir/schemas")
     }
 
+    sourceSets {
+        getByName("androidTest").assets.srcDir("$projectDir/schemas")
+    }
+
     defaultConfig {
         applicationId = "com.david.mailapp"
         minSdk = 26
