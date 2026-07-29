@@ -34,7 +34,11 @@ data class EmailEntity(
     @ColumnInfo(name = "pdf_attachments_json", defaultValue = "'[]'")
     val pdfAttachmentsJson: String = "[]",
     @ColumnInfo(name = "pdf_metadata_scanned", defaultValue = "0")
-    val pdfMetadataScanned: Boolean = false
+    val pdfMetadataScanned: Boolean = false,
+    @ColumnInfo(name = "rfc_message_id")
+    val rfcMessageId: String? = null,
+    @ColumnInfo(name = "rfc_references")
+    val rfcReferences: String? = null
 ) {
     fun toDomain(): Email {
         val pdfAttachments = PdfAttachmentMetadataCodec.decode(pdfAttachmentsJson)
@@ -55,7 +59,9 @@ data class EmailEntity(
             body = body,
             cleanBody = cleanBody,
             pdfAttachments = pdfAttachments,
-            pdfMetadataScanned = pdfMetadataScanned
+            pdfMetadataScanned = pdfMetadataScanned,
+            rfcMessageId = rfcMessageId,
+            rfcReferences = rfcReferences
         )
     }
 
@@ -77,7 +83,9 @@ data class EmailEntity(
             body = email.body,
             cleanBody = email.cleanBody,
             pdfAttachmentsJson = PdfAttachmentMetadataCodec.encode(email.pdfAttachments),
-            pdfMetadataScanned = email.pdfMetadataScanned
+            pdfMetadataScanned = email.pdfMetadataScanned,
+            rfcMessageId = email.rfcMessageId,
+            rfcReferences = email.rfcReferences
         )
     }
 }

@@ -11,7 +11,7 @@ import com.david.mailapp.data.local.entity.EmailEntity
 
 @Database(
     entities = [EmailEntity::class],
-    version = 5,
+    version = 6,
     exportSchema = true
 )
 abstract class MailDatabase : RoomDatabase() {

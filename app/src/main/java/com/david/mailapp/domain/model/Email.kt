@@ -30,7 +30,9 @@ data class Email(
     val body: String = "",
     val cleanBody: String = "",
     val pdfAttachments: List<PdfAttachmentMetadata> = emptyList(),
-    val pdfMetadataScanned: Boolean = false
+    val pdfMetadataScanned: Boolean = false,
+    val rfcMessageId: String? = null,
+    val rfcReferences: String? = null
 )
 
 @Stable
