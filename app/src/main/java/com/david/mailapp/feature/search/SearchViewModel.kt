@@ -97,7 +97,9 @@ class SearchViewModel(
 
                         try {
                             val result = source.search(query, null)
-                            nextPageToken = result.nextPageToken
+                            if (result.isComplete) {
+                                nextPageToken = result.nextPageToken
+                            }
 
                             val state = if (result.items.isEmpty()) {
                                 SearchUiState.Empty(query)
@@ -105,7 +107,7 @@ class SearchViewModel(
                                 SearchUiState.Results(
                                     emails = result.items,
                                     query = query,
-                                    nextPageToken = result.nextPageToken
+                                    nextPageToken = nextPageToken
                                 )
                             }
                             emit(state)
@@ -166,7 +168,9 @@ class SearchViewModel(
 
             try {
                 val result = source.search(currentQuery, nextPageToken)
-                nextPageToken = result.nextPageToken
+                if (result.isComplete) {
+                    nextPageToken = result.nextPageToken
+                } // else: keep existing token for retry
 
                 val after = _uiState.value
                 if (after is SearchUiState.Results) {

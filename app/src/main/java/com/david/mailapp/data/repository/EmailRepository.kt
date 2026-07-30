@@ -78,7 +78,9 @@ class EmailRepository(
 
         val entities = result.items.map { EmailEntity.fromDomain(it, EmailFolder.Inbox) }
         writeGuard.commit(lease) {
-            if (pageToken == null) {
+            // Replace folder only on a complete first page;
+            // partial pages or pagination append/merge.
+            if (pageToken == null && result.isComplete) {
                 dao.replaceFolder("inbox", entities)
             } else {
                 dao.upsertPreservingBodies(entities)
@@ -95,7 +97,7 @@ class EmailRepository(
 
         val entities = result.items.map { EmailEntity.fromDomain(it, EmailFolder.Trash) }
         writeGuard.commit(lease) {
-            if (pageToken == null) {
+            if (pageToken == null && result.isComplete) {
                 dao.replaceFolder("trash", entities)
             } else {
                 dao.upsertPreservingBodies(entities)

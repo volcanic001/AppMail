@@ -96,7 +96,7 @@ class PartialPageContractsTest {
         db.close()
     }
 
-    @Ignore("Contrato pendiente: Fases 2.2 y 2.3")
+    // Activated by Fase 2.2: modelar respuestas parciales
     @Test
     fun c6_partial_page_does_not_replace_cache_or_advance_token() = runTest {
         val existing = (1..5).map { testEmail("existing-$it", subject = "Cached $it") }

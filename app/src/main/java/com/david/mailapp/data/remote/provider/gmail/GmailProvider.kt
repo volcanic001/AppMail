@@ -39,75 +39,18 @@ class GmailProvider(
     // ── fetch ───────────────────────────────────────────────────
 
     override suspend fun fetchInbox(pageToken: String?): PaginatedResult<Email> {
-        return fetchFolder(labelId = "INBOX", pageToken = pageToken)
+        return fetchGmailPage(client, labelId = "INBOX", pageToken = pageToken)
     }
 
     override suspend fun fetchTrash(pageToken: String?): PaginatedResult<Email> {
-        return fetchFolder(labelId = "TRASH", pageToken = pageToken)
+        return fetchGmailPage(client, labelId = "TRASH", pageToken = pageToken)
     }
 
     override suspend fun search(query: String, pageToken: String?): PaginatedResult<Email> {
-        Log.d("SearchDebug", "[GmailProvider] Executing API search with q='$query', pageToken=$pageToken")
-        try {
-            val listResponse: MessageListResponse = client.get("users/me/messages") {
-                parameter("q", query)
-                parameter("maxResults", 20)
-                if (pageToken != null) parameter("pageToken", pageToken)
-            }.body()
-
-            val messages = listResponse.messages ?: emptyList()
-            Log.d("SearchDebug", "[GmailProvider] API returned ${messages.size} message headers. nextPageToken: ${listResponse.nextPageToken}")
-            if (messages.isEmpty()) return PaginatedResult(emptyList(), null)
-
-            val emails = kotlinx.coroutines.supervisorScope {
-                messages.map { msgHeader ->
-                    async { fetchMessage(msgHeader.id) }
-                }.awaitAll().filterNotNull()
-            }
-            Log.d("SearchDebug", "[GmailProvider] Successfully fetched ${emails.size} full email details.")
-            return PaginatedResult(items = emails, nextPageToken = listResponse.nextPageToken)
-        } catch (e: Exception) {
-            Log.e("SearchDebug", "[GmailProvider] API search failed for q='$query': ${e.message}", e)
-            throw e
-        }
-    }
-
-    private suspend fun fetchFolder(labelId: String, pageToken: String?): PaginatedResult<Email> {
-        // Step 1: list message IDs
-        val listResponse: MessageListResponse = client.get("users/me/messages") {
-            parameter("labelIds", labelId)
-            parameter("maxResults", 20)
-            if (pageToken != null) parameter("pageToken", pageToken)
-        }.body()
-
-        val messages = listResponse.messages ?: emptyList()
-        if (messages.isEmpty()) {
-            return PaginatedResult(emptyList(), null)
-        }
-
-        val emails = kotlinx.coroutines.supervisorScope {
-            messages.map { msgHeader ->
-                async { fetchMessage(msgHeader.id) }
-            }.awaitAll().filterNotNull()
-        }
-
-        return PaginatedResult(
-            items = emails,
-            nextPageToken = listResponse.nextPageToken
-        )
-    }
-
-    private suspend fun fetchMessage(messageId: String): Email? {
-        return try {
-            val response: MessageResponse = client.get("users/me/messages/$messageId") {
-                parameter("format", "full")
-            }.body()
-            response.toDomain()
-        } catch (e: kotlinx.coroutines.CancellationException) {
-            throw e
-        } catch (_: Exception) {
-            null
-        }
+        Log.d("SearchDebug", "[GmailProvider] Search with q='$query', pageToken=$pageToken")
+        val result = fetchGmailPage(client, query = query, pageToken = pageToken)
+        Log.d("SearchDebug", "[GmailProvider] Search returned ${result.items.size} emails, complete=${result.isComplete}")
+        return result
     }
 
     // ── body fetch ──────────────────────────────────────────────

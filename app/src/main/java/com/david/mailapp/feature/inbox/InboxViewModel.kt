@@ -71,7 +71,9 @@ class InboxViewModel(
             try {
                 val start = System.currentTimeMillis()
                 val result = source.refreshInbox(null)
-                nextPageToken = result.nextPageToken
+                if (result.isComplete) {
+                    nextPageToken = result.nextPageToken
+                }
 
                 val elapsed = System.currentTimeMillis() - start
                 if (elapsed < 800) {
@@ -102,7 +104,10 @@ class InboxViewModel(
 
             try {
                 val token = nextPageToken
-                nextPageToken = source.refreshInbox(token).nextPageToken
+                val result = source.refreshInbox(token)
+                if (result.isComplete) {
+                    nextPageToken = result.nextPageToken
+                } // else: keep existing token for retry
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

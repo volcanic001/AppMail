@@ -55,7 +55,10 @@ class TrashViewModel(
             }
             try {
                 if (isManualRefresh) delay(800)
-                nextPageToken = source.refreshTrash(null).nextPageToken
+                val result = source.refreshTrash(null)
+                if (result.isComplete) {
+                    nextPageToken = result.nextPageToken
+                }
                 val after = _uiState.value
                 if (after is TrashUiState.Success) {
                     _uiState.value = after.copy(isRefreshing = false)
@@ -83,7 +86,11 @@ class TrashViewModel(
                 _uiState.value = current.copy(isLoadingNextPage = true)
             }
             try {
-                nextPageToken = source.refreshTrash(nextPageToken).nextPageToken
+                val token = nextPageToken
+                val result = source.refreshTrash(token)
+                if (result.isComplete) {
+                    nextPageToken = result.nextPageToken
+                } // else: keep existing token for retry
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
