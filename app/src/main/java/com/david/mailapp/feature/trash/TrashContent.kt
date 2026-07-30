@@ -8,16 +8,21 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -29,13 +34,12 @@ import androidx.compose.ui.unit.dp
 import com.david.mailapp.R
 import com.david.mailapp.core.localization.asString
 import com.david.mailapp.core.localization.toUiText
-import com.david.mailapp.domain.model.Email
+import com.david.mailapp.feature.inbox.ActionFeedbackEffect
+import com.david.mailapp.feature.inbox.ActionFeedbackId
 import com.david.mailapp.feature.inbox.components.EmailListItem
 import com.david.mailapp.ui.components.ContainedLoadingIndicator
 import com.david.mailapp.ui.theme.MotionTokens
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.launch
 
 /**
  * Internal composable extracted from [TrashScreen] for testability.
@@ -44,8 +48,8 @@ import kotlinx.coroutines.launch
  * (delete-permanently contract) can be verified via Compose UI tests
  * without depending on the full TrashScreen composable.
  *
- * Behavior is identical to the inline code in TrashScreen; no
- * functional changes are introduced here.
+ * Owns the delete-confirmation seam and renders only feedback already
+ * confirmed by the ViewModel.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,20 +61,25 @@ fun TrashContent(
     onEmailClick: (String) -> Unit,
     onDeletePermanently: (String) -> Unit,
     onRestoreToInbox: (String) -> Unit,
+    onFeedbackConsumed: (ActionFeedbackId) -> Unit,
     onRefresh: () -> Unit,
     onLoadNextPage: () -> Unit,
     onClearHighlight: () -> Unit,
     bottomPadding: androidx.compose.ui.unit.Dp = 0.dp,
     modifier: Modifier = Modifier
 ) {
-    val snackbarDeletedPermanently = stringResource(R.string.snackbar_deleted_permanently)
-    val snackbarUndo = stringResource(R.string.action_undo)
-    val snackbarRestoredToInbox = stringResource(R.string.snackbar_restored_to_inbox)
-    val scope = rememberCoroutineScope()
-    var snackbarJob: Job? by remember { androidx.compose.runtime.mutableStateOf(null) }
-    val deleteCoordinator = remember(onDeletePermanently, onRestoreToInbox) {
-        TrashDeleteCoordinator(onDeletePermanently, onRestoreToInbox)
+    val currentDeleteCallback by rememberUpdatedState(onDeletePermanently)
+    val deleteCoordinator = remember { TrashDeleteCoordinator() }
+    var pendingDeleteEmailId by remember { mutableStateOf<String?>(null) }
+    SideEffect {
+        deleteCoordinator.onConfirmed = currentDeleteCallback
     }
+
+    ActionFeedbackEffect(
+        feedback = state.pendingFeedbackQueue.firstOrNull(),
+        snackbarHostState = snackbarHostState,
+        onConsumed = onFeedbackConsumed
+    )
 
     LaunchedEffect(highlightedEmailId) {
         if (highlightedEmailId != null) {
@@ -81,7 +90,7 @@ fun TrashContent(
 
     Box(modifier = modifier.fillMaxSize()) {
         if (state.emails.isEmpty() && !state.isRefreshing) {
-            // Empty state is rendered in TrashScreen
+            EmptyTrash()
         } else {
             val ptrState = rememberPullToRefreshState()
             PullToRefreshBox(
@@ -131,34 +140,20 @@ fun TrashContent(
                         }
                         val onDeleteRemembered = remember(email.id) {
                             {
-                                snackbarJob?.cancel()
-                                snackbarJob = scope.launch {
-                                    deleteCoordinator.requestDelete(email.id)
-                                    val result = snackbarHostState.showSnackbar(
-                                        message = snackbarDeletedPermanently,
-                                        actionLabel = snackbarUndo,
-                                        duration = androidx.compose.material3.SnackbarDuration.Short
-                                    )
-                                    if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
-                                        deleteCoordinator.undo(email.id)
-                                    }
-                                }
+                                deleteCoordinator.requestDelete(email.id)
+                                pendingDeleteEmailId = deleteCoordinator.pendingDeleteEmailId
                             }
                         }
                         val onRestoreRemembered = remember(email.id) {
-                            {
-                                snackbarJob?.cancel()
-                                snackbarJob = scope.launch {
-                                    onRestoreToInbox(email.id)
-                                    snackbarHostState.showSnackbar(snackbarRestoredToInbox)
-                                }
-                            }
+                            { onRestoreToInbox(email.id) }
                         }
                         EmailListItem(
                             email = email,
                             onClick = onClickRemembered,
                             onDelete = onDeleteRemembered,
                             onRestore = onRestoreRemembered,
+                            actionsEnabled = email.id !in state.activeActionEmailIds &&
+                                email.id != pendingDeleteEmailId,
                             isHighlighted = (email.id == highlightedEmailId),
                             onClearHighlight = onClearHighlight,
                             modifier = Modifier.animateItem(placementSpec = MotionTokens.listReorganize)
@@ -201,6 +196,37 @@ fun TrashContent(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 24.dp)
+        )
+    }
+
+    if (pendingDeleteEmailId != null) {
+        AlertDialog(
+            onDismissRequest = {
+                deleteCoordinator.cancelDelete()
+                pendingDeleteEmailId = null
+            },
+            title = { Text(stringResource(R.string.trash_delete_dialog_title)) },
+            text = { Text(stringResource(R.string.trash_delete_dialog_body)) },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        deleteCoordinator.cancelDelete()
+                        pendingDeleteEmailId = null
+                    }
+                ) {
+                    Text(stringResource(R.string.trash_delete_dialog_cancel))
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        deleteCoordinator.confirmDelete()
+                        pendingDeleteEmailId = null
+                    }
+                ) {
+                    Text(stringResource(R.string.trash_delete_dialog_confirm))
+                }
+            }
         )
     }
 }

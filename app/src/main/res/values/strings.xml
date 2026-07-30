@@ -153,6 +153,12 @@
     <string name="snackbar_deleted_permanently">Eliminado permanentemente</string>
     <string name="snackbar_restored_to_inbox">Restaurado en la bandeja</string>
 
+    <!-- Confirmación de borrado permanente -->
+    <string name="trash_delete_dialog_title">¿Eliminar permanentemente?</string>
+    <string name="trash_delete_dialog_body">Esta acción no se puede deshacer.</string>
+    <string name="trash_delete_dialog_cancel">Cancelar</string>
+    <string name="trash_delete_dialog_confirm">Eliminar permanentemente</string>
+
     <!-- Búsqueda -->
     <string name="search_recent">Recientes</string>
     <string name="search_clear_history">Borrar</string>

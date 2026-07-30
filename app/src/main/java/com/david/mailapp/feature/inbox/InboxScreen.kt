@@ -38,10 +38,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -76,7 +74,6 @@ import com.david.mailapp.core.localization.toUiText
 import com.david.mailapp.feature.inbox.components.EmailListItem
 import com.david.mailapp.ui.components.ContainedLoadingIndicator
 import com.david.mailapp.ui.theme.MotionTokens
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
@@ -100,11 +97,16 @@ fun InboxScreen(
 
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    var snackbarJob by remember { mutableStateOf<Job?>(null) }
+    val pendingFeedback = (uiState as? InboxUiState.Success)
+        ?.pendingFeedbackQueue
+        ?.firstOrNull()
 
-    // ── Snackbar strings (captured at composable scope) ─────
-    val snackbarMovedToTrash = stringResource(R.string.snackbar_moved_to_trash)
-    val snackbarUndo = stringResource(R.string.action_undo)
+    ActionFeedbackEffect(
+        feedback = pendingFeedback,
+        snackbarHostState = snackbarHostState,
+        onConsumed = viewModel::consumeFeedback,
+        onUndoMoveToTrash = viewModel::undoMoveToTrash
+    )
 
     // ── Pull-to-refresh UX state ───────────────────────────────
     // Tracks whether the list was at the top when the user started refreshing.
@@ -266,25 +268,13 @@ fun InboxScreen(
                                     }
                                 }
                                 val onDeleteRemembered = remember(email.id) {
-                                    {
-                                        snackbarJob?.cancel()
-                                        snackbarJob = scope.launch {
-                                            viewModel.moveToTrash(email.id)
-                                            val result = snackbarHostState.showSnackbar(
-                                                message = snackbarMovedToTrash,
-                                                actionLabel = snackbarUndo,
-                                                duration = SnackbarDuration.Short
-                                            )
-                                            if (result == SnackbarResult.ActionPerformed) {
-                                                viewModel.undoMoveToTrash(email.id)
-                                            }
-                                        }
-                                    }
+                                    { viewModel.moveToTrash(email.id) }
                                 }
                                 EmailListItem(
                                     email = email,
                                     onClick = onClickRemembered,
                                     onDelete = onDeleteRemembered,
+                                    actionsEnabled = email.id !in state.activeActionEmailIds,
                                     isHighlighted = (email.id == highlightedEmailId),
                                     onClearHighlight = onClearHighlight,
                                     modifier = Modifier.animateItem(

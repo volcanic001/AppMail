@@ -6,12 +6,16 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.david.mailapp.core.localization.UiErrorReason
 import com.david.mailapp.core.localization.toUiErrorReason
+import com.david.mailapp.data.repository.EmailActionResult
 import com.david.mailapp.data.repository.EmailRepository
+import com.david.mailapp.feature.inbox.ActionFeedback
+import com.david.mailapp.feature.inbox.ActionFeedbackId
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class TrashViewModel(
@@ -23,57 +27,51 @@ class TrashViewModel(
 
     private var nextPageToken: String? = null
     private var isLoadingNextPage = false
-
     init {
         observeRoom()
         refresh()
     }
 
+    // ── Room observer ────────────────────────────────────────────
+
     private fun observeRoom() {
         viewModelScope.launch {
             source.observeTrash().collect { emails ->
-                val current = _uiState.value
-                when (current) {
-                    is TrashUiState.Loading -> {
-                        _uiState.value = TrashUiState.Success(emails = emails)
+                _uiState.update { current ->
+                    when (current) {
+                        is TrashUiState.Loading -> TrashUiState.Success(emails = emails)
+                        is TrashUiState.Success -> current.copy(emails = emails)
+                        is TrashUiState.Error -> current
                     }
-                    is TrashUiState.Success -> {
-                        _uiState.value = current.copy(emails = emails)
-                    }
-                    is TrashUiState.Error -> { /* keep error visible */ }
                 }
             }
         }
     }
 
+    // ── Refresh / pagination ────────────────────────────────────
+
     fun refresh() {
         viewModelScope.launch {
-            val current = _uiState.value
-            val isManualRefresh = current is TrashUiState.Success
+            val isManualRefresh = _uiState.value is TrashUiState.Success
             if (isManualRefresh) {
-                _uiState.value = current.copy(isRefreshing = true)
+                _uiState.update { current ->
+                    if (current is TrashUiState.Success) current.copy(isRefreshing = true) else current
+                }
             }
             try {
                 if (isManualRefresh) delay(800)
-                // Refresh restarts the paginated window — discard old token
                 nextPageToken = null
                 val result = source.refreshTrash(null)
-                if (result.isComplete) {
-                    nextPageToken = result.nextPageToken
+                if (result.isComplete) nextPageToken = result.nextPageToken
+                _uiState.update { current ->
+                    if (current is TrashUiState.Success) current.copy(isRefreshing = false) else current
                 }
-                val after = _uiState.value
-                if (after is TrashUiState.Success) {
-                    _uiState.value = after.copy(isRefreshing = false)
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) {
                 Log.e("TrashVM", "refresh failed", e)
-                val after = _uiState.value
-                if (after is TrashUiState.Success) {
-                    _uiState.value = after.copy(isRefreshing = false)
-                } else {
-                    _uiState.value = TrashUiState.Error(e.toUiErrorReason())
+                _uiState.update { current ->
+                    if (current is TrashUiState.Success) current.copy(isRefreshing = false)
+                    else TrashUiState.Error(e.toUiErrorReason())
                 }
             }
         }
@@ -83,45 +81,86 @@ class TrashViewModel(
         if (isLoadingNextPage || nextPageToken == null) return
         isLoadingNextPage = true
         viewModelScope.launch {
-            val current = _uiState.value
-            if (current is TrashUiState.Success) {
-                _uiState.value = current.copy(isLoadingNextPage = true)
+            _uiState.update { current ->
+                if (current is TrashUiState.Success) current.copy(isLoadingNextPage = true) else current
             }
             try {
                 val token = nextPageToken
                 val result = source.refreshTrash(token)
-                if (result.isComplete) {
-                    nextPageToken = result.nextPageToken
-                } // else: keep existing token for retry
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Log.e("TrashVM", "loadNextPage failed", e)
-            } finally {
+                if (result.isComplete) nextPageToken = result.nextPageToken
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { Log.e("TrashVM", "loadNextPage failed", e) }
+            finally {
                 isLoadingNextPage = false
-                val after = _uiState.value
-                if (after is TrashUiState.Success) {
-                    _uiState.value = after.copy(isLoadingNextPage = false)
+                _uiState.update { current ->
+                    if (current is TrashUiState.Success) current.copy(isLoadingNextPage = false) else current
                 }
             }
         }
     }
 
+    // ── Actions (block + enqueue + release) ──────────────────────
+
     fun deletePermanently(emailId: String) {
+        if (!guardAction(emailId)) return
         viewModelScope.launch {
-            source.deletePermanently(emailId)
+            try {
+                when (val r = source.deletePermanently(emailId)) {
+                    is EmailActionResult.Success -> enqueueFeedback(ActionFeedback.DeletedPermanently(emailId))
+                    is EmailActionResult.Failure -> enqueueFeedback(ActionFeedback.Failure(r.reason))
+                }
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { enqueueFeedback(ActionFeedback.Failure(e.toUiErrorReason())) }
+            finally { releaseAction(emailId) }
         }
     }
 
     fun restoreToInbox(emailId: String) {
+        if (!guardAction(emailId)) return
         viewModelScope.launch {
-            source.restoreFromTrash(emailId)
+            try {
+                when (val r = source.restoreFromTrash(emailId)) {
+                    is EmailActionResult.Success -> enqueueFeedback(ActionFeedback.RestoredToInbox(emailId))
+                    is EmailActionResult.Failure -> enqueueFeedback(ActionFeedback.Failure(r.reason))
+                }
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { enqueueFeedback(ActionFeedback.Failure(e.toUiErrorReason())) }
+            finally { releaseAction(emailId) }
         }
     }
 
-    class Factory(
-        private val repository: EmailRepository
-    ) : ViewModelProvider.Factory {
+    fun consumeFeedback(feedbackId: ActionFeedbackId) {
+        _uiState.update { current ->
+            if (current is TrashUiState.Success) current.consumeFeedback(feedbackId) else current
+        }
+    }
+
+    // ── Guard / enqueue / release ────────────────────────────────
+
+    private fun guardAction(emailId: String): Boolean {
+        while (true) {
+            val current = _uiState.value
+            if (current !is TrashUiState.Success) return false
+            if (emailId in current.activeActionEmailIds) return false
+            if (_uiState.compareAndSet(current, current.withActive(emailId))) return true
+        }
+    }
+
+    private fun enqueueFeedback(feedback: ActionFeedback) {
+        _uiState.update { current ->
+            if (current is TrashUiState.Success) current.withFeedback(feedback) else current
+        }
+    }
+
+    private fun releaseAction(emailId: String) {
+        _uiState.update { current ->
+            if (current is TrashUiState.Success) current.withoutActive(emailId) else current
+        }
+    }
+
+    // ── Factory ──────────────────────────────────────────────────
+
+    class Factory(private val repository: EmailRepository) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(TrashViewModel::class.java)) {

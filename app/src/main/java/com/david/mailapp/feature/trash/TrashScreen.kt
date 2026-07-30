@@ -112,23 +112,20 @@ fun TrashScreen(
             }
 
             is TrashUiState.Success -> {
-                if (state.emails.isEmpty() && !state.isRefreshing) {
-                    EmptyTrash()
-                } else {
-                    TrashContent(
-                        state = state,
-                        listState = listState,
-                        snackbarHostState = snackbarHostState,
-                        highlightedEmailId = highlightedEmailId,
-                        onEmailClick = onEmailClick,
-                        onDeletePermanently = viewModel::deletePermanently,
-                        onRestoreToInbox = viewModel::restoreToInbox,
-                        onRefresh = viewModel::refresh,
-                        onLoadNextPage = viewModel::loadNextPage,
-                        onClearHighlight = onClearHighlight,
-                        bottomPadding = paddingValues.calculateBottomPadding()
-                    )
-                }
+                TrashContent(
+                    state = state,
+                    listState = listState,
+                    snackbarHostState = snackbarHostState,
+                    highlightedEmailId = highlightedEmailId,
+                    onEmailClick = onEmailClick,
+                    onDeletePermanently = viewModel::deletePermanently,
+                    onRestoreToInbox = viewModel::restoreToInbox,
+                    onFeedbackConsumed = viewModel::consumeFeedback,
+                    onRefresh = viewModel::refresh,
+                    onLoadNextPage = viewModel::loadNextPage,
+                    onClearHighlight = onClearHighlight,
+                    bottomPadding = paddingValues.calculateBottomPadding()
+                )
             }
         }
     }
@@ -138,7 +135,7 @@ fun TrashScreen(
 // ── Sub-composables ─────────────────────────────────────────────
 
 @Composable
-private fun EmptyTrash() {
+internal fun EmptyTrash() {
     Column(
         Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,

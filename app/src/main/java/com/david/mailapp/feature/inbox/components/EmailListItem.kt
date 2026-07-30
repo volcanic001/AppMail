@@ -73,6 +73,7 @@ fun EmailListItem(
     onClick: () -> Unit,
     onDelete: () -> Unit,
     onRestore: (() -> Unit)? = null,
+    actionsEnabled: Boolean = true,
     isHighlighted: Boolean = false,
     onClearHighlight: () -> Unit = {},
     modifier: Modifier = Modifier
@@ -111,23 +112,32 @@ fun EmailListItem(
             }
             .background(MaterialTheme.colorScheme.background)
             // ── Swipe gesture ──────────────────────────────────
-            .pointerInput(email.id) {
+            .pointerInput(email.id, actionsEnabled) {
                 detectHorizontalDragGestures(
                     onDragStart = { },
                     onDragEnd = {
-                        if (isDismissed) return@detectHorizontalDragGestures
+                        if (!actionsEnabled || isDismissed) {
+                            scope.launch {
+                                offsetX.animateTo(0f, MotionTokens.swipeReturn)
+                                thresholdWasCrossed = false
+                            }
+                            return@detectHorizontalDragGestures
+                        }
 
                         scope.launch {
                             if (abs(offsetX.value) > threshold) {
-                                // DISMISS — momentum exit
                                 isDismissed = true
-                                scope.launch {
-                                    offsetX.animateTo(
-                                        targetValue = sign(offsetX.value) * screenWidth * 1.2f,
-                                        animationSpec = MotionTokens.swipeDismiss
-                                    )
-                                }
-                                if (offsetX.value < 0) onDelete() else onRestore?.invoke()
+                                val direction = sign(offsetX.value)
+                                if (direction < 0f) onDelete() else onRestore?.invoke()
+                                offsetX.animateTo(
+                                    targetValue = direction * screenWidth * 1.2f,
+                                    animationSpec = MotionTokens.swipeDismiss
+                                )
+                                // Room owns removal. If the row is still composed
+                                // (failure or confirmation pending), return it safely.
+                                isDismissed = false
+                                offsetX.animateTo(0f, MotionTokens.swipeReturn)
+                                thresholdWasCrossed = false
                             } else {
                                 // RETURN — rubber band overshoot
                                 offsetX.animateTo(
@@ -141,12 +151,13 @@ fun EmailListItem(
                     onDragCancel = {
                         scope.launch {
                             offsetX.animateTo(0f, MotionTokens.swipeReturn)
+                            isDismissed = false
                             thresholdWasCrossed = false
                         }
                     },
                     onHorizontalDrag = { _, dragAmount ->
                         scope.launch {
-                            if (isDismissed) return@launch
+                            if (!actionsEnabled || isDismissed) return@launch
 
                             // ── Resistance curve ────────────────
                             val current = offsetX.value
@@ -174,7 +185,7 @@ fun EmailListItem(
                 )
             }
             // ── Tap gesture ────────────────────────────────────
-            .pointerInput(email.id) {
+            .pointerInput(email.id, actionsEnabled) {
                 detectTapGestures(
                     onPress = {
                         pressScale.snapTo(MotionTokens.pressScale)
@@ -184,7 +195,7 @@ fun EmailListItem(
                             pressScale.animateTo(1f, MotionTokens.itemPress)
                         }
                     },
-                    onTap = { onClick() }
+                    onTap = { if (actionsEnabled) onClick() }
                 )
             }
     ) {

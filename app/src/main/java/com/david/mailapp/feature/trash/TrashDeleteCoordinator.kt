@@ -1,32 +1,32 @@
 package com.david.mailapp.feature.trash
 
 /**
- * Internal seam for the permanent-delete interaction.
+ * Pure confirmation seam for permanent delete.
  *
- * It intentionally preserves the current behavior during Phase 0: a request
- * deletes immediately and offers undo. Contract C9 documents the target
- * behavior and remains ignored until Phase 2.5 changes this coordinator and
- * its UI representation to require confirmation and remove undo.
+ * - [requestDelete] stores the pending ID, does NOT call Gmail.
+ * - [confirmDelete] consumes the ID and invokes [onConfirmed] once.
+ * - [cancelDelete] clears the pending ID without calling back.
+ * - Does NOT offer undo (not even for restore).
  */
-internal class TrashDeleteCoordinator(
-    private val deletePermanently: (String) -> Unit,
-    private val restoreToInbox: (String) -> Unit
-) {
-    var pendingEmailId: String? = null
-        private set
+class TrashDeleteCoordinator {
+    private var pendingDeleteId: String? = null
 
-    val offersUndo: Boolean = true
+    val pendingDeleteEmailId: String? get() = pendingDeleteId
+    val isDeletePending: Boolean get() = pendingDeleteId != null
+
+    var onConfirmed: ((String) -> Unit)? = null
 
     fun requestDelete(emailId: String) {
-        deletePermanently(emailId)
+        pendingDeleteId = emailId
     }
 
     fun confirmDelete() {
-        pendingEmailId?.let(deletePermanently)
-        pendingEmailId = null
+        val id = pendingDeleteId ?: return
+        pendingDeleteId = null
+        onConfirmed?.invoke(id)
     }
 
-    fun undo(emailId: String) {
-        restoreToInbox(emailId)
+    fun cancelDelete() {
+        pendingDeleteId = null
     }
 }

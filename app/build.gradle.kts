@@ -78,6 +78,7 @@ dependencies {
     implementation(libs.compose.animation.core)
     implementation(libs.compose.activity)
     debugImplementation(libs.compose.ui.tooling)
+    debugImplementation(libs.compose.ui.test.manifest)
 
     // Lifecycle
     implementation(libs.lifecycle.runtime)
@@ -135,10 +136,13 @@ dependencies {
     testImplementation(libs.room.testing)
 
     // Instrumented testing
+    androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.androidx.test.core)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.espresso.core)
     androidTestImplementation(libs.coroutines.test)
     androidTestImplementation(libs.ktor.client.mock)
     androidTestImplementation(libs.room.testing)
+    androidTestImplementation(libs.compose.ui.test.junit4)
 }
