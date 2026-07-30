@@ -69,6 +69,8 @@ class InboxViewModel(
             }
 
             try {
+                // Refresh restarts the paginated window — discard old token
+                nextPageToken = null
                 val start = System.currentTimeMillis()
                 val result = source.refreshInbox(null)
                 if (result.isComplete) {

@@ -74,7 +74,8 @@ class EmailRepository(
     suspend fun refreshInbox(pageToken: String? = null): PaginatedResult<Email> {
         val lease = writeGuard.capture() ?: return PaginatedResult(emptyList(), null)
         val p = provider ?: return PaginatedResult(emptyList(), null)
-        val result = p.fetchInbox(pageToken)
+        val fetched = p.fetchInbox(pageToken)
+        val result = if (fetched.isComplete) fetched else fetched.copy(nextPageToken = null)
 
         val entities = result.items.map { EmailEntity.fromDomain(it, EmailFolder.Inbox) }
         writeGuard.commit(lease) {
@@ -93,10 +94,13 @@ class EmailRepository(
     suspend fun refreshTrash(pageToken: String? = null): PaginatedResult<Email> {
         val lease = writeGuard.capture() ?: return PaginatedResult(emptyList(), null)
         val p = provider ?: return PaginatedResult(emptyList(), null)
-        val result = p.fetchTrash(pageToken)
+        val fetched = p.fetchTrash(pageToken)
+        val result = if (fetched.isComplete) fetched else fetched.copy(nextPageToken = null)
 
         val entities = result.items.map { EmailEntity.fromDomain(it, EmailFolder.Trash) }
         writeGuard.commit(lease) {
+            // Refresh replaces the paginated window only for a complete first page.
+            // Partial pages and subsequent pages can only merge into the cache.
             if (pageToken == null && result.isComplete) {
                 dao.replaceFolder("trash", entities)
             } else {

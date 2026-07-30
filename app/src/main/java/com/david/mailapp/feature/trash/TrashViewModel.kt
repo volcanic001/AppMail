@@ -55,6 +55,8 @@ class TrashViewModel(
             }
             try {
                 if (isManualRefresh) delay(800)
+                // Refresh restarts the paginated window — discard old token
+                nextPageToken = null
                 val result = source.refreshTrash(null)
                 if (result.isComplete) {
                     nextPageToken = result.nextPageToken

@@ -19,14 +19,17 @@ class EmailCacheMergeTest {
         cleanBody: String = "",
         pdfJson: String = "[]",
         pdfScanned: Boolean = false,
-        hasAtt: Boolean = false
+        hasAtt: Boolean = false,
+        rfcMessageId: String? = null,
+        rfcReferences: String? = null
     ): EmailEntity = EmailEntity(
         id = id, threadId = "t1", from = "a", fromInitials = "A",
         to = "b", subject = "s", snippet = "s", timestamp = 1L,
         isRead = true, isStarred = false, hasAttachments = hasAtt,
         labels = "", folder = "inbox",
         body = body, cleanBody = cleanBody,
-        pdfAttachmentsJson = pdfJson, pdfMetadataScanned = pdfScanned
+        pdfAttachmentsJson = pdfJson, pdfMetadataScanned = pdfScanned,
+        rfcMessageId = rfcMessageId, rfcReferences = rfcReferences
     )
 
     @Test
@@ -150,5 +153,19 @@ class EmailCacheMergeTest {
         assertTrue("pdfMetadataScanned must be preserved after merge",
             merged.pdfMetadataScanned)
         assertEquals("blank body stays blank", "", merged.body)
+    }
+
+    @Test
+    fun `incoming missing RFC headers preserves existing values`() {
+        val existing = entity(
+            rfcMessageId = "<message@example.com>",
+            rfcReferences = "<parent@example.com>"
+        )
+        val incoming = entity(rfcMessageId = null, rfcReferences = null)
+
+        val merged = mergeWithExisting(incoming, existing)
+
+        assertEquals("<message@example.com>", merged.rfcMessageId)
+        assertEquals("<parent@example.com>", merged.rfcReferences)
     }
 }

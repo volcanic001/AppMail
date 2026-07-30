@@ -11,8 +11,8 @@ import kotlinx.coroutines.flow.Flow
 /**
  * Merges an incoming [incoming] entity with the [existing] entity stored in Room.
  *
- * This function preserves previously-fetched data (body, cleanBody, PDF metadata)
- * when the incoming sync is less detailed.
+ * This function preserves previously-fetched data (body, cleanBody, PDF metadata,
+ * RFC headers) when the incoming sync is less detailed.
  *
  * Rules:
  * - body and cleanBody: preserve existing when the incoming value is blank.
@@ -25,6 +25,8 @@ import kotlinx.coroutines.flow.Flow
 internal fun mergeWithExisting(incoming: EmailEntity, existing: EmailEntity): EmailEntity {
     val body = if (incoming.body.isBlank() && existing.body.isNotBlank()) existing.body else incoming.body
     val cleanBody = if (incoming.cleanBody.isBlank() && existing.cleanBody.isNotBlank()) existing.cleanBody else incoming.cleanBody
+    val rfcMessageId = incoming.rfcMessageId ?: existing.rfcMessageId
+    val rfcReferences = incoming.rfcReferences ?: existing.rfcReferences
 
     val (pdfJson, pdfScanned, hasAtt) = when {
         incoming.pdfMetadataScanned -> Triple(incoming.pdfAttachmentsJson, true, incoming.hasAttachments)
@@ -37,7 +39,9 @@ internal fun mergeWithExisting(incoming: EmailEntity, existing: EmailEntity): Em
         cleanBody = cleanBody,
         pdfAttachmentsJson = pdfJson,
         pdfMetadataScanned = pdfScanned,
-        hasAttachments = hasAtt
+        hasAttachments = hasAtt,
+        rfcMessageId = rfcMessageId,
+        rfcReferences = rfcReferences
     )
 }
 
