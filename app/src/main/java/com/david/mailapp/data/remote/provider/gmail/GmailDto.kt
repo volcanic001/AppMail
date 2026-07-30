@@ -101,10 +101,7 @@ data class AttachmentResponse(
 
 /** Parsed Content-ID header value, with angle-brackets stripped. */
 val Payload.contentId: String?
-    get() = headers
-        ?.firstOrNull { it.name.equals("Content-Id", ignoreCase = true) }
-        ?.value
-        ?.trim('<', '>', ' ')
+    get() = headers?.headerValue("Content-Id")?.trim('<', '>', ' ')
 
 /** A part that is an inline image referenced via `cid:` in the HTML body. */
 data class InlineImage(
@@ -176,10 +173,7 @@ internal fun Payload.collectPdfAttachments(): List<PdfAttachmentMetadata> {
         }
 
         // Content-Disposition: reject if token starts with "inline"
-        val disposition = node.headers
-            ?.firstOrNull { it.name.equals("Content-Disposition", ignoreCase = true) }
-            ?.value
-            ?.trim()
+        val disposition = node.headers?.headerValue("Content-Disposition")
         if (disposition != null && disposition.startsWith("inline", ignoreCase = true)) {
             node.parts?.forEach { walk(it) }
             return

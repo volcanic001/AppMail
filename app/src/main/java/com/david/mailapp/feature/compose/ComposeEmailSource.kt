@@ -1,5 +1,7 @@
 package com.david.mailapp.feature.compose
 
+import com.david.mailapp.data.remote.provider.ReplyContext
+
 /**
  * Internal contract isolating ComposeViewModel from the repository
  * for testability without changing production behavior.
@@ -12,7 +14,6 @@ interface ComposeEmailSource {
     suspend fun sendEmail(
         to: String, cc: String?, bcc: String?,
         subject: String, body: String,
-        inReplyToId: String? = null,
-        references: String? = null
+        replyContext: ReplyContext? = null
     )
 }

@@ -61,7 +61,8 @@ interface EmailProvider {
     /**
      * Envía un email de texto plano vía el provider.
      *
-     * [inReplyToId] y [references] se usan para threading RFC 2822 en Reply.
+     * [replyContext] proporciona threadId y encabezados RFC In-Reply-To/References
+     * para threading. Nulo para un correo nuevo.
      */
     suspend fun sendEmail(
         to: String,
@@ -69,8 +70,7 @@ interface EmailProvider {
         bcc: String?,
         subject: String,
         body: String,
-        inReplyToId: String? = null,
-        references: String? = null
+        replyContext: ReplyContext? = null
     )
 }
 

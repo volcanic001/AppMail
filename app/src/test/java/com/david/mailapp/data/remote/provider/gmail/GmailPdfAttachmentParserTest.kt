@@ -356,4 +356,39 @@ class GmailPdfAttachmentParserTest {
 
         assertTrue(payload.collectPdfAttachments().isEmpty())
     }
+
+    // ── Mixed-case header reuse ────────────────────────────────
+
+    @Test
+    fun `accepts PDF with mixed-case Content-Disposition attachment`() {
+        val payload = pdfPart(
+            filename = "doc.pdf",
+            attachmentId = "att_mc",
+            headers = listOf(
+                header("content-disposition", "Attachment"),
+                header("content-type", "Application/Pdf")
+            )
+        )
+        val result = payload.collectPdfAttachments()
+        assertEquals(1, result.size)
+        assertEquals("doc.pdf", result[0].fileName)
+        assertEquals("att_mc", result[0].attachmentId)
+    }
+
+    @Test
+    fun `rejects inline PDF regardless of Content-ID capitalization`() {
+        val payload = nonPdfPart(
+            parts = listOf(
+                pdfPart(
+                    filename = "inline.pdf",
+                    attachmentId = "att_ci",
+                    headers = listOf(
+                        header("content-disposition", "INLINE"),
+                        header("CONTENT-ID", "<img001@mail.gmail.com>")
+                    )
+                )
+            )
+        )
+        assertTrue(payload.collectPdfAttachments().isEmpty())
+    }
 }

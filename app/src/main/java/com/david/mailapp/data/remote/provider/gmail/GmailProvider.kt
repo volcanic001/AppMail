@@ -5,6 +5,7 @@ import android.util.Log
 import com.david.mailapp.data.remote.provider.BodyFetchResult
 import com.david.mailapp.data.remote.provider.EmailProvider
 import com.david.mailapp.data.remote.provider.InlineImageRef
+import com.david.mailapp.data.remote.provider.ReplyContext
 import com.david.mailapp.domain.model.Email
 import com.david.mailapp.domain.model.EmailFolder
 import com.david.mailapp.domain.model.PaginatedResult
@@ -334,8 +335,7 @@ class GmailProvider(
         bcc: String?,
         subject: String,
         body: String,
-        inReplyToId: String?,
-        references: String?
+        replyContext: ReplyContext?
     ) {
         val fromAddress = getUserEmail() ?: throw IllegalStateException("No se pudo obtener la dirección del remitente")
 
@@ -346,28 +346,15 @@ class GmailProvider(
             bcc = bcc,
             subject = subject,
             body = body,
-            inReplyToId = inReplyToId,
-            references = references
+            replyContext = replyContext
         )
 
-        val encoded = android.util.Base64.encodeToString(
-            rawMime.toByteArray(Charsets.UTF_8),
-            android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP
+        val encoded = java.util.Base64.getUrlEncoder().encodeToString(
+            rawMime.toByteArray(Charsets.UTF_8)
         )
-
-        val threadId = if (inReplyToId != null) {
-            try {
-                val msg: MessageResponse = client.get("users/me/messages/$inReplyToId") {
-                    parameter("format", "minimal")
-                }.body()
-                msg.threadId
-            } catch (_: Exception) {
-                null
-            }
-        } else null
 
         client.post("users/me/messages/send") {
-            setBody(SendRequest(raw = encoded, threadId = threadId))
+            setBody(SendRequest(raw = encoded, threadId = replyContext?.threadId))
         }
     }
 
@@ -381,87 +368,43 @@ class GmailProvider(
         bcc: String?,
         subject: String,
         body: String,
-        inReplyToId: String?,
-        references: String?
+        replyContext: ReplyContext?
     ): String = buildString {
         append("From: $from\r\n")
         append("To: $to\r\n")
         if (!cc.isNullOrBlank()) append("Cc: $cc\r\n")
         if (!bcc.isNullOrBlank()) append("Bcc: $bcc\r\n")
         append("Subject: =?UTF-8?B?").append(
-            android.util.Base64.encodeToString(
-                subject.toByteArray(Charsets.UTF_8),
-                android.util.Base64.NO_WRAP
+            java.util.Base64.getEncoder().encodeToString(
+                subject.toByteArray(Charsets.UTF_8)
             )
         ).append("?=\r\n")
         append("MIME-Version: 1.0\r\n")
         append("Content-Type: text/plain; charset=UTF-8\r\n")
         append("Content-Transfer-Encoding: base64\r\n")
-        if (inReplyToId != null) {
-            append("In-Reply-To: <$inReplyToId>\r\n")
+        val inReplyTo = replyContext?.inReplyTo
+        val references = replyContext?.references
+        if (!inReplyTo.isNullOrBlank()) {
+            append("In-Reply-To: $inReplyTo\r\n")
         }
         if (!references.isNullOrBlank()) {
             append("References: $references\r\n")
         }
         append("\r\n")
         append(
-            android.util.Base64.encodeToString(
-                body.toByteArray(Charsets.UTF_8),
-                android.util.Base64.NO_WRAP
+            java.util.Base64.getEncoder().encodeToString(
+                body.toByteArray(Charsets.UTF_8)
             )
         )
     }
 
     // ── mapping ─────────────────────────────────────────────────
 
-    private fun MessageResponse.toDomain(): Email {
-        val headers = payload?.headers?.associate { it.name to it.value } ?: emptyMap()
-        val from = headers["From"] ?: headers["from"] ?: "Unknown"
-        val to = headers["To"] ?: headers["to"] ?: ""
-        val subject = headers["Subject"] ?: headers["subject"] ?: "(no subject)"
-
-        val pdfAttachments = payload?.collectPdfAttachments().orEmpty()
-
-        return Email(
-            id = id,
-            threadId = threadId,
-            from = from,
-            fromInitials = extractInitials(from),
-            to = to,
-            subject = subject,
-            snippet = snippet ?: "",
-            timestamp = internalDate?.toLongOrNull() ?: System.currentTimeMillis(),
-            isRead = labelIds?.contains("UNREAD") != true,
-            isStarred = labelIds?.contains("STARRED") == true,
-            hasAttachments = pdfAttachments.isNotEmpty(),
-            labels = labelIds ?: emptyList(),
-            folder = if (labelIds?.contains("TRASH") == true) EmailFolder.Trash else EmailFolder.Inbox,
-            pdfAttachments = pdfAttachments,
-            pdfMetadataScanned = true
-        )
-    }
-
-    /** Extract initials from "John Doe <john@example.com>" → "JD". */
-    private fun extractInitials(from: String): String {
-        val name = from.substringBefore("<").trim()
-        
-        // If there's no name part or name is just an email
-        if (name.isEmpty() || (name == from && name.contains("@"))) {
-            val email = from.substringAfter("<").substringBefore(">").trim()
-            return email.firstOrNull { it.isLetterOrDigit() }?.uppercase() ?: "?"
-        }
-
-        val initials = name.split(Regex("[^\\p{L}\\p{Nd}]+"))
-            .filter { it.isNotBlank() }
-            .take(2)
-            .map { it.first().uppercase() }
-            .joinToString("")
-
-        if (initials.isEmpty()) {
-            val email = from.substringAfter("<").substringBefore(">").trim()
-            return email.firstOrNull { it.isLetterOrDigit() }?.uppercase() ?: "?"
-        }
-
-        return initials
-    }
+    /**
+     * Pure mapping from Gmail's [MessageResponse] to our [Email] domain model.
+     *
+     * Uses case-insensitive header lookup, deterministic defaults, and
+     * preserves RFC Message-ID/References for threading.
+     */
+    private fun MessageResponse.toDomain(): Email = toDomainEmail()
 }

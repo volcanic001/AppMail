@@ -10,6 +10,7 @@ import com.david.mailapp.data.pdf.PdfDownloadFailure
 import com.david.mailapp.data.pdf.PdfDownloadState
 import com.david.mailapp.data.remote.provider.BodyFetchResult
 import com.david.mailapp.data.remote.provider.EmailProvider
+import com.david.mailapp.data.remote.provider.ReplyContext
 import com.david.mailapp.data.remote.provider.InlineImageRef
 import com.david.mailapp.domain.model.Email
 import com.david.mailapp.domain.model.EmailFolder
@@ -418,10 +419,9 @@ class EmailRepository(
     suspend fun sendEmail(
         to: String, cc: String?, bcc: String?,
         subject: String, body: String,
-        inReplyToId: String? = null,
-        references: String? = null
+        replyContext: ReplyContext? = null
     ) {
-        provider?.sendEmail(to, cc, bcc, subject, body, inReplyToId, references)
+        provider?.sendEmail(to, cc, bcc, subject, body, replyContext)
             ?: error("No hay proveedor activo")
     }
 }

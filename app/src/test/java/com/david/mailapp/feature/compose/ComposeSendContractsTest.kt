@@ -1,6 +1,7 @@
 package com.david.mailapp.feature.compose
 
 import com.david.mailapp.core.localization.StringProvider
+import com.david.mailapp.data.remote.provider.ReplyContext
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -108,7 +109,7 @@ class FakeComposeEmailSource(
     override suspend fun sendEmail(
         to: String, cc: String?, bcc: String?,
         subject: String, body: String,
-        inReplyToId: String?, references: String?
+        replyContext: ReplyContext?
     ) {
         sendCallCount++
         sendGate?.await()

@@ -3,6 +3,7 @@ package com.david.mailapp.testhelpers
 import com.david.mailapp.data.remote.provider.BodyFetchResult
 import com.david.mailapp.data.remote.provider.EmailProvider
 import com.david.mailapp.data.remote.provider.InlineImageRef
+import com.david.mailapp.data.remote.provider.ReplyContext
 import com.david.mailapp.domain.model.Email
 import com.david.mailapp.domain.model.EmailFolder
 import com.david.mailapp.domain.model.PaginatedResult
@@ -149,7 +150,7 @@ class FakeEmailProvider : EmailProvider {
 
     override suspend fun sendEmail(
         to: String, cc: String?, bcc: String?, subject: String, body: String,
-        inReplyToId: String?, references: String?
+        replyContext: ReplyContext?
     ) {
         sendEmailDeferred?.await()
         sendEmailCalls++

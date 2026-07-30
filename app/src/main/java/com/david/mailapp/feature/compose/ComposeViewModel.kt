@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.david.mailapp.core.auth.AuthManager
 import com.david.mailapp.core.localization.StringProvider
+import com.david.mailapp.data.remote.provider.ReplyContext
 import com.david.mailapp.data.repository.EmailRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -103,14 +104,18 @@ class ComposeViewModel(
                     }
                 }
 
+                val replyContext: ReplyContext? =
+                    if (state.composeMode == ComposeMode.REPLY) {
+                        state.originalEmail?.let(ReplyContext::from)
+                    } else null
+
                 emailSource.sendEmail(
                     to = state.toField,
                     cc = state.ccField.ifBlank { null },
                     bcc = state.bccField.ifBlank { null },
                     subject = state.subject,
                     body = finalBody,
-                    inReplyToId = if (state.composeMode == ComposeMode.REPLY) state.originalEmail?.id else null,
-                    references = if (state.composeMode == ComposeMode.REPLY) state.originalEmail?.id else null
+                    replyContext = replyContext
                 )
                 _uiState.value = _uiState.value.copy(
                     isSending = false,
@@ -146,8 +151,8 @@ class ComposeViewModel(
                     override suspend fun sendEmail(
                         to: String, cc: String?, bcc: String?,
                         subject: String, body: String,
-                        inReplyToId: String?, references: String?
-                    ) = repository.sendEmail(to, cc, bcc, subject, body, inReplyToId, references)
+                        replyContext: ReplyContext?
+                    ) = repository.sendEmail(to, cc, bcc, subject, body, replyContext)
                 }
                 return ComposeViewModel(args, emailSource, stringProvider) as T
             }
