@@ -106,6 +106,6 @@ private class RecordingTrashSource(initialResult: PaginatedResult<Email>) : Tras
     }
 
     override fun observeTrash() = room
-    override suspend fun deletePermanently(emailId: String) = Unit
-    override suspend fun restoreFromTrash(emailId: String) = Unit
+    override suspend fun deletePermanently(emailId: String) = com.david.mailapp.data.repository.EmailActionResult.Success
+    override suspend fun restoreFromTrash(emailId: String) = com.david.mailapp.data.repository.EmailActionResult.Success
 }

@@ -16,10 +16,14 @@ import com.david.mailapp.domain.model.Email
 import com.david.mailapp.domain.model.EmailFolder
 import com.david.mailapp.domain.model.PaginatedResult
 import com.david.mailapp.domain.model.PdfAttachmentMetadata
+import com.david.mailapp.core.localization.UiErrorReason
+import com.david.mailapp.core.localization.toUiErrorReason
 import com.david.mailapp.core.session.SessionWriteGuard
+import com.david.mailapp.core.session.SessionWriteLease
 import com.david.mailapp.feature.emaildetail.components.EmailHtmlCleaner
 import java.io.File
 import java.io.FileInputStream
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -120,51 +124,144 @@ class EmailRepository(
         return p.search(query, pageToken)
     }
 
-    suspend fun moveToTrash(emailId: String) {
-        val lease = writeGuard.capture() ?: return
-        val currentProvider = provider
-        val committed = writeGuard.commit(lease) {
+    suspend fun moveToTrash(emailId: String): EmailActionResult {
+        val lease = writeGuard.capture() ?: return EmailActionResult.Failure(
+            UiErrorReason.NO_ACTIVE_ACCOUNT, remoteApplied = false)
+        val p = provider ?: return EmailActionResult.Failure(
+            UiErrorReason.NO_ACTIVE_ACCOUNT, remoteApplied = false)
+
+        // 1. Remote first
+        try {
+            p.moveToTrash(emailId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return EmailActionResult.Failure(e.toUiErrorReason(), remoteApplied = false)
+        }
+
+        // 2. Local write with exception/rejection handling
+        return commitWithReconcile(lease, p, folders = listOf("inbox", "trash")) {
             dao.moveToFolder(emailId, "trash")
-            true
-        } ?: false
-        if (committed) {
-            try { currentProvider?.moveToTrash(emailId) } catch (_: Exception) {}
         }
     }
 
-    suspend fun restoreFromTrash(emailId: String) {
-        val lease = writeGuard.capture() ?: return
-        val currentProvider = provider
-        val committed = writeGuard.commit(lease) {
+    suspend fun restoreFromTrash(emailId: String): EmailActionResult {
+        val lease = writeGuard.capture() ?: return EmailActionResult.Failure(
+            UiErrorReason.NO_ACTIVE_ACCOUNT, remoteApplied = false)
+        val p = provider ?: return EmailActionResult.Failure(
+            UiErrorReason.NO_ACTIVE_ACCOUNT, remoteApplied = false)
+
+        try {
+            p.restoreFromTrash(emailId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return EmailActionResult.Failure(e.toUiErrorReason(), remoteApplied = false)
+        }
+
+        return commitWithReconcile(lease, p, folders = listOf("trash", "inbox")) {
             dao.moveToFolder(emailId, "inbox")
-            true
-        } ?: false
-        if (committed) {
-            try { currentProvider?.restoreFromTrash(emailId) } catch (_: Exception) {}
         }
     }
 
-    suspend fun deletePermanently(emailId: String) {
-        val lease = writeGuard.capture() ?: return
-        val currentProvider = provider
-        val committed = writeGuard.commit(lease) {
+    suspend fun deletePermanently(emailId: String): EmailActionResult {
+        val lease = writeGuard.capture() ?: return EmailActionResult.Failure(
+            UiErrorReason.NO_ACTIVE_ACCOUNT, remoteApplied = false)
+        val p = provider ?: return EmailActionResult.Failure(
+            UiErrorReason.NO_ACTIVE_ACCOUNT, remoteApplied = false)
+
+        try {
+            p.deletePermanently(emailId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return EmailActionResult.Failure(e.toUiErrorReason(), remoteApplied = false)
+        }
+
+        return commitWithReconcile(lease, p, folders = listOf("trash")) {
             dao.deleteById(emailId)
-            true
-        } ?: false
-        if (committed) {
-            try { currentProvider?.deletePermanently(emailId) } catch (_: Exception) {}
         }
     }
 
-    suspend fun markAsRead(emailId: String) {
-        val lease = writeGuard.capture() ?: return
-        val currentProvider = provider
-        val committed = writeGuard.commit(lease) {
+    suspend fun markAsRead(emailId: String): EmailActionResult {
+        val lease = writeGuard.capture() ?: return EmailActionResult.Failure(
+            UiErrorReason.NO_ACTIVE_ACCOUNT, remoteApplied = false)
+        val p = provider ?: return EmailActionResult.Failure(
+            UiErrorReason.NO_ACTIVE_ACCOUNT, remoteApplied = false)
+
+        try {
+            p.markAsRead(emailId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return EmailActionResult.Failure(e.toUiErrorReason(), remoteApplied = false)
+        }
+
+        return commitWithReconcile(lease, p, folders = listOf("inbox")) {
             dao.updateReadStatus(emailId, isRead = true)
-            true
-        } ?: false
-        if (committed) {
-            try { currentProvider?.markAsRead(emailId) } catch (_: Exception) {}
+        }
+    }
+
+    // ── Commit helper (best-effort reconciliation on local failure) ──
+
+    /**
+     * Attempts the local [block] via [writeGuard.commit].
+     *
+     * - Successful commit → [EmailActionResult.Success].
+     * - Null/exception commit → reconciliation for [folders] → Failure(UNKNOWN, true).
+     * - CancellationException during commit → rethrown (not reconciled).
+     * - CancellationException during reconciliation → rethrown.
+     */
+    private suspend fun commitWithReconcile(
+        lease: SessionWriteLease,
+        provider: EmailProvider,
+        folders: List<String>,
+        block: suspend () -> Unit
+    ): EmailActionResult {
+        val commitResult = try {
+            writeGuard.commit(lease) { block(); true }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.e(REPO_TAG, "Local commit failed after remote success", e)
+            null
+        }
+
+        if (commitResult == true) return EmailActionResult.Success
+
+        // Reconcile in folder order; each folder in its own try
+        for (folder in folders) {
+            try {
+                reconcileFolder(provider, lease, folder)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e(REPO_TAG, "Reconcile $folder failed after remote success", e)
+            }
+        }
+
+        return EmailActionResult.Failure(UiErrorReason.UNKNOWN, remoteApplied = true)
+    }
+
+    private suspend fun reconcileFolder(
+        p: EmailProvider,
+        lease: SessionWriteLease,
+        folder: String
+    ) {
+        val result = when (folder) {
+            "inbox" -> p.fetchInbox(null)
+            "trash" -> p.fetchTrash(null)
+            else -> return
+        }
+        writeGuard.commit(lease) {
+            val entities = result.items.map {
+                EmailEntity.fromDomain(it, if (folder == "inbox") EmailFolder.Inbox else EmailFolder.Trash)
+            }
+            if (result.isComplete) {
+                dao.replaceFolder(folder, entities)
+            } else {
+                dao.upsertPreservingBodies(entities)
+            }
         }
     }
 

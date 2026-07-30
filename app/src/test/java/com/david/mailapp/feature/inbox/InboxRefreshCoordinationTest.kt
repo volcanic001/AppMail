@@ -135,9 +135,9 @@ private class ControllingInboxSource : InboxEmailSource {
         return plan.result
     }
 
-    override suspend fun moveToTrash(emailId: String) = Unit
-    override suspend fun restoreFromTrash(emailId: String) = Unit
-    override suspend fun markAsRead(emailId: String) = Unit
+    override suspend fun moveToTrash(emailId: String) = com.david.mailapp.data.repository.EmailActionResult.Success
+    override suspend fun restoreFromTrash(emailId: String) = com.david.mailapp.data.repository.EmailActionResult.Success
+    override suspend fun markAsRead(emailId: String) = com.david.mailapp.data.repository.EmailActionResult.Success
 }
 
 private fun email(id: String) = Email(

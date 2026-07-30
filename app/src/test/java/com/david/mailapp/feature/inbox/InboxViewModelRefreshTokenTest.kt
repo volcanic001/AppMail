@@ -106,7 +106,7 @@ private class RecordingInboxSource(initialResult: PaginatedResult<Email>) : Inbo
     }
 
     override fun observeInbox() = room
-    override suspend fun moveToTrash(emailId: String) = Unit
-    override suspend fun restoreFromTrash(emailId: String) = Unit
-    override suspend fun markAsRead(emailId: String) = Unit
+    override suspend fun moveToTrash(emailId: String) = com.david.mailapp.data.repository.EmailActionResult.Success
+    override suspend fun restoreFromTrash(emailId: String) = com.david.mailapp.data.repository.EmailActionResult.Success
+    override suspend fun markAsRead(emailId: String) = com.david.mailapp.data.repository.EmailActionResult.Success
 }

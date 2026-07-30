@@ -63,6 +63,7 @@ class FakeEmailProvider : EmailProvider {
     var downloadAttachmentCalls = 0
     var fetchInboxCalls = 0
     var fetchTrashCalls = 0
+    var eventLog: MutableList<String>? = null
     val receivedInboxTokens = mutableListOf<String?>()
     val receivedTrashTokens = mutableListOf<String?>()
 
@@ -77,6 +78,7 @@ class FakeEmailProvider : EmailProvider {
     var searchError: Exception? = null
 
     override suspend fun fetchInbox(pageToken: String?): PaginatedResult<Email> {
+        eventLog?.add("gmail.fetch.inbox")
         fetchInboxCalls++
         receivedInboxTokens += pageToken
         if (inboxPlans.isNotEmpty()) return execute(inboxPlans.removeAt(0))
@@ -86,6 +88,7 @@ class FakeEmailProvider : EmailProvider {
     }
 
     override suspend fun fetchTrash(pageToken: String?): PaginatedResult<Email> {
+        eventLog?.add("gmail.fetch.trash")
         fetchTrashCalls++
         receivedTrashTokens += pageToken
         if (trashPlans.isNotEmpty()) return execute(trashPlans.removeAt(0))
@@ -112,24 +115,28 @@ class FakeEmailProvider : EmailProvider {
     override suspend fun search(query: String, pageToken: String?) = searchResult
 
     override suspend fun moveToTrash(emailId: String) {
+        eventLog?.add("gmail.moveToTrash")
         moveToTrashDeferred?.await()
         moveToTrashCalls++
         moveToTrashError?.let { throw it }
     }
 
     override suspend fun restoreFromTrash(emailId: String) {
+        eventLog?.add("gmail.restoreFromTrash")
         restoreFromTrashDeferred?.await()
         restoreFromTrashCalls++
         restoreFromTrashError?.let { throw it }
     }
 
     override suspend fun deletePermanently(emailId: String) {
+        eventLog?.add("gmail.deletePermanently")
         deletePermanentlyDeferred?.await()
         deletePermanentlyCalls++
         deletePermanentlyError?.let { throw it }
     }
 
     override suspend fun markAsRead(emailId: String) {
+        eventLog?.add("gmail.markAsRead")
         markAsReadDeferred?.await()
         markAsReadCalls++
         markAsReadError?.let { throw it }
