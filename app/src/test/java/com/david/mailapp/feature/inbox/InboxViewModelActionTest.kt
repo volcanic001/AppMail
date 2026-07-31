@@ -160,6 +160,24 @@ class InboxViewModelActionTest {
         assertEquals(2, state.pendingFeedbackQueue.size)
     }
 
+    @Test fun rapid_offline_failures_for_different_ids_are_all_enqueued() = runTest {
+        val src = FakeInboxSource(
+            moveToTrashResult = EmailActionResult.Failure(UiErrorReason.NO_CONNECTION, false)
+        )
+        val vm = InboxViewModel(src)
+        advanceUntilIdle()
+
+        repeat(5) { index -> vm.moveToTrash("e$index") }
+        advanceUntilIdle()
+
+        val state = vm.uiState.value as InboxUiState.Success
+        assertEquals(5, src.moveToTrashCalls)
+        assertEquals(5, state.pendingFeedbackQueue.size)
+        assertEquals(5, state.pendingFeedbackQueue.map { it.id }.toSet().size)
+        assertTrue(state.pendingFeedbackQueue.all { it is ActionFeedback.Failure })
+        assertTrue(state.activeActionEmailIds.isEmpty())
+    }
+
     // ── Consume feedback ────────────────────────────────────────
 
     @Test fun consume_feedback_removes_it_from_queue() = runTest {

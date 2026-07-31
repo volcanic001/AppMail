@@ -1,5 +1,6 @@
 package com.david.mailapp.ui.components
 
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -9,6 +10,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
@@ -37,8 +39,29 @@ fun ExpressiveLoadingIndicator(
     color: Color = MaterialTheme.colorScheme.primary,
     progress: Float? = null
 ) {
+    val isIndeterminate = progress == null
+
+    Crossfade(
+        targetState = isIndeterminate,
+        modifier = modifier.size(size),
+        animationSpec = tween(durationMillis = 150),
+        label = "ExpressiveIndicatorMode"
+    ) { indeterminate ->
+        if (indeterminate) {
+            IndeterminateExpressiveLoadingIndicator(color = color)
+        } else {
+            ExpressiveLoadingIndicatorShape(
+                color = color,
+                progress = (progress ?: 1f).coerceIn(0f, 1f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun IndeterminateExpressiveLoadingIndicator(color: Color) {
     val transition = rememberInfiniteTransition(label = "ExpressiveIndicator")
-    
+
     val animatedRotation by transition.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
@@ -59,24 +82,43 @@ fun ExpressiveLoadingIndicator(
         label = "Morph"
     )
 
-    val currentRotation = if (progress != null) (progress * 360f * 1.5f) else animatedRotation
-    val currentMorph = if (progress != null) (progress * PI.toFloat() * 2f) else animatedMorph
+    ExpressiveLoadingIndicatorShape(
+        color = color,
+        rotationDegrees = animatedRotation,
+        morphPhase = animatedMorph
+    )
+}
 
-    Canvas(modifier = modifier.size(size)) {
+@Composable
+private fun ExpressiveLoadingIndicatorShape(
+    color: Color,
+    progress: Float
+) {
+    ExpressiveLoadingIndicatorShape(
+        color = color,
+        rotationDegrees = progress * 360f,
+        morphPhase = progress * EXPRESSIVE_MORPH_CYCLE
+    )
+}
+
+@Composable
+private fun ExpressiveLoadingIndicatorShape(
+    color: Color,
+    rotationDegrees: Float,
+    morphPhase: Float
+) {
+    Canvas(modifier = Modifier.fillMaxSize()) {
         val center = Offset(this.size.width / 2f, this.size.height / 2f)
         val maxRadius = this.size.minDimension / 2f * 0.92f
-        val rotationRad = Math.toRadians(currentRotation.toDouble()).toFloat()
+        val rotationRad = Math.toRadians(rotationDegrees.toDouble()).toFloat()
 
         val path = Path()
         val steps = 72
-        val n = 7 // 7-vertex rounded star/blob
 
         for (i in 0..steps) {
             val t = (i * 2 * PI / steps).toFloat()
-            // Organic morphing amplitude and shape
-            val amp = 0.15f + 0.06f * sin(currentMorph)
-            val r = maxRadius * (0.80f + amp * cos(n * t + currentMorph * 0.5f))
-            
+            val r = maxRadius * expressiveRadiusFactor(t, morphPhase)
+
             val x = center.x + r * cos(t + rotationRad)
             val y = center.y + r * sin(t + rotationRad)
 
@@ -93,6 +135,19 @@ fun ExpressiveLoadingIndicator(
             color = color
         )
     }
+}
+
+internal const val EXPRESSIVE_MORPH_CYCLE = (2 * PI).toFloat()
+
+/**
+ * Normalized radius of the organic seven-vertex shape.
+ *
+ * Both terms complete a full period at [EXPRESSIVE_MORPH_CYCLE], so the last
+ * frame of an animation cycle has exactly the same geometry as its first frame.
+ */
+internal fun expressiveRadiusFactor(angle: Float, morphPhase: Float): Float {
+    val amplitude = 0.15f + 0.06f * sin(morphPhase)
+    return 0.80f + amplitude * cos(7 * angle + morphPhase)
 }
 
 /**

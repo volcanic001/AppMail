@@ -27,10 +27,29 @@ class ActionFeedbackId private constructor(val value: Long) {
  * Each instance carries a unique [id] so consumers can observe
  * exactly that feedback and no other — even two [MovedToTrash] or
  * two [RestoredToInbox] for different actions are distinguishable.
+ * The id is a data-class component so Compose also treats repeated
+ * feedback with identical payloads as distinct values.
  */
-sealed class ActionFeedback(val id: ActionFeedbackId = ActionFeedbackId.next()) {
-    data class MovedToTrash(val emailId: String) : ActionFeedback()
-    data class RestoredToInbox(val emailId: String) : ActionFeedback()
-    data class DeletedPermanently(val emailId: String) : ActionFeedback()
-    data class Failure(val reason: UiErrorReason) : ActionFeedback()
+sealed class ActionFeedback {
+    abstract val id: ActionFeedbackId
+
+    data class MovedToTrash(
+        val emailId: String,
+        override val id: ActionFeedbackId = ActionFeedbackId.next()
+    ) : ActionFeedback()
+
+    data class RestoredToInbox(
+        val emailId: String,
+        override val id: ActionFeedbackId = ActionFeedbackId.next()
+    ) : ActionFeedback()
+
+    data class DeletedPermanently(
+        val emailId: String,
+        override val id: ActionFeedbackId = ActionFeedbackId.next()
+    ) : ActionFeedback()
+
+    data class Failure(
+        val reason: UiErrorReason,
+        override val id: ActionFeedbackId = ActionFeedbackId.next()
+    ) : ActionFeedback()
 }

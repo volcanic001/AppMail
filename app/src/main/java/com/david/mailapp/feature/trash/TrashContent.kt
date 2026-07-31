@@ -1,17 +1,32 @@
 package com.david.mailapp.feature.trash
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material3.BasicAlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -30,6 +45,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.david.mailapp.R
 import com.david.mailapp.core.localization.asString
@@ -200,33 +216,96 @@ fun TrashContent(
     }
 
     if (pendingDeleteEmailId != null) {
-        AlertDialog(
+        BasicAlertDialog(
             onDismissRequest = {
                 deleteCoordinator.cancelDelete()
                 pendingDeleteEmailId = null
-            },
-            title = { Text(stringResource(R.string.trash_delete_dialog_title)) },
-            text = { Text(stringResource(R.string.trash_delete_dialog_body)) },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        deleteCoordinator.cancelDelete()
-                        pendingDeleteEmailId = null
-                    }
+            }
+        ) {
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                tonalElevation = 6.dp
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(stringResource(R.string.trash_delete_dialog_cancel))
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        deleteCoordinator.confirmDelete()
-                        pendingDeleteEmailId = null
+                    // Ícono con contenedor circular semántico
+                    Box(
+                        modifier = Modifier
+                            .size(52.dp)
+                            .background(
+                                color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f),
+                                shape = CircleShape
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.DeleteForever,
+                            contentDescription = null,
+                            modifier = Modifier.size(24.dp),
+                            tint = MaterialTheme.colorScheme.error
+                        )
                     }
-                ) {
-                    Text(stringResource(R.string.trash_delete_dialog_confirm))
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Título
+                    Text(
+                        text = stringResource(R.string.trash_delete_dialog_title),
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Subtítulo
+                    Text(
+                        text = stringResource(R.string.trash_delete_dialog_body),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    // Botón Cancelar (menor jerarquía visual)
+                    TextButton(
+                        onClick = {
+                            deleteCoordinator.cancelDelete()
+                            pendingDeleteEmailId = null
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.onSurface
+                        )
+                    ) {
+                        Text(stringResource(R.string.trash_delete_dialog_cancel))
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    // Botón Eliminar permanentemente (acción destructiva principal)
+                    Button(
+                        onClick = {
+                            deleteCoordinator.confirmDelete()
+                            pendingDeleteEmailId = null
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.medium,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    ) {
+                        Text(stringResource(R.string.trash_delete_dialog_confirm))
+                    }
                 }
             }
-        )
+        }
     }
 }

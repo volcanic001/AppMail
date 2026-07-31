@@ -15,6 +15,8 @@ class ActionFeedbackTest {
 
         assertNotEquals(restored1.id, restored2.id)
         assertNotEquals(deleted1.id, deleted2.id)
+        assertNotEquals(restored1, restored2)
+        assertNotEquals(deleted1, deleted2)
     }
 
     @Test fun consume_feedback_removes_only_matching_id() {
@@ -27,6 +29,7 @@ class ActionFeedbackTest {
 
         val consumed = state.consumeFeedback(second.id)
 
+        assertNotEquals(first, second)
         assertEquals(listOf(first), consumed.pendingFeedbackQueue)
     }
 }

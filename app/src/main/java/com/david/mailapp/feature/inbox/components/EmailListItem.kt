@@ -116,7 +116,14 @@ fun EmailListItem(
                 detectHorizontalDragGestures(
                     onDragStart = { },
                     onDragEnd = {
-                        if (!actionsEnabled || isDismissed) {
+                        // A dismiss already owns offsetX until it finishes. Starting
+                        // another animation here would cancel it and could leave
+                        // isDismissed stuck at true for the lifetime of this row.
+                        if (isDismissed) {
+                            return@detectHorizontalDragGestures
+                        }
+
+                        if (!actionsEnabled) {
                             scope.launch {
                                 offsetX.animateTo(0f, MotionTokens.swipeReturn)
                                 thresholdWasCrossed = false
@@ -127,17 +134,20 @@ fun EmailListItem(
                         scope.launch {
                             if (abs(offsetX.value) > threshold) {
                                 isDismissed = true
-                                val direction = sign(offsetX.value)
-                                if (direction < 0f) onDelete() else onRestore?.invoke()
-                                offsetX.animateTo(
-                                    targetValue = direction * screenWidth * 1.2f,
-                                    animationSpec = MotionTokens.swipeDismiss
-                                )
-                                // Room owns removal. If the row is still composed
-                                // (failure or confirmation pending), return it safely.
-                                isDismissed = false
-                                offsetX.animateTo(0f, MotionTokens.swipeReturn)
-                                thresholdWasCrossed = false
+                                try {
+                                    val direction = sign(offsetX.value)
+                                    if (direction < 0f) onDelete() else onRestore?.invoke()
+                                    offsetX.animateTo(
+                                        targetValue = direction * screenWidth * 1.2f,
+                                        animationSpec = MotionTokens.swipeDismiss
+                                    )
+                                    // Room owns removal. If the row is still composed
+                                    // (failure or confirmation pending), return it safely.
+                                    offsetX.animateTo(0f, MotionTokens.swipeReturn)
+                                } finally {
+                                    isDismissed = false
+                                    thresholdWasCrossed = false
+                                }
                             } else {
                                 // RETURN — rubber band overshoot
                                 offsetX.animateTo(
@@ -149,10 +159,13 @@ fun EmailListItem(
                         }
                     },
                     onDragCancel = {
-                        scope.launch {
-                            offsetX.animateTo(0f, MotionTokens.swipeReturn)
-                            isDismissed = false
-                            thresholdWasCrossed = false
+                        // Do not let a second, cancelled gesture interrupt the
+                        // accepted dismiss animation that already owns offsetX.
+                        if (!isDismissed) {
+                            scope.launch {
+                                offsetX.animateTo(0f, MotionTokens.swipeReturn)
+                                thresholdWasCrossed = false
+                            }
                         }
                     },
                     onHorizontalDrag = { _, dragAmount ->

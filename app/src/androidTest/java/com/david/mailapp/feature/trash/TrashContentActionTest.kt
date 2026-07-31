@@ -21,6 +21,7 @@ import com.david.mailapp.feature.inbox.ActionFeedbackEffect
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
+import java.util.concurrent.atomic.AtomicInteger
 
 class TrashContentActionTest {
 
@@ -89,9 +90,11 @@ class TrashContentActionTest {
     @Test
     fun failure_shows_error_not_success_and_row_remains() {
         var state by mutableStateOf(TrashUiState.Success(emails = listOf(email)))
+        var deleteCalls = 0
         setTrashContent(
             stateProvider = { state },
             onDelete = {
+                deleteCalls++
                 state = state.copy(
                     pendingFeedbackQueue = listOf(ActionFeedback.Failure(UiErrorReason.NO_CONNECTION))
                 )
@@ -105,6 +108,16 @@ class TrashContentActionTest {
         composeRule.onNodeWithText("Sin conexión a Internet").assertExists()
         composeRule.onNodeWithText("Eliminado permanentemente").assertDoesNotExist()
         composeRule.onNodeWithText(email.subject).assertExists()
+
+        composeRule.waitUntil(timeoutMillis = 6_000) {
+            state.pendingFeedbackQueue.isEmpty()
+        }
+        composeRule.onNodeWithText(email.subject).performTouchInput { swipeLeft() }
+        composeRule.onNodeWithText("Eliminar permanentemente").performClick()
+
+        composeRule.onNodeWithText("Sin conexión a Internet").assertExists()
+        composeRule.onNodeWithText(email.subject).assertExists()
+        assertEquals(2, deleteCalls)
     }
 
     @Test
@@ -154,6 +167,48 @@ class TrashContentActionTest {
 
         assertEquals(email.id, undoneEmailId)
         assertEquals(true, consumed)
+    }
+
+    @Test
+    fun rapid_identical_failures_are_consumed_without_stalling_snackbar_queue() {
+        var queue by mutableStateOf<List<ActionFeedback>>(emptyList())
+        val consumedCount = AtomicInteger(0)
+
+        composeRule.setContent {
+            MaterialTheme {
+                val host = remember { SnackbarHostState() }
+                Box {
+                    ActionFeedbackEffect(
+                        feedback = queue.firstOrNull(),
+                        snackbarHostState = host,
+                        onConsumed = { id ->
+                            queue = queue.filterNot { it.id == id }
+                            consumedCount.incrementAndGet()
+                        }
+                    )
+                    SnackbarHost(hostState = host)
+                }
+            }
+        }
+
+        composeRule.runOnIdle {
+            queue = List(5) { ActionFeedback.Failure(UiErrorReason.NO_CONNECTION) }
+        }
+
+        composeRule.waitUntil(timeoutMillis = 25_000) {
+            consumedCount.get() == 5
+        }
+        assertEquals(5, consumedCount.get())
+        assertEquals(true, queue.isEmpty())
+
+        composeRule.runOnIdle {
+            queue = listOf(ActionFeedback.Failure(UiErrorReason.NO_CONNECTION))
+        }
+        composeRule.waitUntil(timeoutMillis = 6_000) {
+            consumedCount.get() == 6
+        }
+        assertEquals(6, consumedCount.get())
+        assertEquals(true, queue.isEmpty())
     }
 
     private fun setTrashContent(
