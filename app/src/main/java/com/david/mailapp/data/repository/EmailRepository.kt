@@ -197,7 +197,7 @@ class EmailRepository(
             return EmailActionResult.Failure(e.toUiErrorReason(), remoteApplied = false)
         }
 
-        return commitWithReconcile(lease, p, folders = listOf("inbox")) {
+        return commitWithReconcile(lease, p, folders = listOf("inbox", "trash")) {
             dao.updateReadStatus(emailId, isRead = true)
         }
     }

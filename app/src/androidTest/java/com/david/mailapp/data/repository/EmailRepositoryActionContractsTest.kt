@@ -143,6 +143,18 @@ class EmailRepositoryActionContractsTest {
         assertEquals(listOf("gmail.markAsRead", "room.commit"), events)
     }
 
+    @Test fun c1_markAsRead_from_trash_success_remote_first_room_reflects() = runTest {
+        seed("e1", EmailFolder.Trash, isRead = false)
+
+        val result = repository.markAsRead("e1")
+
+        assertTrue(result is EmailActionResult.Success)
+        assertTrue(get("e1")?.isRead ?: false)
+        assertEquals("trash", get("e1")?.folder)
+        assertEquals(1, fakeProvider.markAsReadCalls)
+        assertEquals(listOf("gmail.markAsRead", "room.commit"), events)
+    }
+
     // ═══════════════════════════════════════════════════════════════
     // C2 — Remote OK, local commit failed → Failure + reconcile
     // ═══════════════════════════════════════════════════════════════
@@ -195,15 +207,18 @@ class EmailRepositoryActionContractsTest {
         )
     }
 
-    @Test fun c2_markAsRead_commit_rejected_reconciles_inbox() = runTest {
-        seed("e1", EmailFolder.Inbox, isRead = false)
+    @Test fun c2_markAsRead_commit_rejected_reconciles_inbox_and_trash() = runTest {
+        seed("e1", EmailFolder.Trash, isRead = false)
         fakeWriteGuard.commitReturnsNull = true
 
         val result = repository.markAsRead("e1")
 
         assertTrue(result is EmailActionResult.Failure)
         assertTrue((result as EmailActionResult.Failure).remoteApplied)
-        assertEquals(listOf("gmail.fetch.inbox"), events.filter { it.startsWith("gmail.fetch") })
+        assertEquals(
+            listOf("gmail.fetch.inbox", "gmail.fetch.trash"),
+            events.filter { it.startsWith("gmail.fetch") }
+        )
     }
 
     @Test fun c2_first_reconciliation_failure_does_not_block_second_folder() = runTest {

@@ -263,7 +263,6 @@ fun InboxScreen(
                             ) { email ->
                                 val onClickRemembered = remember(email.id) {
                                     {
-                                        viewModel.markAsRead(email.id)
                                         onEmailClick(email.id)
                                     }
                                 }

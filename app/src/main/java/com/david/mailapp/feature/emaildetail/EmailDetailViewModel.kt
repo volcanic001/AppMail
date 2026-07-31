@@ -41,6 +41,10 @@ class EmailDetailViewModel(
     private val _pdfOpenEvents = Channel<PdfExternalActionRequest>(Channel.CONFLATED)
     val pdfOpenEvents: Flow<PdfExternalActionRequest> = _pdfOpenEvents.receiveAsFlow()
 
+    private val _readFailureEvents = Channel<UiErrorReason>(Channel.BUFFERED)
+    val readFailureEvents: Flow<UiErrorReason> = _readFailureEvents.receiveAsFlow()
+    private val readOnOpenCoordinator = EmailReadOnOpenCoordinator(repository::markAsRead)
+
     /**
      * Última solicitud externa (Open / Save) que espera a que termine la
      * descarga. Al completarse, solo la última solicitud se ejecuta.
@@ -59,6 +63,16 @@ class EmailDetailViewModel(
         viewModelScope.launch {
             repository.getEmailById(emailId).collect { email ->
                 if (email != null) {
+                    readOnOpenCoordinator.prepare(email)?.let { markAsRead ->
+                        launch {
+                            when (val outcome = markAsRead()) {
+                                EmailReadOnOpenOutcome.Marked -> Unit
+                                is EmailReadOnOpenOutcome.Failure ->
+                                    _readFailureEvents.send(outcome.reason)
+                            }
+                        }
+                    }
+
                     EmailRenderTrace.d(
                         traceMail,
                         "VM",

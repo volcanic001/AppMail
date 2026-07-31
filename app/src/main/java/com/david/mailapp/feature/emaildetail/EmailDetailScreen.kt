@@ -143,6 +143,12 @@ fun EmailDetailScreen(
     val screenContext = LocalContext.current
     val scope = rememberCoroutineScope()
 
+    EmailDetailReadFailureEffect(
+        failureEvents = viewModel.readFailureEvents,
+        snackbarHostState = snackbarHostState,
+        stringProvider = AppContainer.stringProvider
+    )
+
     // ── PDF Save state ───────────────────────────────────────────
     val savingStableIds = remember { mutableSetOf<String>() }
     val savingState = remember { mutableStateOf(savingStableIds.toSet()) }
