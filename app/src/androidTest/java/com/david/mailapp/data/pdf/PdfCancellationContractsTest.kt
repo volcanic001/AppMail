@@ -10,11 +10,10 @@ import com.david.mailapp.testhelpers.FakeSessionWriteGuard
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import org.junit.After
-import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Before
-import org.junit.Ignore
 import org.junit.Test
 import java.io.File
 
@@ -31,29 +30,68 @@ class PdfCancellationContractsTest {
         cacheDir.mkdirs()
     }
 
-    @After fun tearDown() { db.close() }
+    @After
+    fun tearDown() {
+        db.close()
+        cacheDir.deleteRecursively()
+    }
 
-    @Ignore("Contrato pendiente: Fase 3.1")
+    private fun assertCacheHasNoFiles() {
+        val cacheFiles = cacheDir.walkTopDown()
+            .filter { it.isFile }
+            .toList()
+        assertTrue("No cache files should be created: $cacheFiles", cacheFiles.isEmpty())
+    }
+
     @Test fun c3_cancellation_propagates_not_converted_to_error() = runTest {
         val fakeProvider = FakeEmailProvider()
-        fakeProvider.downloadAttachmentError = CancellationException("Download cancelled")
+        val sentinel = CancellationException("Download cancelled from network")
+        fakeProvider.downloadAttachmentError = sentinel
         val repository = EmailRepository(
             database = db, providerFactory = { fakeProvider },
             pdfCacheManager = PdfCacheManager(cacheDir), writeGuard = FakeSessionWriteGuard()
         )
         val metadata = PdfAttachmentMetadata(
             fileName = "test.pdf", mimeType = "application/pdf",
-            attachmentId = "att_1", sizeBytes = 1024L
+            attachmentId = "att_1", sizeBytes = 1024L, partId = "1"
         )
         try {
             repository.downloadPdf("email_1", metadata)
             fail("Expected CancellationException to propagate")
         } catch (e: CancellationException) {
-            assertEquals("Download cancelled", e.message)
+            assertSame("Must propagate exact sentinel instance", sentinel, e)
         } catch (e: Exception) {
             fail("Expected CancellationException, got ${e.javaClass.simpleName}")
         }
-        val cacheFiles = cacheDir.listFiles() ?: emptyArray()
-        assertTrue("No cache files should be created", cacheFiles.isEmpty())
+        assertCacheHasNoFiles()
+    }
+
+    @Test fun c3_cancellation_during_commit_propagates() = runTest {
+        val fakeProvider = FakeEmailProvider()
+        fakeProvider.downloadAttachmentResult =
+            byteArrayOf(0x25, 0x50, 0x44, 0x46, 0x2D)
+
+        val sentinel = CancellationException("Commit cancelled")
+        val failingGuard = FakeSessionWriteGuard().apply {
+            commitError = sentinel
+        }
+
+        val repository = EmailRepository(
+            database = db, providerFactory = { fakeProvider },
+            pdfCacheManager = PdfCacheManager(cacheDir), writeGuard = failingGuard
+        )
+        val metadata = PdfAttachmentMetadata(
+            fileName = "test.pdf", mimeType = "application/pdf",
+            attachmentId = "att_1", sizeBytes = 1024L, partId = "1"
+        )
+        try {
+            repository.downloadPdf("email_1", metadata)
+            fail("Expected CancellationException to propagate from commit")
+        } catch (e: CancellationException) {
+            assertSame("Must propagate exact sentinel instance", sentinel, e)
+        } catch (e: Exception) {
+            fail("Expected CancellationException, got ${e.javaClass.simpleName}")
+        }
+        assertCacheHasNoFiles()
     }
 }

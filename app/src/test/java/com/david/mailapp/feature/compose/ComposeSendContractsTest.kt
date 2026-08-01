@@ -95,7 +95,41 @@ class ComposeSendContractsTest {
         assertTrue("Expected Success", result is SendResult.Success)
         assertEquals("Should have exactly 1 send call", 1, fakeSource.sendCallCount)
     }
+    @Test
+    fun `cancelacion de sendEmail no produce SendResult Error ni Success`() = runTest(mainDispatcher) {
+        val sentinel = kotlinx.coroutines.CancellationException("sentinel-send")
+        val fakeSource = object : ComposeEmailSource {
+            override suspend fun getUserEmail(): String? = "test@example.com"
+            override suspend fun sendEmail(
+                to: String, cc: String?, bcc: String?, subject: String, body: String, replyContext: ReplyContext?
+            ) {
+                throw sentinel
+            }
+        }
+
+        val viewModel = ComposeViewModel(
+            args = ComposeArgs.Write,
+            emailSource = fakeSource,
+            stringProvider = TestStringProvider()
+        )
+
+        viewModel.onToChanged("to@test.com")
+        testScheduler.advanceUntilIdle()
+
+        viewModel.onSend()
+        // CancellationException inside viewModelScope.launch cancels the child coroutine;
+        // it does NOT propagate to the test scope. Verify observable contract only.
+        testScheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        org.junit.Assert.assertNull(
+            "sendResult must be null after cancellation (no Error, no Success)",
+            state.sendResult
+        )
+        assertFalse("isSending must be false after cancellation", state.isSending)
+    }
 }
+
 
 class FakeComposeEmailSource(
     private val emailResult: String? = "test@example.com",

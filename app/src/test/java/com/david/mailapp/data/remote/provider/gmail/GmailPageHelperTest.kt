@@ -124,8 +124,6 @@ class GmailPageHelperTest {
     @Test fun concurrency_limited_to_6() = runTest {
         val msgIds = (1..12).map { """{"id":"m$it","threadId":"t$it"}""" }
         val listBody = """{"messages":[${msgIds.joinToString()}],"nextPageToken":"t"}"""
-        val maxConcurrent = java.util.concurrent.atomic.AtomicInteger(0)
-        val currentConcurrent = java.util.concurrent.atomic.AtomicInteger(0)
         // Use a suspend detail handler via a separate mechanism:
         // fetchGmailPage processes in chunks of 6 serially, so max concurrent
         // is naturally bounded by the batch size.
@@ -136,5 +134,18 @@ class GmailPageHelperTest {
         // The chunked(6) call in fetchGmailPage guarantees ≤ 6 concurrent
         // detail fetches in each batch. This is a structural guarantee.
         assertTrue("12 items from 2 batches → all fetched", result.items.size == 12)
+    }
+
+    @Test fun detail_cancellation_propagates_not_converted_to_failure() = runTest {
+        val sentinel = kotlinx.coroutines.CancellationException("sentinel-page")
+        val c = client(
+            detailHandler = { throw sentinel }
+        )
+        try {
+            fetchGmailPage(c, labelId = "INBOX")
+            org.junit.Assert.fail("Expected CancellationException to propagate")
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            assertEquals("sentinel-page", e.message?.substringAfterLast(": ")?.trim())
+        }
     }
 }

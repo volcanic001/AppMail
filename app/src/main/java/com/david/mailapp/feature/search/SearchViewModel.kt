@@ -117,6 +117,8 @@ class SearchViewModel(
                                 writeGuard.commit(lease) {
                                     saveToHistory(query)
                                 }
+                            } catch (e: CancellationException) {
+                                throw e
                             } catch (e: Exception) {
                                 Log.e(TAG, "Failed to save search history for '$query'", e)
                             }

@@ -253,8 +253,9 @@ class EmailDetailViewModel(
             }
             // On success Room will re-emit with the fetched body — the collect
             // lambda will pick it up and proceed to inline-image resolution.
+        } catch (e: CancellationException) {
+            throw e
         } catch (error: Exception) {
-            if (error is CancellationException) throw error
             if (!delivered) {
                 delivered = true
                 EmailRenderTrace.d(
@@ -319,6 +320,8 @@ class EmailDetailViewModel(
                     "bodyKey=${EmailRenderTrace.bodyKey(injectedBody)}"
             )
             _uiState.value = EmailDetailUiState.Ready(injectedEmail, inlineImagesLoading = false)
+        } catch (e: CancellationException) {
+            throw e
         } catch (error: Exception) {
             // Inline images failed — deliver original body as final fallback.
             cachedInlineImages = emptyMap()

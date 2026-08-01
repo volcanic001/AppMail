@@ -63,6 +63,8 @@ class FakeEmailProvider : EmailProvider {
     var downloadAttachmentCalls = 0
     var fetchInboxCalls = 0
     var fetchTrashCalls = 0
+    var fetchBodyCalls = 0
+    var inlineImagesCalls = 0
     var eventLog: MutableList<String>? = null
     val receivedInboxTokens = mutableListOf<String?>()
     val receivedTrashTokens = mutableListOf<String?>()
@@ -76,6 +78,8 @@ class FakeEmailProvider : EmailProvider {
     var fetchInboxError: Exception? = null
     var fetchTrashError: Exception? = null
     var searchError: Exception? = null
+    var fetchBodyError: Exception? = null
+    var inlineImagesError: Exception? = null
 
     override suspend fun fetchInbox(pageToken: String?): PaginatedResult<Email> {
         eventLog?.add("gmail.fetch.inbox")
@@ -142,9 +146,17 @@ class FakeEmailProvider : EmailProvider {
         markAsReadError?.let { throw it }
     }
 
-    override suspend fun fetchBodyWithRefs(emailId: String) = fetchBodyResult
+    override suspend fun fetchBodyWithRefs(emailId: String): BodyFetchResult? {
+        fetchBodyCalls++
+        fetchBodyError?.let { throw it }
+        return fetchBodyResult
+    }
 
-    override suspend fun downloadInlineImages(emailId: String, refs: List<InlineImageRef>) = inlineImagesResult
+    override suspend fun downloadInlineImages(emailId: String, refs: List<InlineImageRef>): Map<String, String> {
+        inlineImagesCalls++
+        inlineImagesError?.let { throw it }
+        return inlineImagesResult
+    }
 
     override suspend fun getUserEmail() = userEmailResult
 

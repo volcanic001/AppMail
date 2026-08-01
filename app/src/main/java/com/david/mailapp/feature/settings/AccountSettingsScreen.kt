@@ -51,6 +51,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.david.mailapp.R
 import com.david.mailapp.core.di.AppContainer
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -67,13 +68,11 @@ fun AccountSettingsScreen(
     var isEmailLoading by remember { mutableStateOf(true) }
 
     LaunchedEffect(Unit) {
-        try {
-            userEmail = AppContainer.emailRepository.getUserEmail()
-        } catch (_: Exception) {
-            userEmail = null
-        } finally {
-            isEmailLoading = false
+        val email = loadAccountEmail { AppContainer.emailRepository.getUserEmail() }
+        if (email != null) {
+            userEmail = email
         }
+        isEmailLoading = false
     }
 
     Scaffold(
@@ -295,5 +294,15 @@ fun AccountSettingsScreen(
                 }
             }
         }
+    }
+}
+
+internal suspend fun loadAccountEmail(getUserEmail: suspend () -> String?): String? {
+    return try {
+        getUserEmail()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (_: Exception) {
+        null
     }
 }

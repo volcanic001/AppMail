@@ -213,4 +213,32 @@ class SearchViewModelTest {
         val state = vm.uiState.value
         assertTrue("Expected Results, got ${state::class.simpleName}", state is SearchUiState.Results)
     }
+
+    @Test
+    fun `cancelacion del commit del historial conserva SearchUiState_Results y no escribe historial`() = testScope.runTest {
+        val sentinel = CancellationException("sentinel-search")
+        val failingGuard = object : SessionWriteGuard {
+            override suspend fun activate() {}
+            override suspend fun capture(): SessionWriteLease? = object : SessionWriteLease { override val generation = 1L }
+            override suspend fun <T> commit(lease: SessionWriteLease, block: suspend () -> T): T? {
+                throw sentinel
+            }
+            override suspend fun invalidate() {}
+        }
+        val vm = createViewModel(
+            source = SearchEmailSource { _, _ -> PaginatedResult(listOf(email("1")), null) },
+            writeGuard = failingGuard
+        )
+
+        vm.onQueryChange("test")
+        // CancellationException from commit() cancels the child flow coroutine but
+        // does NOT propagate to the test scope. Check observable contract only.
+        advanceUntilIdle()
+
+        val state = vm.uiState.value
+        assertTrue("Expected Results, got ${state::class.simpleName}", state is SearchUiState.Results)
+
+        val history = testStore.data.first()[stringPreferencesKey("search_history")]
+        org.junit.Assert.assertNull(history)
+    }
 }

@@ -413,6 +413,8 @@ class EmailRepository(
             Log.d(REPO_TAG, "[PDF_DOWNLOAD] DOWNLOADING emailId=$emailId " +
                 "attachmentId=${metadata.attachmentId}")
             bytes = p.downloadAttachment(emailId, metadata.attachmentId)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.e(REPO_TAG, "[PDF_DOWNLOAD] NETWORK_ERROR emailId=$emailId " +
                 "attachmentId=${metadata.attachmentId} error=${e.message}", e)
@@ -445,6 +447,8 @@ class EmailRepository(
             Log.d(REPO_TAG, "[PDF_DOWNLOAD] SUCCESS emailId=$emailId " +
                 "attachmentId=${metadata.attachmentId} size=${file.length()}")
             PdfDownloadState.Ready(file.length())
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.e(REPO_TAG, "[PDF_DOWNLOAD] CACHE_WRITE_ERROR emailId=$emailId " +
                 "attachmentId=${metadata.attachmentId} error=${e.message}", e)

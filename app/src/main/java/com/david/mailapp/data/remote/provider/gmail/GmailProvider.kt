@@ -16,6 +16,7 @@ import io.ktor.client.request.get
 import io.ktor.client.request.parameter
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -90,6 +91,8 @@ class GmailProvider(
             Log.d(PERF_TAG, "[BODY_FETCH] PDF_ATTACHMENTS_FOUND count=${pdfAttachments.size} emailId=$emailId")
 
             BodyFetchResult(rawBody = rawBody, inlineRefs = inlineRefs, pdfAttachments = pdfAttachments)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.d(PERF_TAG, "[BODY_FETCH] ERROR emailId=$emailId durationMs=${perfNow() - t0} error=${e.javaClass.simpleName}: ${e.message}")
             null
@@ -119,6 +122,8 @@ class GmailProvider(
                         val tEncode = perfNow()
                         Log.d(PERF_TAG, "[INLINE_DOWNLOAD] IMG_ENCODED idx=$idx b64Len=${b64.length} encodeMs=${tEncode - tBytes} totalImgMs=${tEncode - tImg}")
                         ref.contentId to "data:${ref.mimeType};base64,$b64"
+                    } catch (e: CancellationException) {
+                        throw e
                     } catch (e: Exception) {
                         Log.d(PERF_TAG, "[INLINE_DOWNLOAD] IMG_ERROR idx=$idx cid=${ref.contentId} error=${e.javaClass.simpleName}: ${e.message}")
                         null
@@ -265,6 +270,8 @@ class GmailProvider(
         return try {
             val response: ProfileResponse = client.get("users/me/profile").body()
             response.emailAddress
+        } catch (e: CancellationException) {
+            throw e
         } catch (_: Exception) {
             null
         }

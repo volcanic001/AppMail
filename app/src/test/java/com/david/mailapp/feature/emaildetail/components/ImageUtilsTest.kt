@@ -91,4 +91,133 @@ class ImageUtilsTest {
         val result = ImageUtils.buildImageFilename(template, 9999L, "png")
         assertEquals("IMG_9999.png", result)
     }
+
+    // ── Pruebas de GalleryStorage (Tarea 3.1-B) ────────────────
+
+    private class FakeGalleryStorage : ImageUtils.GalleryStorage {
+        var insertCalled = 0
+        var openCalled = 0
+        var publishCalled = 0
+        var deleteCalled = 0
+        var toasts = mutableListOf<String>()
+        var throwOnInsert: Throwable? = null
+        var throwOnOpen: Throwable? = null
+        var throwOnWrite: Throwable? = null
+
+        override fun insertPendingImage(filename: String, mimeType: String): Any? {
+            insertCalled++
+            throwOnInsert?.let { throw it }
+            // Return a plain String token — no android.net.Uri needed in JVM
+            return "content://media/external/images/media/1"
+        }
+
+        override fun openOutputStream(token: Any): java.io.OutputStream? {
+            openCalled++
+            throwOnOpen?.let { throw it }
+            return object : java.io.ByteArrayOutputStream() {
+                override fun write(buffer: ByteArray, offset: Int, length: Int) {
+                    throwOnWrite?.let { throw it }
+                    super.write(buffer, offset, length)
+                }
+            }
+        }
+
+        override fun publishImage(token: Any) {
+            publishCalled++
+        }
+
+        override fun deleteImage(token: Any) {
+            deleteCalled++
+        }
+
+        override suspend fun showToast(message: String) {
+            toasts.add(message)
+        }
+    }
+
+    @Test
+    fun `cancelación durante creación propaga CancellationException y no notifica ni escribe`() =
+        kotlinx.coroutines.test.runTest {
+            val storage = FakeGalleryStorage()
+            val sentinel = kotlinx.coroutines.CancellationException("sentinel-insert")
+            storage.throwOnInsert = sentinel
+            val labels = ImageSaveLabels("Fmt", "Success", "Error", "IMG_%1\$d.%2\$s")
+
+            try {
+                ImageUtils.saveImageToGalleryInternal(
+                    "data:image/png;base64,iVBORw0KGgo",
+                    labels,
+                    storage,
+                    123L,
+                    decodeBase64 = { byteArrayOf(1, 2, 3) }
+                )
+                org.junit.Assert.fail("Expected CancellationException")
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                // Stack-trace recovery may copy the outer exception. The original
+                // sentinel must still be preserved by identity in the cause chain.
+                assertTrue(
+                    "Must preserve the exact sentinel instance",
+                    generateSequence(e as Throwable) { it.cause }.any { it === sentinel }
+                )
+            }
+
+            assertEquals(1, storage.insertCalled)
+            assertEquals(0, storage.openCalled)
+            assertEquals(0, storage.publishCalled)
+            assertEquals(0, storage.deleteCalled) // nothing was created yet
+            assertTrue(storage.toasts.isEmpty())
+        }
+
+    @Test
+    fun `cancelación durante escritura elimina entrada parcial sin notificar ni publicar`() =
+        kotlinx.coroutines.test.runTest {
+            val storage = FakeGalleryStorage()
+            val sentinel = kotlinx.coroutines.CancellationException("sentinel-write")
+            storage.throwOnWrite = sentinel
+            val labels = ImageSaveLabels("Fmt", "Success", "Error", "IMG_%1\$d.%2\$s")
+
+            try {
+                ImageUtils.saveImageToGalleryInternal(
+                    "data:image/png;base64,iVBORw0KGgo",
+                    labels,
+                    storage,
+                    123L,
+                    decodeBase64 = { byteArrayOf(1, 2, 3) }
+                )
+                org.junit.Assert.fail("Expected CancellationException")
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                assertTrue(
+                    "Must preserve the exact sentinel instance",
+                    generateSequence(e as Throwable) { it.cause }.any { it === sentinel }
+                )
+            }
+
+            assertEquals(1, storage.insertCalled)
+            assertEquals(1, storage.openCalled)
+            assertEquals(0, storage.publishCalled)
+            assertEquals(1, storage.deleteCalled) // cleanup happened
+            assertTrue(storage.toasts.isEmpty())
+        }
+
+    @Test
+    fun `excepción ordinaria limpia entrada parcial y muestra un único error`() =
+        kotlinx.coroutines.test.runTest {
+            val storage = FakeGalleryStorage()
+            storage.throwOnWrite = RuntimeException("unexpected")
+            val labels = ImageSaveLabels("Fmt", "Success", "Error", "IMG_%1\$d.%2\$s")
+
+            ImageUtils.saveImageToGalleryInternal(
+                "data:image/png;base64,iVBORw0KGgo",
+                labels,
+                storage,
+                123L,
+                decodeBase64 = { byteArrayOf(1, 2, 3) }
+            )
+
+            assertEquals(1, storage.insertCalled)
+            assertEquals(1, storage.openCalled)
+            assertEquals(0, storage.publishCalled)
+            assertEquals(1, storage.deleteCalled) // cleanup happened
+            assertEquals(listOf("Error"), storage.toasts)
+        }
 }

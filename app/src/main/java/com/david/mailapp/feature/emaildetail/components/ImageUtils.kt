@@ -71,6 +71,55 @@ object ImageUtils {
 
     // ── Save to gallery ────────────────────────────────────────
 
+    internal interface GalleryStorage {
+        /** Returns an opaque token representing the inserted entry, or null on failure. */
+        fun insertPendingImage(filename: String, mimeType: String): Any?
+        fun openOutputStream(token: Any): java.io.OutputStream?
+        fun publishImage(token: Any)
+        fun deleteImage(token: Any)
+        suspend fun showToast(message: String)
+    }
+
+    internal class DefaultGalleryStorage(private val context: Context) : GalleryStorage {
+        override fun insertPendingImage(filename: String, mimeType: String): Any? {
+            val contentValues = ContentValues().apply {
+                put(MediaStore.MediaColumns.DISPLAY_NAME, filename)
+                put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    put(MediaStore.MediaColumns.RELATIVE_PATH, "Pictures/MailApp")
+                    put(MediaStore.MediaColumns.IS_PENDING, 1)
+                }
+            }
+            return context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
+        }
+
+        override fun openOutputStream(token: Any): java.io.OutputStream? =
+            context.contentResolver.openOutputStream(token as android.net.Uri)
+
+        override fun publishImage(token: Any) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val contentValues = ContentValues().apply {
+                    put(MediaStore.MediaColumns.IS_PENDING, 0)
+                }
+                context.contentResolver.update(token as android.net.Uri, contentValues, null, null)
+            }
+        }
+
+        override fun deleteImage(token: Any) {
+            try {
+                context.contentResolver.delete(token as android.net.Uri, null, null)
+            } catch (e: Exception) {
+                // Ignore failure on cleanup
+            }
+        }
+
+        override suspend fun showToast(message: String) {
+            withContext(Dispatchers.Main) {
+                Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     /**
      * Saves a "data:image/xxx;base64,..." string to the device's public gallery (MediaStore).
      *
@@ -80,10 +129,28 @@ object ImageUtils {
         context: Context,
         dataUri: String,
         labels: ImageSaveLabels
+    ) {
+        saveImageToGalleryInternal(
+            dataUri,
+            labels,
+            DefaultGalleryStorage(context),
+            System.currentTimeMillis()
+        )
+    }
+
+    internal suspend fun saveImageToGalleryInternal(
+        dataUri: String,
+        labels: ImageSaveLabels,
+        storage: GalleryStorage,
+        timestamp: Long,
+        decodeBase64: (String) -> ByteArray = { encoded ->
+            Base64.decode(encoded, Base64.DEFAULT)
+        }
     ) = withContext(Dispatchers.IO) {
+        var createdUri: Any? = null
         try {
             if (!dataUri.startsWith("data:image/")) {
-                showToast(context, labels.invalidFormatMessage)
+                storage.showToast(labels.invalidFormatMessage)
                 return@withContext
             }
 
@@ -95,45 +162,36 @@ object ImageUtils {
             if (base64StartIndex == -1) return@withContext
             val base64Data = dataUri.substring(base64StartIndex + 7)
 
-            val bytes = Base64.decode(base64Data, Base64.DEFAULT)
+            val bytes = decodeBase64(base64Data)
             val extension = mimeTypeToExtension(mimeType)
-            val filename = buildImageFilename(labels.filenameTemplate, System.currentTimeMillis(), extension)
+            val filename = buildImageFilename(labels.filenameTemplate, timestamp, extension)
 
-            val contentValues = ContentValues().apply {
-                put(MediaStore.MediaColumns.DISPLAY_NAME, filename)
-                put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    put(MediaStore.MediaColumns.RELATIVE_PATH, "Pictures/MailApp")
-                    put(MediaStore.MediaColumns.IS_PENDING, 1)
-                }
-            }
+            createdUri = storage.insertPendingImage(filename, mimeType)
 
-            val resolver = context.contentResolver
-            val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
-
-            if (uri != null) {
-                resolver.openOutputStream(uri)?.use { outputStream ->
+            if (createdUri != null) {
+                storage.openOutputStream(createdUri)?.use { outputStream ->
                     outputStream.write(bytes)
                 }
-
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    contentValues.clear()
-                    contentValues.put(MediaStore.MediaColumns.IS_PENDING, 0)
-                    resolver.update(uri, contentValues, null, null)
-                }
-                showToast(context, labels.savedToGalleryMessage)
+                storage.publishImage(createdUri)
+                storage.showToast(labels.savedToGalleryMessage)
             } else {
-                showToast(context, labels.saveErrorMessage)
+                storage.showToast(labels.saveErrorMessage)
             }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            createdUri?.let { token ->
+                withContext(kotlinx.coroutines.NonCancellable) {
+                    storage.deleteImage(token)
+                }
+            }
+            throw e
         } catch (e: Exception) {
             e.printStackTrace()
-            showToast(context, labels.saveErrorMessage)
-        }
-    }
-
-    private suspend fun showToast(context: Context, message: String) {
-        withContext(Dispatchers.Main) {
-            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            createdUri?.let { token ->
+                withContext(kotlinx.coroutines.NonCancellable) {
+                    storage.deleteImage(token)
+                }
+            }
+            storage.showToast(labels.saveErrorMessage)
         }
     }
 }

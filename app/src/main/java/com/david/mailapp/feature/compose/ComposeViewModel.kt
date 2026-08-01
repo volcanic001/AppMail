@@ -121,8 +121,11 @@ class ComposeViewModel(
                     isSending = false,
                     sendResult = SendResult.Success
                 )
+            } catch (e: CancellationException) {
+                // Reset isSending before propagating — the UI must not remain frozen.
+                _uiState.value = _uiState.value.copy(isSending = false)
+                throw e
             } catch (e: Exception) {
-                if (e is CancellationException) throw e
                 _uiState.value = _uiState.value.copy(
                     isSending = false,
                     sendResult = SendResult.Error(e.toComposeSendErrorReason())
