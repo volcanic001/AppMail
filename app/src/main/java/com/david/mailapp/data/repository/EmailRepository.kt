@@ -27,6 +27,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 // DEBUG_PERF
@@ -50,6 +52,9 @@ class EmailRepository(
     private val writeGuard: SessionWriteGuard
 ) {
     private val dao = database.emailDao()
+
+    private val inboxCommitCoordinator = FolderCommitCoordinator()
+    private val trashCommitCoordinator = FolderCommitCoordinator()
 
     /** Current provider — read via factory every time so it stays fresh after sign-in/sign-out. */
     private val provider: EmailProvider? get() = providerFactory()
@@ -76,19 +81,27 @@ class EmailRepository(
 
     /** Fetch from provider and persist to Room. Returns the paginated result for UI pagination. */
     suspend fun refreshInbox(pageToken: String? = null): PaginatedResult<Email> {
+        val gen = if (pageToken == null) {
+            inboxCommitCoordinator.nextGeneration()
+        } else {
+            inboxCommitCoordinator.currentGeneration()
+        }
+
         val lease = writeGuard.capture() ?: return PaginatedResult(emptyList(), null)
         val p = provider ?: return PaginatedResult(emptyList(), null)
         val fetched = p.fetchInbox(pageToken)
         val result = if (fetched.isComplete) fetched else fetched.copy(nextPageToken = null)
 
         val entities = result.items.map { EmailEntity.fromDomain(it, EmailFolder.Inbox) }
-        writeGuard.commit(lease) {
-            // Replace folder only on a complete first page;
-            // partial pages or pagination append/merge.
-            if (pageToken == null && result.isComplete) {
-                dao.replaceFolder("inbox", entities)
-            } else {
-                dao.upsertPreservingBodies(entities)
+        inboxCommitCoordinator.commitIfValid(gen) {
+            writeGuard.commit(lease) {
+                // Replace folder only on a complete first page;
+                // partial pages or pagination append/merge.
+                if (pageToken == null && result.isComplete) {
+                    dao.replaceFolder("inbox", entities)
+                } else {
+                    dao.upsertPreservingBodies(entities)
+                }
             }
         }
 
@@ -96,19 +109,27 @@ class EmailRepository(
     }
 
     suspend fun refreshTrash(pageToken: String? = null): PaginatedResult<Email> {
+        val gen = if (pageToken == null) {
+            trashCommitCoordinator.nextGeneration()
+        } else {
+            trashCommitCoordinator.currentGeneration()
+        }
+
         val lease = writeGuard.capture() ?: return PaginatedResult(emptyList(), null)
         val p = provider ?: return PaginatedResult(emptyList(), null)
         val fetched = p.fetchTrash(pageToken)
         val result = if (fetched.isComplete) fetched else fetched.copy(nextPageToken = null)
 
         val entities = result.items.map { EmailEntity.fromDomain(it, EmailFolder.Trash) }
-        writeGuard.commit(lease) {
-            // Refresh replaces the paginated window only for a complete first page.
-            // Partial pages and subsequent pages can only merge into the cache.
-            if (pageToken == null && result.isComplete) {
-                dao.replaceFolder("trash", entities)
-            } else {
-                dao.upsertPreservingBodies(entities)
+        trashCommitCoordinator.commitIfValid(gen) {
+            writeGuard.commit(lease) {
+                // Refresh replaces the paginated window only for a complete first page.
+                // Partial pages and subsequent pages can only merge into the cache.
+                if (pageToken == null && result.isComplete) {
+                    dao.replaceFolder("trash", entities)
+                } else {
+                    dao.upsertPreservingBodies(entities)
+                }
             }
         }
 
@@ -530,5 +551,30 @@ class EmailRepository(
     ) {
         provider?.sendEmail(to, cc, bcc, subject, body, replyContext)
             ?: error("No hay proveedor activo")
+    }
+}
+
+internal class FolderCommitCoordinator {
+    private val mutex = Mutex()
+    private var currentGeneration = 0L
+
+    suspend fun nextGeneration(): Long = mutex.withLock {
+        ++currentGeneration
+    }
+
+    suspend fun currentGeneration(): Long = mutex.withLock {
+        currentGeneration
+    }
+
+    suspend fun commitIfValid(
+        generation: Long,
+        block: suspend () -> Unit
+    ): Boolean = mutex.withLock {
+        if (generation != currentGeneration) {
+            false
+        } else {
+            block()
+            true
+        }
     }
 }

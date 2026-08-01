@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 class TrashViewModel(
@@ -27,6 +28,11 @@ class TrashViewModel(
 
     private var nextPageToken: String? = null
     private var isLoadingNextPage = false
+
+    private var refreshJob: Job? = null
+    private var paginationJob: Job? = null
+    private var currentGeneration = 0L
+
     init {
         observeRoom()
         refresh()
@@ -51,49 +57,81 @@ class TrashViewModel(
     // ── Refresh / pagination ────────────────────────────────────
 
     fun refresh() {
-        viewModelScope.launch {
-            val isManualRefresh = _uiState.value is TrashUiState.Success
-            if (isManualRefresh) {
-                _uiState.update { current ->
-                    if (current is TrashUiState.Success) current.copy(isRefreshing = true) else current
-                }
+        val myGen = ++currentGeneration
+        refreshJob?.cancel()
+        paginationJob?.cancel()
+        nextPageToken = null
+        isLoadingNextPage = false
+
+        val isManualRefresh = _uiState.value is TrashUiState.Success
+        if (isManualRefresh) {
+            _uiState.update { current ->
+                if (current is TrashUiState.Success) {
+                    current.copy(isRefreshing = true, isLoadingNextPage = false)
+                } else current
             }
+        }
+
+        refreshJob = viewModelScope.launch {
             try {
                 if (isManualRefresh) delay(800)
-                nextPageToken = null
                 val result = source.refreshTrash(null)
-                if (result.isComplete) nextPageToken = result.nextPageToken
-                _uiState.update { current ->
-                    if (current is TrashUiState.Success) current.copy(isRefreshing = false) else current
+                if (currentGeneration == myGen) {
+                    if (result.isComplete) {
+                        nextPageToken = result.nextPageToken
+                    }
+                    _uiState.update { current ->
+                        if (current is TrashUiState.Success) current.copy(isRefreshing = false) else current
+                    }
                 }
-            } catch (e: CancellationException) { throw e }
-            catch (e: Exception) {
-                Log.e("TrashVM", "refresh failed", e)
-                _uiState.update { current ->
-                    if (current is TrashUiState.Success) current.copy(isRefreshing = false)
-                    else TrashUiState.Error(e.toUiErrorReason())
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (currentGeneration == myGen) {
+                    Log.e("TrashVM", "refresh failed", e)
+                    _uiState.update { current ->
+                        if (current is TrashUiState.Success) {
+                            current.copy(isRefreshing = false)
+                        } else {
+                            TrashUiState.Error(e.toUiErrorReason())
+                        }
+                    }
                 }
             }
         }
     }
 
     fun loadNextPage() {
-        if (isLoadingNextPage || nextPageToken == null) return
+        if (isLoadingNextPage) return
+        val token = nextPageToken ?: return
+
+        val myGen = currentGeneration
         isLoadingNextPage = true
-        viewModelScope.launch {
-            _uiState.update { current ->
-                if (current is TrashUiState.Success) current.copy(isLoadingNextPage = true) else current
-            }
+
+        _uiState.update { current ->
+            if (current is TrashUiState.Success) current.copy(isLoadingNextPage = true) else current
+        }
+
+        paginationJob = viewModelScope.launch {
             try {
-                val token = nextPageToken
                 val result = source.refreshTrash(token)
-                if (result.isComplete) nextPageToken = result.nextPageToken
-            } catch (e: CancellationException) { throw e }
-            catch (e: Exception) { Log.e("TrashVM", "loadNextPage failed", e) }
-            finally {
-                isLoadingNextPage = false
-                _uiState.update { current ->
-                    if (current is TrashUiState.Success) current.copy(isLoadingNextPage = false) else current
+                if (currentGeneration == myGen && token == nextPageToken) {
+                    if (result.isComplete) {
+                        nextPageToken = result.nextPageToken
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (currentGeneration == myGen && token == nextPageToken) {
+                    Log.e("TrashVM", "loadNextPage failed", e)
+                }
+            } finally {
+                if (currentGeneration == myGen) {
+                    isLoadingNextPage = false
+                    _uiState.update { current ->
+                        if (current is TrashUiState.Success) current.copy(isLoadingNextPage = false) else current
+                    }
                 }
             }
         }

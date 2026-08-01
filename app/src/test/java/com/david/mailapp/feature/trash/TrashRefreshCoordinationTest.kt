@@ -17,9 +17,10 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.withContext
 import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
-import org.junit.Ignore
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -30,7 +31,6 @@ class TrashRefreshCoordinationTest {
     @Before fun setup() = Dispatchers.setMain(mainDispatcher)
     @After fun tearDown() = Dispatchers.resetMain()
 
-    @Ignore("Contrato pendiente: Fase 3.2")
     @Test
     fun `C4 Trash refresh tardio no reemplaza datos ni token recientes`() = runTest(mainDispatcher) {
         val source = ControllingTrashSource()
@@ -62,7 +62,6 @@ class TrashRefreshCoordinationTest {
         )
     }
 
-    @Ignore("Contrato pendiente: Fase 3.2")
     @Test
     fun `C5 Trash refresh nuevo cancela paginacion y refresh anterior`() = runTest(mainDispatcher) {
         val source = ControllingTrashSource()
@@ -90,11 +89,37 @@ class TrashRefreshCoordinationTest {
                 "New Trash refresh must cancel pagination and the prior refresh",
                 page.cancelled.isCompleted && refreshA.cancelled.isCompleted
             )
+            val state = viewModel.uiState.value as TrashUiState.Success
+            assertFalse("isRefreshing must be false after refresh-b completes", state.isRefreshing)
+            assertFalse("isLoadingNextPage must be false after cancellation", state.isLoadingNextPage)
+            assertEquals(listOf("refresh-b"), state.emails.map { it.id })
         } finally {
             pageGate.complete(Unit)
             refreshGate.complete(Unit)
             advanceUntilIdle()
         }
+    }
+
+    @Test
+    fun `refresh inmediato despues de paginacion no conserva flag obsoleto`() = runTest(mainDispatcher) {
+        val source = ControllingTrashSource()
+        source.enqueue(PaginatedResult(listOf(email("initial")), "page-2"))
+        val viewModel = TrashViewModel(source)
+        advanceUntilIdle()
+
+        source.enqueue(
+            PaginatedResult(listOf(email("refresh")), "refresh-token")
+        )
+
+        viewModel.loadNextPage()
+        viewModel.refresh() // deliberadamente sin runCurrent()
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value as TrashUiState.Success
+        assertFalse(state.isLoadingNextPage)
+        assertFalse(state.isRefreshing)
+        assertEquals(listOf("refresh"), state.emails.map { it.id })
+        assertEquals(listOf(null, null), source.receivedTokens)
     }
 }
 
@@ -123,14 +148,18 @@ private class ControllingTrashSource : TrashEmailSource {
         receivedTokens += pageToken
         val plan = plans.removeAt(0)
         plan.started.complete(Unit)
+        var wasCancelled = false
         try {
             plan.gate?.await()
         } catch (cancelled: CancellationException) {
             plan.cancelled.complete(Unit)
+            wasCancelled = true
             if (!plan.ignoreCancellation) throw cancelled
             withContext(NonCancellable) { plan.gate?.await() }
         }
-        room.value = if (pageToken == null) plan.result.items else room.value + plan.result.items
+        if (!wasCancelled) {
+            room.value = if (pageToken == null) plan.result.items else room.value + plan.result.items
+        }
         return plan.result
     }
 

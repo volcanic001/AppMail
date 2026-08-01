@@ -10,6 +10,9 @@ import com.david.mailapp.domain.model.PaginatedResult
 import com.david.mailapp.testhelpers.FakeEmailProvider
 import com.david.mailapp.testhelpers.FakeSessionWriteGuard
 import com.david.mailapp.testhelpers.testEmail
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -20,6 +23,7 @@ import org.junit.Test
 /**
  * Fase 2.3: Safe refresh semantics — replace, merge, token handling.
  */
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class SafeRefreshContractsTest {
 
     private lateinit var db: MailDatabase
@@ -157,6 +161,116 @@ class SafeRefreshContractsTest {
         assertTrue(trash.any { it.id == "page1" })
         assertTrue(trash.any { it.id == "page2" })
         assertEquals(2, trash.size)
+    }
+
+    // ── Instrumented coordination tests ──────────────────────────
+
+    @Test fun inbox_obsolete_slow_refresh_rejected() = runTest {
+        val gateA = CompletableDeferred<Unit>()
+        provider.enqueueInbox(
+            PaginatedResult(listOf(testEmail("A")), "page-A", isComplete = true),
+            gateA,
+            ignoreCancellation = true
+        )
+
+        val jobA = launch {
+            repository.refreshInbox(null)
+        }
+        runCurrent()
+
+        provider.enqueueInbox(
+            PaginatedResult(listOf(testEmail("B")), "page-B", isComplete = true)
+        )
+        repository.refreshInbox(null)
+
+        gateA.complete(Unit)
+        jobA.join()
+
+        val inbox = db.emailDao().getEntitiesByFolderSync("inbox")
+        assertEquals(1, inbox.size)
+        assertEquals("B", inbox[0].id)
+    }
+
+    @Test fun inbox_active_pagination_obsoleted_by_refresh_rejected() = runTest {
+        seedInbox(listOf(testEmail("initial")))
+
+        val gateA = CompletableDeferred<Unit>()
+        provider.enqueueInbox(
+            PaginatedResult(listOf(testEmail("paginated-A")), "page-3", isComplete = true),
+            gateA,
+            ignoreCancellation = true
+        )
+
+        val jobA = launch {
+            repository.refreshInbox("page-2")
+        }
+        runCurrent()
+
+        provider.enqueueInbox(
+            PaginatedResult(listOf(testEmail("B")), "page-B", isComplete = true)
+        )
+        repository.refreshInbox(null)
+
+        gateA.complete(Unit)
+        jobA.join()
+
+        val inbox = db.emailDao().getEntitiesByFolderSync("inbox")
+        assertEquals(1, inbox.size)
+        assertEquals("B", inbox[0].id)
+    }
+
+    @Test fun trash_obsolete_slow_refresh_rejected() = runTest {
+        val gateA = CompletableDeferred<Unit>()
+        provider.enqueueTrash(
+            PaginatedResult(listOf(testEmail("A", folder = EmailFolder.Trash)), "page-A", isComplete = true),
+            gateA,
+            ignoreCancellation = true
+        )
+
+        val jobA = launch {
+            repository.refreshTrash(null)
+        }
+        runCurrent()
+
+        provider.enqueueTrash(
+            PaginatedResult(listOf(testEmail("B", folder = EmailFolder.Trash)), "page-B", isComplete = true)
+        )
+        repository.refreshTrash(null)
+
+        gateA.complete(Unit)
+        jobA.join()
+
+        val trash = db.emailDao().getEntitiesByFolderSync("trash")
+        assertEquals(1, trash.size)
+        assertEquals("B", trash[0].id)
+    }
+
+    @Test fun trash_active_pagination_obsoleted_by_refresh_rejected() = runTest {
+        seedTrash(listOf(testEmail("initial", folder = EmailFolder.Trash)))
+
+        val gateA = CompletableDeferred<Unit>()
+        provider.enqueueTrash(
+            PaginatedResult(listOf(testEmail("paginated-A", folder = EmailFolder.Trash)), "page-3", isComplete = true),
+            gateA,
+            ignoreCancellation = true
+        )
+
+        val jobA = launch {
+            repository.refreshTrash("page-2")
+        }
+        runCurrent()
+
+        provider.enqueueTrash(
+            PaginatedResult(listOf(testEmail("B", folder = EmailFolder.Trash)), "page-B", isComplete = true)
+        )
+        repository.refreshTrash(null)
+
+        gateA.complete(Unit)
+        jobA.join()
+
+        val trash = db.emailDao().getEntitiesByFolderSync("trash")
+        assertEquals(1, trash.size)
+        assertEquals("B", trash[0].id)
     }
 }
 

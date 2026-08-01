@@ -184,9 +184,68 @@ class TrashViewModelActionTest {
         gate.complete(Unit)
         advanceUntilIdle()
     }
+
+    @Test fun active_action_and_feedback_survive_refresh_and_pagination() = runTest {
+        val refreshGate = CompletableDeferred<Unit>()
+        val actionGate = CompletableDeferred<Unit>()
+        val receivedTokens = mutableListOf<String?>()
+
+        val src = object : FakeTrashSource(
+            deleteGate = actionGate,
+            restoreResult = EmailActionResult.Failure(UiErrorReason.NO_CONNECTION, false)
+        ) {
+            override suspend fun refreshTrash(pageToken: String?): PaginatedResult<Email> {
+                receivedTokens += pageToken
+                return if (pageToken == null) {
+                    refreshGate.await()
+                    PaginatedResult(listOf(email), "page-2", isComplete = true)
+                } else {
+                    PaginatedResult(emptyList(), null, isComplete = true)
+                }
+            }
+        }
+
+        val vm = TrashViewModel(src)
+        // Complete the initial refresh gate so the initial load can proceed
+        refreshGate.complete(Unit)
+        advanceUntilIdle()
+
+        // Enqueue feedback via a failing restore
+        vm.restoreToInbox("feedback-id")
+        advanceUntilIdle()
+
+        // Start a long-running delete action
+        vm.deletePermanently("active-id")
+        runCurrent()
+
+        val beforeRefresh = vm.uiState.value as TrashUiState.Success
+        assertTrue("active-id should be active before refresh", "active-id" in beforeRefresh.activeActionEmailIds)
+        assertEquals("feedback should be present before refresh", 1, beforeRefresh.pendingFeedbackQueue.size)
+
+        // Trigger a manual refresh — this starts a new refreshJob; actions/feedback must survive
+        vm.refresh()
+        advanceUntilIdle()
+
+        val afterRefresh = vm.uiState.value as TrashUiState.Success
+        assertTrue("active-id must survive refresh", "active-id" in afterRefresh.activeActionEmailIds)
+        assertEquals("feedback must survive refresh", 1, afterRefresh.pendingFeedbackQueue.size)
+
+        vm.loadNextPage()
+        advanceUntilIdle()
+
+        val afterPagination = vm.uiState.value as TrashUiState.Success
+
+        assertEquals("page-2", receivedTokens.last())
+        assertTrue("active-id" in afterPagination.activeActionEmailIds)
+        assertEquals(1, afterPagination.pendingFeedbackQueue.size)
+        assertFalse(afterPagination.isLoadingNextPage)
+
+        actionGate.complete(Unit)
+        advanceUntilIdle()
+    }
 }
 
-class FakeTrashSource(
+open class FakeTrashSource(
     private var deleteResult: EmailActionResult = EmailActionResult.Success,
     private var restoreResult: EmailActionResult = EmailActionResult.Success,
     var deleteGate: CompletableDeferred<Unit>? = null,
@@ -210,6 +269,6 @@ class FakeTrashSource(
         restoreError?.let { throw it }
         return restoreResult
     }
-    override suspend fun refreshTrash(pageToken: String?): PaginatedResult<Email> = PaginatedResult(emptyList(), null)
+    open override suspend fun refreshTrash(pageToken: String?): PaginatedResult<Email> = PaginatedResult(emptyList(), null)
     override fun observeTrash(): Flow<List<Email>> = room
 }

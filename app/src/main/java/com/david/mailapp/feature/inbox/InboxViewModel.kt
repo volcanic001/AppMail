@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 class InboxViewModel(
@@ -28,6 +29,10 @@ class InboxViewModel(
     private var isLoadingNextPage = false
     private var isInitialRefresh = true
     private var lastSeenEmails: List<com.david.mailapp.domain.model.Email>? = null
+
+    private var refreshJob: Job? = null
+    private var paginationJob: Job? = null
+    private var currentGeneration = 0L
 
     init {
         observeRoom()
@@ -58,55 +63,79 @@ class InboxViewModel(
     // ── Refresh / pagination ────────────────────────────────────
 
     fun refresh() {
-        viewModelScope.launch {
-            val isManualRefresh = _uiState.value is InboxUiState.Success
-            if (isManualRefresh) {
-                _uiState.update { current ->
-                    if (current is InboxUiState.Success) current.copy(isRefreshing = true) else current
-                }
-            }
+        val myGen = ++currentGeneration
+        refreshJob?.cancel()
+        paginationJob?.cancel()
+        nextPageToken = null
+        isLoadingNextPage = false
 
+        val isManualRefresh = _uiState.value is InboxUiState.Success
+        if (isManualRefresh) {
+            _uiState.update { current ->
+                if (current is InboxUiState.Success) {
+                    current.copy(isRefreshing = true, isLoadingNextPage = false)
+                } else current
+            }
+        }
+
+        refreshJob = viewModelScope.launch {
             try {
-                // Refresh restarts the paginated window — discard old token
-                nextPageToken = null
                 val start = nowMillis()
                 val result = source.refreshInbox(null)
-                if (result.isComplete) {
-                    nextPageToken = result.nextPageToken
-                }
-
                 val elapsed = nowMillis() - start
                 if (elapsed < 800) {
                     delay(800 - elapsed)
                 }
-                isInitialRefresh = false
-                mergeRefreshSuccess(result.items)
-            } catch (e: CancellationException) { throw e }
-            catch (e: Exception) {
-                Log.e("InboxVM", "refresh failed", e)
-                isInitialRefresh = false
-                mergeRefreshError(e)
+                if (currentGeneration == myGen) {
+                    if (result.isComplete) {
+                        nextPageToken = result.nextPageToken
+                    }
+                    isInitialRefresh = false
+                    mergeRefreshSuccess(result.items)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (currentGeneration == myGen) {
+                    Log.e("InboxVM", "refresh failed", e)
+                    isInitialRefresh = false
+                    mergeRefreshError(e)
+                }
             }
         }
     }
 
     fun loadNextPage() {
-        if (isLoadingNextPage || nextPageToken == null) return
+        if (isLoadingNextPage) return
+        val token = nextPageToken ?: return
+
+        val myGen = currentGeneration
         isLoadingNextPage = true
-        viewModelScope.launch {
-            _uiState.update { current ->
-                if (current is InboxUiState.Success) current.copy(isLoadingNextPage = true) else current
-            }
+
+        _uiState.update { current ->
+            if (current is InboxUiState.Success) current.copy(isLoadingNextPage = true) else current
+        }
+
+        paginationJob = viewModelScope.launch {
             try {
-                val token = nextPageToken
                 val result = source.refreshInbox(token)
-                if (result.isComplete) nextPageToken = result.nextPageToken
-            } catch (e: CancellationException) { throw e }
-            catch (e: Exception) { Log.e("InboxVM", "loadNextPage failed", e) }
-            finally {
-                isLoadingNextPage = false
-                _uiState.update { current ->
-                    if (current is InboxUiState.Success) current.copy(isLoadingNextPage = false) else current
+                if (currentGeneration == myGen && token == nextPageToken) {
+                    if (result.isComplete) {
+                        nextPageToken = result.nextPageToken
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (currentGeneration == myGen && token == nextPageToken) {
+                    Log.e("InboxVM", "loadNextPage failed", e)
+                }
+            } finally {
+                if (currentGeneration == myGen) {
+                    isLoadingNextPage = false
+                    _uiState.update { current ->
+                        if (current is InboxUiState.Success) current.copy(isLoadingNextPage = false) else current
+                    }
                 }
             }
         }
