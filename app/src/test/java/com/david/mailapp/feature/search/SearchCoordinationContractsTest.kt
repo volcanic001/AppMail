@@ -7,6 +7,8 @@ import com.david.mailapp.domain.model.Email
 import com.david.mailapp.domain.model.EmailFolder
 import com.david.mailapp.domain.model.PaginatedResult
 import com.david.mailapp.testhelpers.FakeSessionWriteGuard
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -36,6 +38,7 @@ class SearchCoordinationContractsTest {
     private lateinit var historyStore: DataStore<Preferences>
     private lateinit var fakeSource: ControllingSearchSource
     private val mainDispatcher = StandardTestDispatcher()
+    private var activeViewModel: SearchViewModel? = null
 
     @Before
     fun setup() {
@@ -47,10 +50,11 @@ class SearchCoordinationContractsTest {
 
     @After
     fun tearDown() {
+        activeViewModel?.viewModelScope?.cancel()
+        mainDispatcher.scheduler.advanceUntilIdle()
         Dispatchers.resetMain()
     }
 
-    @Ignore("Contrato pendiente: Fase 3.3")
     @Test
     fun `C7 pagina de consulta A no se anexa a resultados de B`() = runTest(mainDispatcher) {
         val aPage1 = (1..20).map { testEmail(id = "a_$it", subject = "A result $it") }
@@ -59,16 +63,17 @@ class SearchCoordinationContractsTest {
 
         val aPage2Gate = CompletableDeferred<Unit>()
         fakeSource.addResults("query-A", null, PaginatedResult(aPage1, "A_page2"))
-        fakeSource.addResults("query-A", "A_page2", PaginatedResult(aPage2, null), gate = aPage2Gate)
-        fakeSource.addResults("query-B", null, PaginatedResult(bPage1, null))
+        val aPage2Entry = fakeSource.addResults("query-A", "A_page2", PaginatedResult(aPage2, null), gate = aPage2Gate, ignoreCancellation = true)
+        fakeSource.addResults("query-B", null, PaginatedResult(bPage1, "B_page2"))
 
-        val viewModel = SearchViewModel(fakeSource, historyStore, FakeSessionWriteGuard())
+        val viewModel = SearchViewModel(fakeSource, historyStore, FakeSessionWriteGuard()).also { activeViewModel = it }
 
         viewModel.onQueryChange("query-A")
         testScheduler.advanceUntilIdle()
 
         viewModel.loadNextPage()
         testScheduler.runCurrent()
+        aPage2Entry.started.await()
 
         viewModel.onQueryChange("query-B")
         testScheduler.advanceUntilIdle()
@@ -81,18 +86,21 @@ class SearchCoordinationContractsTest {
         val results = state as SearchUiState.Results
         assertTrue("A results leaked into B", results.emails.none { it.id.startsWith("a_") })
         assertTrue("B missing expected results", results.emails.all { it.id.startsWith("b_") })
+        assertEquals("query-B", results.query)
+        assertEquals("B_page2", results.nextPageToken)
+        assertFalse("isLoadingNextPage should be false", results.isLoadingNextPage)
+        assertTrue("A page 2 should have registered cancellation", aPage2Entry.cancelled.isCompleted)
     }
 
-    @Ignore("Contrato pendiente: Fase 3.3")
     @Test
     fun `C7 IDs duplicados en paginacion de B se eliminan`() = runTest(mainDispatcher) {
         val bPage1 = listOf(testEmail(id = "b_1"), testEmail(id = "b_2"))
-        val bPage2 = listOf(testEmail(id = "b_1"), testEmail(id = "b_3"))
+        val bPage2 = listOf(testEmail(id = "b_1"), testEmail(id = "b_3"), testEmail(id = "b_3"))
 
         fakeSource.addResults("query-B", null, PaginatedResult(bPage1, "B_page2"))
         fakeSource.addResults("query-B", "B_page2", PaginatedResult(bPage2, null))
 
-        val viewModel = SearchViewModel(fakeSource, historyStore, FakeSessionWriteGuard())
+        val viewModel = SearchViewModel(fakeSource, historyStore, FakeSessionWriteGuard()).also { activeViewModel = it }
         viewModel.onQueryChange("query-B")
         testScheduler.advanceUntilIdle()
 
@@ -103,12 +111,11 @@ class SearchCoordinationContractsTest {
         assertTrue(state is SearchUiState.Results)
         val results = state as SearchUiState.Results
         val ids = results.emails.map { it.id }
-        assertEquals("Duplicate IDs present", ids.size, ids.toSet().size)
-        assertEquals(3, ids.size)
+        assertEquals("Duplicate IDs present", ids.toSet().size, ids.size)
+        assertEquals(listOf("b_1", "b_2", "b_3"), ids)
         assertFalse("isLoadingNextPage should be false", results.isLoadingNextPage)
     }
 
-    @Ignore("Contrato pendiente: Fase 3.3")
     @Test
     fun `C7 cambio de consulta limpia isLoadingNextPage`() = runTest(mainDispatcher) {
         val aPage1 = (1..20).map { testEmail(id = "a_$it") }
@@ -116,16 +123,17 @@ class SearchCoordinationContractsTest {
         val aPage2Gate = CompletableDeferred<Unit>()
 
         fakeSource.addResults("query-A", null, PaginatedResult(aPage1, "A_page2"))
-        fakeSource.addResults("query-A", "A_page2", PaginatedResult(aPage2, null), gate = aPage2Gate)
+        val aPage2Entry = fakeSource.addResults("query-A", "A_page2", PaginatedResult(aPage2, null), gate = aPage2Gate, ignoreCancellation = false)
         fakeSource.addResults("query-B", null, PaginatedResult(listOf(testEmail(id = "b_1")), null))
 
-        val viewModel = SearchViewModel(fakeSource, historyStore, FakeSessionWriteGuard())
+        val viewModel = SearchViewModel(fakeSource, historyStore, FakeSessionWriteGuard()).also { activeViewModel = it }
 
         viewModel.onQueryChange("query-A")
         testScheduler.advanceUntilIdle()
 
         viewModel.loadNextPage()
-        testScheduler.advanceUntilIdle()
+        testScheduler.runCurrent()
+        aPage2Entry.started.await()
 
         viewModel.onQueryChange("query-B")
         testScheduler.advanceUntilIdle()
@@ -138,6 +146,7 @@ class SearchCoordinationContractsTest {
         val results = state as SearchUiState.Results
         assertFalse("isLoadingNextPage should be false", results.isLoadingNextPage)
         assertTrue("A results leaked into B", results.emails.all { it.id.startsWith("b_") })
+        assertTrue("A page 2 should have registered cancellation", aPage2Entry.cancelled.isCompleted)
     }
 }
 

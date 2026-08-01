@@ -14,19 +14,12 @@ import com.david.mailapp.data.repository.EmailRepository
 import com.david.mailapp.domain.model.Email
 import com.david.mailapp.domain.model.PaginatedResult
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.FlowPreview
-import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.debounce
-import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
 
 /**
@@ -36,7 +29,6 @@ fun interface SearchEmailSource {
     suspend fun search(query: String, pageToken: String?): PaginatedResult<Email>
 }
 
-@OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 class SearchViewModel(
     private val source: SearchEmailSource,
     private val historyStore: DataStore<Preferences>,
@@ -55,10 +47,6 @@ class SearchViewModel(
     /** The current search query text. */
     val query: StateFlow<String> = _queryFlow.asStateFlow()
 
-    // ── Retry signal (bypasses debounce) ───────────────────────
-
-    private val _retryFlow = MutableSharedFlow<String>(extraBufferCapacity = 1)
-
     // ── UI State ───────────────────────────────────────────────
 
     private val _uiState = MutableStateFlow<SearchUiState>(SearchUiState.Idle)
@@ -76,121 +64,141 @@ class SearchViewModel(
     private var nextPageToken: String? = null
     private var isLoadingNextPage = false
 
-    // ── Search pipeline ────────────────────────────────────────
+    // ── Job tracking ───────────────────────────────────────────
 
-    init {
-        viewModelScope.launch {
-            merge(
-                _queryFlow.debounce(300).filter { it.length >= 2 },
-                _retryFlow
-            )
-                .flatMapLatest { query ->
-                    Log.d(TAG, "Starting search pipeline for: '$query'")
-                    _uiState.value = SearchUiState.Loading
+    private var searchJob: Job? = null
+    private var paginationJob: Job? = null
+    private var currentGeneration = 0L
 
-                    flow {
-                        val lease = writeGuard.capture()
-                        if (lease == null) {
-                            emit(SearchUiState.Idle)
-                            return@flow
-                        }
-
-                        try {
-                            val result = source.search(query, null)
-                            if (result.isComplete) {
-                                nextPageToken = result.nextPageToken
-                            }
-
-                            val state = if (result.items.isEmpty()) {
-                                SearchUiState.Empty(query)
-                            } else {
-                                SearchUiState.Results(
-                                    emails = result.items,
-                                    query = query,
-                                    nextPageToken = nextPageToken
-                                )
-                            }
-                            emit(state)
-
-                            // Save to history only on successful search
-                            try {
-                                writeGuard.commit(lease) {
-                                    saveToHistory(query)
-                                }
-                            } catch (e: CancellationException) {
-                                throw e
-                            } catch (e: Exception) {
-                                Log.e(TAG, "Failed to save search history for '$query'", e)
-                            }
-                        } catch (e: CancellationException) {
-                            throw e
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Search failed for '$query'", e)
-                            emit(
-                                SearchUiState.Error(
-                                    reason = e.toUiErrorReason(),
-                                    query = query
-                                )
-                            )
-                        }
-                    }
-                }
-                .collect { state ->
-                    _uiState.value = state
-                }
+    private suspend fun performSearch(query: String, myGen: Long) {
+        val lease = writeGuard.capture()
+        if (lease == null) {
+            if (currentGeneration == myGen && _queryFlow.value == query) {
+                _uiState.value = SearchUiState.Idle
+            }
+            return
         }
+
+        try {
+            val result = source.search(query, null)
+            if (currentGeneration == myGen && _queryFlow.value == query) {
+                nextPageToken = if (result.isComplete) result.nextPageToken else null
+                val uniqueEmails = deduplicateEmails(result.items)
+                val state = if (uniqueEmails.isEmpty()) {
+                    SearchUiState.Empty(query)
+                } else {
+                    SearchUiState.Results(
+                        emails = uniqueEmails,
+                        query = query,
+                        nextPageToken = nextPageToken
+                    )
+                }
+                _uiState.value = state
+
+                try {
+                    writeGuard.commit(lease) {
+                        saveToHistory(query)
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to save search history for '$query'", e)
+                }
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            if (currentGeneration == myGen && _queryFlow.value == query) {
+                Log.e(TAG, "Search failed for '$query'", e)
+                _uiState.value = SearchUiState.Error(
+                    reason = e.toUiErrorReason(),
+                    query = query
+                )
+            }
+        }
+    }
+
+    private fun deduplicateEmails(items: List<Email>): List<Email> {
+        val seen = mutableSetOf<String>()
+        return items.filter { seen.add(it.id) }
     }
 
     // ── Public actions ─────────────────────────────────────────
 
     fun onQueryChange(newQuery: String) {
+        if (newQuery == _queryFlow.value) return
         _queryFlow.value = newQuery
+
+        val myGen = ++currentGeneration
+        searchJob?.cancel()
+        paginationJob?.cancel()
+        nextPageToken = null
+        isLoadingNextPage = false
+
         if (newQuery.length < 2) {
             _uiState.value = SearchUiState.Idle
-            nextPageToken = null
+        } else {
+            searchJob = viewModelScope.launch {
+                try {
+                    delay(300)
+                    if (currentGeneration == myGen && _queryFlow.value == newQuery) {
+                        _uiState.value = SearchUiState.Loading
+                        performSearch(newQuery, myGen)
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                }
+            }
         }
     }
 
     fun clearQuery() {
-        _queryFlow.value = ""
-        _uiState.value = SearchUiState.Idle
-        nextPageToken = null
+        onQueryChange("")
     }
 
     fun loadNextPage() {
-        if (isLoadingNextPage || nextPageToken == null) return
-        isLoadingNextPage = true
-
+        val current = _uiState.value
         val currentQuery = _queryFlow.value
-        viewModelScope.launch {
-            val current = _uiState.value
-            if (current is SearchUiState.Results) {
-                _uiState.value = current.copy(isLoadingNextPage = true)
-            }
+        if (current !is SearchUiState.Results || current.query != currentQuery || current.isLoadingNextPage || isLoadingNextPage) return
+        val token = nextPageToken ?: return
+        val myGen = currentGeneration
 
+        isLoadingNextPage = true
+        _uiState.value = current.copy(isLoadingNextPage = true)
+
+        paginationJob = viewModelScope.launch {
             try {
-                val result = source.search(currentQuery, nextPageToken)
-                if (result.isComplete) {
-                    nextPageToken = result.nextPageToken
-                } // else: keep existing token for retry
+                val result = source.search(currentQuery, token)
+                if (currentGeneration == myGen && _queryFlow.value == currentQuery) {
+                    val after = _uiState.value
+                    if (after is SearchUiState.Results && after.query == currentQuery) {
+                        val newNextPageToken = if (result.isComplete) result.nextPageToken else token
+                        nextPageToken = newNextPageToken
 
-                val after = _uiState.value
-                if (after is SearchUiState.Results) {
-                    _uiState.value = after.copy(
-                        emails = after.emails + result.items,
-                        nextPageToken = nextPageToken,
-                        isLoadingNextPage = false
-                    )
+                        val existingEmails = after.emails
+                        val seenIds = existingEmails.mapTo(mutableSetOf()) { it.id }
+                        val newEmails = result.items.filter { seenIds.add(it.id) }
+
+                        _uiState.value = after.copy(
+                            emails = existingEmails + newEmails,
+                            nextPageToken = newNextPageToken,
+                            isLoadingNextPage = false
+                        )
+                    }
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                Log.e(TAG, "loadNextPage failed for '$currentQuery'", e)
+                if (currentGeneration == myGen && _queryFlow.value == currentQuery) {
+                    Log.e(TAG, "loadNextPage failed for '$currentQuery'", e)
+                }
             } finally {
-                isLoadingNextPage = false
-                val after = _uiState.value
-                if (after is SearchUiState.Results) {
-                    _uiState.value = after.copy(isLoadingNextPage = false)
+                if (currentGeneration == myGen && _queryFlow.value == currentQuery) {
+                    isLoadingNextPage = false
+                    val after = _uiState.value
+                    if (after is SearchUiState.Results && after.query == currentQuery) {
+                        _uiState.value = after.copy(isLoadingNextPage = false)
+                    }
                 }
             }
         }
@@ -199,7 +207,20 @@ class SearchViewModel(
     fun retry() {
         val current = _queryFlow.value
         if (current.length >= 2) {
-            _retryFlow.tryEmit(current)
+            val myGen = ++currentGeneration
+            searchJob?.cancel()
+            paginationJob?.cancel()
+            nextPageToken = null
+            isLoadingNextPage = false
+
+            _uiState.value = SearchUiState.Loading
+            searchJob = viewModelScope.launch {
+                try {
+                    performSearch(current, myGen)
+                } catch (e: CancellationException) {
+                    throw e
+                }
+            }
         }
     }
 
