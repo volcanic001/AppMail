@@ -11,6 +11,8 @@ import com.david.mailapp.data.repository.EmailRepository
 import com.david.mailapp.domain.model.Email
 import com.david.mailapp.domain.model.PdfAttachmentMetadata
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -67,8 +69,10 @@ class EmailDetailViewModel(
                         launch {
                             when (val outcome = markAsRead()) {
                                 EmailReadOnOpenOutcome.Marked -> Unit
-                                is EmailReadOnOpenOutcome.Failure ->
+                                is EmailReadOnOpenOutcome.Failure -> {
+                                    ensureActive()
                                     _readFailureEvents.send(outcome.reason)
+                                }
                             }
                         }
                     }
@@ -110,6 +114,7 @@ class EmailDetailViewModel(
                                 val cached = withContext(Dispatchers.IO) {
                                     repository.checkPdfCache(emailId, stableId)
                                 }
+                                ensureActive()
                                 val restoredState = cached ?: PdfDownloadState.Idle
                                 _pdfDownloadStates.update { states ->
                                     when (states[stableId]) {
@@ -203,6 +208,7 @@ class EmailDetailViewModel(
             val fetchedResult = withContext(Dispatchers.IO) {
                 repository.fetchAndCacheBody(emailId)
             }
+            currentCoroutineContext().ensureActive()
             if (fetchedResult == null) {
                 if (!delivered) {
                     delivered = true
@@ -289,18 +295,21 @@ class EmailDetailViewModel(
             val refs = cachedInlineRefs ?: withContext(Dispatchers.IO) {
                 repository.fetchAndCacheBody(emailId)?.inlineRefs
             } ?: emptyList()
+            currentCoroutineContext().ensureActive()
 
             val images = if (refs.isNotEmpty()) {
                 withContext(Dispatchers.IO) {
                     repository.downloadInlineImages(emailId, refs)
                 }
             } else emptyMap()
+            currentCoroutineContext().ensureActive()
 
             val injectedBody = if (images.isNotEmpty()) {
                 withContext(Dispatchers.Default) {
                     repository.injectInlineImages(email.body, images)
                 }
             } else email.body
+            currentCoroutineContext().ensureActive()
 
             cachedInlineImages = images
             val injectedEmail = email.copy(body = injectedBody)
@@ -424,6 +433,7 @@ class EmailDetailViewModel(
                 "attachmentId=$attachmentId fileName=${attachment.fileName}"
             )
             val state = repository.downloadPdf(emailId, attachment)
+            ensureActive()
             _pdfDownloadStates.update {
                 it + (stableId to state)
             }

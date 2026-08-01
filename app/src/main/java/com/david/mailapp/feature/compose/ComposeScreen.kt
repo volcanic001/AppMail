@@ -41,6 +41,7 @@ import com.david.mailapp.core.localization.toUiText
 import com.david.mailapp.feature.compose.components.ComposeTopBar
 import com.david.mailapp.feature.compose.components.ForwardedMessageBlock
 import com.david.mailapp.feature.compose.components.OriginalMessageQuote
+import com.david.mailapp.ui.navigation.rememberDestinationViewModelStoreOwner
 
 @Composable
 fun ComposeScreen(
@@ -51,7 +52,9 @@ fun ComposeScreen(
     val repository = AppContainer.emailRepository
     val authManager = AppContainer.authManager
     val stringProvider = AppContainer.stringProvider
+    val owner = rememberDestinationViewModelStoreOwner()
     val viewModel: ComposeViewModel = viewModel(
+        viewModelStoreOwner = owner,
         key = "compose_${args::class.simpleName}_${args.hashCode()}",
         factory = ComposeViewModel.Factory(args, repository, authManager, stringProvider)
     )

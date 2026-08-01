@@ -46,6 +46,16 @@ class FakeEmailProvider : EmailProvider {
     var markAsReadDeferred: CompletableDeferred<Unit>? = null
     var sendEmailDeferred: CompletableDeferred<Unit>? = null
     var downloadAttachmentDeferred: CompletableDeferred<Unit>? = null
+    var fetchBodyDeferred: CompletableDeferred<Unit>? = null
+    var downloadInlineImagesDeferred: CompletableDeferred<Unit>? = null
+
+    var wasCancelledFetchBody = false
+    var completedFetchBody = false
+    var ignoreCancellationFetchBody = false
+    var wasCancelledInlineImages = false
+    var ignoreCancellationInlineImages = false
+    var wasCancelledDownloadAttachment = false
+    var ignoreCancellationDownloadAttachment = false
 
     var fetchInboxResult: PaginatedResult<Email> = PaginatedResult(emptyList(), null)
     var fetchTrashResult: PaginatedResult<Email> = PaginatedResult(emptyList(), null)
@@ -148,12 +158,33 @@ class FakeEmailProvider : EmailProvider {
 
     override suspend fun fetchBodyWithRefs(emailId: String): BodyFetchResult? {
         fetchBodyCalls++
+        val deferred = fetchBodyDeferred
+        if (deferred != null) {
+            try {
+                deferred.await()
+            } catch (e: CancellationException) {
+                wasCancelledFetchBody = true
+                if (!ignoreCancellationFetchBody) throw e
+                withContext(NonCancellable) { deferred.await() }
+            }
+        }
         fetchBodyError?.let { throw it }
+        completedFetchBody = true
         return fetchBodyResult
     }
 
     override suspend fun downloadInlineImages(emailId: String, refs: List<InlineImageRef>): Map<String, String> {
         inlineImagesCalls++
+        val deferred = downloadInlineImagesDeferred
+        if (deferred != null) {
+            try {
+                deferred.await()
+            } catch (e: CancellationException) {
+                wasCancelledInlineImages = true
+                if (!ignoreCancellationInlineImages) throw e
+                withContext(NonCancellable) { deferred.await() }
+            }
+        }
         inlineImagesError?.let { throw it }
         return inlineImagesResult
     }
@@ -161,8 +192,17 @@ class FakeEmailProvider : EmailProvider {
     override suspend fun getUserEmail() = userEmailResult
 
     override suspend fun downloadAttachment(emailId: String, attachmentId: String): ByteArray {
-        downloadAttachmentDeferred?.await()
         downloadAttachmentCalls++
+        val deferred = downloadAttachmentDeferred
+        if (deferred != null) {
+            try {
+                deferred.await()
+            } catch (e: CancellationException) {
+                wasCancelledDownloadAttachment = true
+                if (!ignoreCancellationDownloadAttachment) throw e
+                withContext(NonCancellable) { deferred.await() }
+            }
+        }
         downloadAttachmentError?.let { throw it }
         return downloadAttachmentResult
     }

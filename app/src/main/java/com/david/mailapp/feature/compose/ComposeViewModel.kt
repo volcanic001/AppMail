@@ -8,6 +8,8 @@ import com.david.mailapp.core.localization.StringProvider
 import com.david.mailapp.data.remote.provider.ReplyContext
 import com.david.mailapp.data.repository.EmailRepository
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -22,6 +24,8 @@ class ComposeViewModel(
     private val composeFormatUtils = ComposeFormatUtils(stringProvider)
     private val _uiState = MutableStateFlow(ComposeUiState())
     val uiState: StateFlow<ComposeUiState> = _uiState.asStateFlow()
+
+    private var sendJob: Job? = null
 
     init {
         // Set mode-dependent fields synchronously — no delay for UI.
@@ -84,45 +88,57 @@ class ComposeViewModel(
     fun onSend() {
         val state = _uiState.value
         if (state.toField.isBlank()) return
+        if (sendJob?.isActive == true || state.isSending) return
 
-        viewModelScope.launch {
-            _uiState.value = state.copy(isSending = true, sendResult = null)
+        // Capture immutable snapshot of fields before coroutine launch
+        val to = state.toField
+        val cc = state.ccField.ifBlank { null }
+        val bcc = state.bccField.ifBlank { null }
+        val subject = state.subject
+        val bodyText = state.bodyText
+        val composeMode = state.composeMode
+        val originalEmail = state.originalEmail
+
+        // Publish isSending = true and clear sendResult synchronously
+        _uiState.value = _uiState.value.copy(isSending = true, sendResult = null)
+
+        sendJob = viewModelScope.launch {
             try {
-                val finalBody = when (state.composeMode) {
-                    ComposeMode.WRITE -> state.bodyText
+                val finalBody = when (composeMode) {
+                    ComposeMode.WRITE -> bodyText
                     ComposeMode.REPLY -> {
-                        val orig = state.originalEmail
-                        if (orig != null) {
-                            composeFormatUtils.buildReplyBody(state.bodyText, orig, orig.snippet)
-                        } else state.bodyText
+                        if (originalEmail != null) {
+                            composeFormatUtils.buildReplyBody(bodyText, originalEmail, originalEmail.snippet)
+                        } else bodyText
                     }
                     ComposeMode.FORWARD -> {
-                        val orig = state.originalEmail
-                        if (orig != null) {
-                            composeFormatUtils.buildForwardBody(state.bodyText, orig, orig.snippet)
-                        } else state.bodyText
+                        if (originalEmail != null) {
+                            composeFormatUtils.buildForwardBody(bodyText, originalEmail, originalEmail.snippet)
+                        } else bodyText
                     }
                 }
 
                 val replyContext: ReplyContext? =
-                    if (state.composeMode == ComposeMode.REPLY) {
-                        state.originalEmail?.let(ReplyContext::from)
+                    if (composeMode == ComposeMode.REPLY) {
+                        originalEmail?.let(ReplyContext::from)
                     } else null
 
                 emailSource.sendEmail(
-                    to = state.toField,
-                    cc = state.ccField.ifBlank { null },
-                    bcc = state.bccField.ifBlank { null },
-                    subject = state.subject,
+                    to = to,
+                    cc = cc,
+                    bcc = bcc,
+                    subject = subject,
                     body = finalBody,
                     replyContext = replyContext
                 )
+
+                ensureActive()
+
                 _uiState.value = _uiState.value.copy(
                     isSending = false,
                     sendResult = SendResult.Success
                 )
             } catch (e: CancellationException) {
-                // Reset isSending before propagating — the UI must not remain frozen.
                 _uiState.value = _uiState.value.copy(isSending = false)
                 throw e
             } catch (e: Exception) {
@@ -130,6 +146,8 @@ class ComposeViewModel(
                     isSending = false,
                     sendResult = SendResult.Error(e.toComposeSendErrorReason())
                 )
+            } finally {
+                sendJob = null
             }
         }
     }

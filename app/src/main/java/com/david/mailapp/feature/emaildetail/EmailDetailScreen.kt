@@ -121,6 +121,8 @@ import android.content.ActivityNotFoundException
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 
+import com.david.mailapp.ui.navigation.rememberDestinationViewModelStoreOwner
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EmailDetailScreen(
@@ -131,7 +133,9 @@ fun EmailDetailScreen(
     modifier: Modifier = Modifier
 ) {
     val repository = AppContainer.emailRepository
+    val owner = rememberDestinationViewModelStoreOwner()
     val viewModel: EmailDetailViewModel = viewModel(
+        viewModelStoreOwner = owner,
         key = emailId,
         factory = EmailDetailViewModel.Factory(emailId, repository)
     )
