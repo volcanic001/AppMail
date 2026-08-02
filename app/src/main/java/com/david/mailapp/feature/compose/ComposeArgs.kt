@@ -14,11 +14,23 @@ sealed class ComposeArgs {
      * Responder al remitente del email original.
      * El ViewModel prerellenará: Para = from, Asunto = "Re: …"
      */
-    data class Reply(val originalEmailId: String) : ComposeArgs()
+    data class Reply(val originalEmailId: String) : ComposeArgs() {
+        init {
+            require(originalEmailId.isNotBlank()) {
+                "originalEmailId must not be empty or blank"
+            }
+        }
+    }
 
     /**
      * Reenviar el email original a nuevos destinatarios.
      * El ViewModel prerellenará: Asunto = "Fwd: …", Para vacío.
      */
-    data class Forward(val originalEmailId: String) : ComposeArgs()
+    data class Forward(val originalEmailId: String) : ComposeArgs() {
+        init {
+            require(originalEmailId.isNotBlank()) {
+                "originalEmailId must not be empty or blank"
+            }
+        }
+    }
 }

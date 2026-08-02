@@ -87,7 +87,7 @@ class MainNavigationTest {
     }
 
     @Test
-    fun testNavigationFlows() {
+    fun testNavigationFlowsAndReconstruction() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         lateinit var navController: TestNavHostController
 
@@ -103,14 +103,129 @@ class MainNavigationTest {
 
         composeTestRule.waitForIdle()
 
-        // Inbox -> Search
+        // 1. Navigate to EmailDetail and verify exact reconstruction (including sensitive chars)
+        val sensitiveId = "id/with/slashes?and=queries&spaces= "
+        composeTestRule.runOnUiThread {
+            navController.navigate(MainRoute.EmailDetail(sensitiveId))
+        }
+        composeTestRule.waitForIdle()
+        assertTrue(navController.currentBackStackEntry?.destination?.hasRoute<MainRoute.EmailDetail>() == true)
+        val detailRoute = navController.currentBackStackEntry?.toRoute<MainRoute.EmailDetail>()
+        assertEquals(sensitiveId, detailRoute?.emailId)
+
+        // 2. Navigate to Compose (WRITE) and reconstruct
+        composeTestRule.runOnUiThread {
+            navController.navigate(MainRoute.Compose(ComposeMode.WRITE))
+        }
+        composeTestRule.waitForIdle()
+        assertTrue(navController.currentBackStackEntry?.destination?.hasRoute<MainRoute.Compose>() == true)
+        var composeRoute = navController.currentBackStackEntry?.toRoute<MainRoute.Compose>()
+        assertEquals(ComposeMode.WRITE, composeRoute?.mode)
+        assertEquals(null, composeRoute?.originalEmailId)
+
+        // 3. Navigate to Compose (REPLY) and reconstruct
+        composeTestRule.runOnUiThread {
+            navController.navigate(MainRoute.Compose(ComposeMode.REPLY, "orig123"))
+        }
+        composeTestRule.waitForIdle()
+        composeRoute = navController.currentBackStackEntry?.toRoute<MainRoute.Compose>()
+        assertEquals(ComposeMode.REPLY, composeRoute?.mode)
+        assertEquals("orig123", composeRoute?.originalEmailId)
+
+        // 4. Navigate to Compose (FORWARD) and reconstruct
+        composeTestRule.runOnUiThread {
+            navController.navigate(MainRoute.Compose(ComposeMode.FORWARD, "orig456"))
+        }
+        composeTestRule.waitForIdle()
+        composeRoute = navController.currentBackStackEntry?.toRoute<MainRoute.Compose>()
+        assertEquals(ComposeMode.FORWARD, composeRoute?.mode)
+        assertEquals("orig456", composeRoute?.originalEmailId)
+    }
+
+    @Test
+    fun testDetailToComposeAndBackPreservesDetail() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        lateinit var navController: TestNavHostController
+
+        composeTestRule.setContent {
+            navController = TestNavHostController(context).apply {
+                navigatorProvider.addNavigator(ComposeNavigator())
+                navigatorProvider.addNavigator(DialogNavigator())
+            }
+            MainScreen(
+                navController = navController
+            )
+        }
+
+        composeTestRule.waitForIdle()
+
+        // 1. Navigate to Detail
+        composeTestRule.runOnUiThread {
+            navController.navigate(MainRoute.EmailDetail("detail_id"))
+        }
+        composeTestRule.waitForIdle()
+        val detailEntry = navController.currentBackStackEntry
+        assertTrue(detailEntry?.destination?.hasRoute<MainRoute.EmailDetail>() == true)
+
+        // 2. Detail -> Reply
+        composeTestRule.runOnUiThread {
+            navController.navigate(MainRoute.Compose(ComposeMode.REPLY, "detail_id"))
+        }
+        composeTestRule.waitForIdle()
+        assertTrue(navController.currentBackStackEntry?.destination?.hasRoute<MainRoute.Compose>() == true)
+        val replyRoute = navController.currentBackStackEntry?.toRoute<MainRoute.Compose>()
+        assertEquals(ComposeMode.REPLY, replyRoute?.mode)
+        assertEquals("detail_id", replyRoute?.originalEmailId)
+
+        // Reply -> Back (popBackStack) -> should preserve the same Detail entry in back stack
+        composeTestRule.runOnUiThread {
+            navController.popBackStack()
+        }
+        composeTestRule.waitForIdle()
+        var postBackEntry = navController.currentBackStackEntry
+        assertTrue(postBackEntry?.destination?.hasRoute<MainRoute.EmailDetail>() == true)
+        assertEquals(detailEntry, postBackEntry)
+
+        // 3. Detail -> Forward
+        composeTestRule.runOnUiThread {
+            navController.navigate(MainRoute.Compose(ComposeMode.FORWARD, "detail_id"))
+        }
+        composeTestRule.waitForIdle()
+        assertTrue(navController.currentBackStackEntry?.destination?.hasRoute<MainRoute.Compose>() == true)
+        val forwardRoute = navController.currentBackStackEntry?.toRoute<MainRoute.Compose>()
+        assertEquals(ComposeMode.FORWARD, forwardRoute?.mode)
+        assertEquals("detail_id", forwardRoute?.originalEmailId)
+
+        // Forward -> Back (popBackStack) -> should preserve the same Detail entry in back stack
+        composeTestRule.runOnUiThread {
+            navController.popBackStack()
+        }
+        composeTestRule.waitForIdle()
+        postBackEntry = navController.currentBackStackEntry
+        assertTrue(postBackEntry?.destination?.hasRoute<MainRoute.EmailDetail>() == true)
+        assertEquals(detailEntry, postBackEntry)
+    }
+
+    @Test
+    fun search_detail_and_back_return_to_search() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        lateinit var navController: TestNavHostController
+
+        composeTestRule.setContent {
+            navController = TestNavHostController(context).apply {
+                navigatorProvider.addNavigator(ComposeNavigator())
+                navigatorProvider.addNavigator(DialogNavigator())
+            }
+            MainScreen(navController = navController)
+        }
+        composeTestRule.waitForIdle()
+
         composeTestRule.runOnUiThread {
             navController.navigate(MainRoute.Search)
         }
         composeTestRule.waitForIdle()
         assertTrue(navController.currentBackStackEntry?.destination?.hasRoute<MainRoute.Search>() == true)
 
-        // Search -> Detail
         composeTestRule.runOnUiThread {
             navController.navigate(MainRoute.EmailDetail("123"))
         }
@@ -119,7 +234,6 @@ class MainNavigationTest {
         val detailRoute = navController.currentBackStackEntry?.toRoute<MainRoute.EmailDetail>()
         assertEquals("123", detailRoute?.emailId)
 
-        // Detail -> Back -> Search
         composeTestRule.runOnUiThread {
             navController.popBackStack()
         }

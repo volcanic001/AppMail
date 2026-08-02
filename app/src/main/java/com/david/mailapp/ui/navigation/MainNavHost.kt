@@ -17,7 +17,6 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
-import com.david.mailapp.feature.compose.ComposeArgs
 import com.david.mailapp.feature.compose.ComposeMode
 import com.david.mailapp.feature.compose.ComposeScreen
 import com.david.mailapp.feature.emaildetail.EmailDetailScreen
@@ -170,11 +169,7 @@ fun MainNavHost(
             exitTransition = { fadeOut(spring(dampingRatio = 0.65f, stiffness = 350f)) }
         ) { backStackEntry ->
             val composeRoute: MainRoute.Compose = backStackEntry.toRoute()
-            val args = when (composeRoute.mode) {
-                ComposeMode.WRITE -> ComposeArgs.Write
-                ComposeMode.REPLY -> ComposeArgs.Reply(composeRoute.originalEmailId.orEmpty())
-                ComposeMode.FORWARD -> ComposeArgs.Forward(composeRoute.originalEmailId.orEmpty())
-            }
+            val args = composeRoute.toComposeArgs()
             ComposeScreen(
                 args = args,
                 onClose = { navController.popBackStack() }

@@ -1,11 +1,13 @@
 package com.david.mailapp.ui.navigation
 
+import com.david.mailapp.feature.compose.ComposeArgs
 import com.david.mailapp.feature.compose.ComposeMode
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertFalse
 import org.junit.Assert.fail
 import org.junit.Test
 
@@ -95,11 +97,71 @@ class NavigationTest {
         val detailDecoded = json.decodeFromString<MainRoute>(detailStr) as MainRoute.EmailDetail
         assertEquals("msg123", detailDecoded.emailId)
 
-        val compose = MainRoute.Compose(ComposeMode.REPLY, "msg123")
-        val composeStr = json.encodeToString<MainRoute>(compose)
-        val composeDecoded = json.decodeFromString<MainRoute>(composeStr) as MainRoute.Compose
-        assertEquals(ComposeMode.REPLY, composeDecoded.mode)
-        assertEquals("msg123", composeDecoded.originalEmailId)
+        val composeWrite = MainRoute.Compose(ComposeMode.WRITE, null)
+        val composeWriteStr = json.encodeToString<MainRoute>(composeWrite)
+        val composeWriteDecoded = json.decodeFromString<MainRoute>(composeWriteStr) as MainRoute.Compose
+        assertEquals(ComposeMode.WRITE, composeWriteDecoded.mode)
+        assertEquals(null, composeWriteDecoded.originalEmailId)
+
+        val composeReply = MainRoute.Compose(ComposeMode.REPLY, "msg123")
+        val composeReplyStr = json.encodeToString<MainRoute>(composeReply)
+        val composeReplyDecoded = json.decodeFromString<MainRoute>(composeReplyStr) as MainRoute.Compose
+        assertEquals(ComposeMode.REPLY, composeReplyDecoded.mode)
+        assertEquals("msg123", composeReplyDecoded.originalEmailId)
+
+        val composeForward = MainRoute.Compose(ComposeMode.FORWARD, "msg456")
+        val composeForwardStr = json.encodeToString<MainRoute>(composeForward)
+        val composeForwardDecoded = json.decodeFromString<MainRoute>(composeForwardStr) as MainRoute.Compose
+        assertEquals(ComposeMode.FORWARD, composeForwardDecoded.mode)
+        assertEquals("msg456", composeForwardDecoded.originalEmailId)
+    }
+
+    @Test
+    fun `EmailDetail rechaza IDs vacios o en blanco`() {
+        try {
+            MainRoute.EmailDetail("")
+            fail("Should fail on empty emailId")
+        } catch (e: IllegalArgumentException) {
+            // expected
+        }
+
+        try {
+            MainRoute.EmailDetail("   ")
+            fail("Should fail on blank emailId")
+        } catch (e: IllegalArgumentException) {
+            // expected
+        }
+    }
+
+    @Test
+    fun `ComposeArgs Reply y Forward rechazan IDs vacios o en blanco`() {
+        try {
+            ComposeArgs.Reply("")
+            fail("Should fail on empty id")
+        } catch (e: IllegalArgumentException) {
+            // expected
+        }
+
+        try {
+            ComposeArgs.Reply("   ")
+            fail("Should fail on blank id")
+        } catch (e: IllegalArgumentException) {
+            // expected
+        }
+
+        try {
+            ComposeArgs.Forward("")
+            fail("Should fail on empty id")
+        } catch (e: IllegalArgumentException) {
+            // expected
+        }
+
+        try {
+            ComposeArgs.Forward("   ")
+            fail("Should fail on blank id")
+        } catch (e: IllegalArgumentException) {
+            // expected
+        }
     }
 
     @Test
@@ -119,10 +181,42 @@ class NavigationTest {
             // expected
         }
 
+        // WRITE con originalEmailId vacio -> Excepcion
+        try {
+            MainRoute.Compose(ComposeMode.WRITE, "")
+            fail("WRITE mode should throw exception if originalEmailId is empty")
+        } catch (e: IllegalArgumentException) {
+            // expected
+        }
+
+        // WRITE con originalEmailId en blanco -> Excepcion
+        try {
+            MainRoute.Compose(ComposeMode.WRITE, "   ")
+            fail("WRITE mode should throw exception if originalEmailId is blank")
+        } catch (e: IllegalArgumentException) {
+            // expected
+        }
+
         // REPLY con originalEmailId = null -> Excepcion
         try {
             MainRoute.Compose(ComposeMode.REPLY, null)
             fail("REPLY mode should throw exception if originalEmailId is null")
+        } catch (e: IllegalArgumentException) {
+            // expected
+        }
+
+        // REPLY con originalEmailId vacio -> Excepcion
+        try {
+            MainRoute.Compose(ComposeMode.REPLY, "")
+            fail("REPLY mode should throw exception if originalEmailId is empty")
+        } catch (e: IllegalArgumentException) {
+            // expected
+        }
+
+        // REPLY con originalEmailId en blanco -> Excepcion
+        try {
+            MainRoute.Compose(ComposeMode.REPLY, "   ")
+            fail("REPLY mode should throw exception if originalEmailId is blank")
         } catch (e: IllegalArgumentException) {
             // expected
         }
@@ -134,5 +228,86 @@ class NavigationTest {
         } catch (e: IllegalArgumentException) {
             // expected
         }
+
+        // FORWARD con originalEmailId vacio -> Excepcion
+        try {
+            MainRoute.Compose(ComposeMode.FORWARD, "")
+            fail("FORWARD mode should throw exception if originalEmailId is empty")
+        } catch (e: IllegalArgumentException) {
+            // expected
+        }
+
+        // FORWARD con originalEmailId en blanco -> Excepcion
+        try {
+            MainRoute.Compose(ComposeMode.FORWARD, "   ")
+            fail("FORWARD mode should throw exception if originalEmailId is blank")
+        } catch (e: IllegalArgumentException) {
+            // expected
+        }
+
+        // IDs validos con espacios internos o finales se conservan exactamente
+        val idWithInternalAndTrailingSpaces = "some id here "
+        val replyCompose = MainRoute.Compose(ComposeMode.REPLY, idWithInternalAndTrailingSpaces)
+        assertEquals(idWithInternalAndTrailingSpaces, replyCompose.originalEmailId)
+    }
+
+    @Test
+    fun `mapper produce los ComposeArgs correctos`() {
+        val writeRoute = MainRoute.Compose(ComposeMode.WRITE, null)
+        val replyRoute = MainRoute.Compose(ComposeMode.REPLY, "reply123")
+        val forwardRoute = MainRoute.Compose(ComposeMode.FORWARD, "forward123")
+
+        assertTrue(writeRoute.toComposeArgs() is ComposeArgs.Write)
+
+        val replyArgs = replyRoute.toComposeArgs() as ComposeArgs.Reply
+        assertEquals("reply123", replyArgs.originalEmailId)
+
+        val forwardArgs = forwardRoute.toComposeArgs() as ComposeArgs.Forward
+        assertEquals("forward123", forwardArgs.originalEmailId)
+    }
+
+    @Test
+    fun `IDs con caracteres sensibles se conservan exactamente`() {
+        val sensitiveId = "id/with/slashes?and=queries&spaces= "
+        val detail = MainRoute.EmailDetail(sensitiveId)
+        assertEquals(sensitiveId, detail.emailId)
+
+        val reply = MainRoute.Compose(ComposeMode.REPLY, sensitiveId)
+        assertEquals(sensitiveId, reply.originalEmailId)
+        val replyArgs = reply.toComposeArgs() as ComposeArgs.Reply
+        assertEquals(sensitiveId, replyArgs.originalEmailId)
+    }
+
+    @Test
+    fun `prueba estructural de campos en MainRoute`() {
+        val detailFields = MainRoute.EmailDetail::class.java.declaredFields
+            .filter { !it.isSynthetic && !it.name.startsWith("$") && !it.name.contains("$") && it.name != "Companion" && it.name != "serialVersionUID" }
+        assertEquals(1, detailFields.size)
+        assertEquals("emailId", detailFields.first().name)
+
+        val composeFields = MainRoute.Compose::class.java.declaredFields
+            .filter { !it.isSynthetic && !it.name.startsWith("$") && !it.name.contains("$") && it.name != "Companion" && it.name != "serialVersionUID" }
+        assertEquals(2, composeFields.size)
+        val fieldNames = composeFields.map { it.name }
+        assertTrue(fieldNames.contains("mode"))
+        assertTrue(fieldNames.contains("originalEmailId"))
+    }
+
+    @Test
+    fun `ningun campo de ruta o ComposeArgs tiene tipo Email`() {
+        fun checkClass(clazz: Class<*>) {
+            clazz.declaredFields.forEach { field ->
+                val typeName = field.type.name
+                assertFalse(
+                    "Field ${field.name} of ${clazz.simpleName} must not be Email type",
+                    typeName.contains("com.david.mailapp.domain.model.Email")
+                )
+            }
+        }
+
+        checkClass(MainRoute.EmailDetail::class.java)
+        checkClass(MainRoute.Compose::class.java)
+        checkClass(ComposeArgs.Reply::class.java)
+        checkClass(ComposeArgs.Forward::class.java)
     }
 }
