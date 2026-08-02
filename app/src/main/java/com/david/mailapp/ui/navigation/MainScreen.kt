@@ -67,14 +67,6 @@ fun MainScreen(
         }
     }
 
-    var highlightedEmailId by remember { mutableStateOf<String?>(null) }
-
-    val closeDetail: (String) -> Unit = { emailId ->
-        if (navController.popBackStack()) {
-            highlightedEmailId = emailId
-        }
-    }
-
     // These screens are removed from NavHost after navigating to a
     // message. Keep their scroll state at this longer-lived navigation level
     // so returning from EmailDetail restores the exact list position.
@@ -88,7 +80,7 @@ fun MainScreen(
         scope.launch { drawerState.open() }
     }
 
-    val gesturesEnabled = currentRoute !is MainRoute.EmailDetail && currentRoute !is MainRoute.Compose
+    val gesturesEnabled = currentRoute is MainRoute.Inbox || currentRoute is MainRoute.Trash || currentRoute is MainRoute.Settings
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -98,18 +90,9 @@ fun MainScreen(
                 currentRoute = currentRoute ?: MainRoute.Inbox,
                 onRouteSelected = { route ->
                     scope.launch { drawerState.close() }
-                    highlightedEmailId = null
 
-                    if (route == MainRoute.Inbox) {
-                        navController.navigate(MainRoute.Inbox) {
-                            popUpTo(MainRoute.Inbox) { inclusive = false }
-                            launchSingleTop = true
-                        }
-                    } else {
-                        navController.navigate(route) {
-                            popUpTo(MainRoute.Inbox) { inclusive = false }
-                            launchSingleTop = true
-                        }
+                    if (currentRoute != route) {
+                        navController.navigateToTopLevel(route)
                     }
                 }
             )
@@ -131,9 +114,6 @@ fun MainScreen(
                 inboxListState = inboxListState,
                 trashListState = trashListState,
                 searchListState = searchListState,
-                highlightedEmailId = highlightedEmailId,
-                onClearHighlight = { highlightedEmailId = null },
-                onCloseDetail = closeDetail,
                 onMenuClick = onMenuClick,
                 currentPalette = currentPalette,
                 isDarkMode = isDarkMode,
@@ -157,7 +137,7 @@ fun MainScreen(
             ) {
                 ComposeFab(
                     onClick = {
-                        navController.navigate(MainRoute.Compose(ComposeMode.WRITE))
+                        navController.navigateToOverlay(MainRoute.Compose(ComposeMode.WRITE))
                     },
                     modifier = Modifier
                         .testTag("fab_compose")

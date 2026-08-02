@@ -194,4 +194,94 @@ class DestinationLifecycleTest {
         assertEquals("Should be cleared exactly once", 1, vmB.clearCount)
         assertTrue("Job should be cancelled", vmB.testJob.isCancelled)
     }
+
+    @Test
+    fun testTopLevelViewModelLifecycle() {
+        var inboxVm: TestLifecycleViewModel? = null
+        var trashVm: TestLifecycleViewModel? = null
+        lateinit var localNavController: androidx.navigation.NavHostController
+
+        composeRule.setContent {
+            localNavController = rememberNavController()
+            NavHost(navController = localNavController, startDestination = MainRoute.Inbox) {
+                composable<MainRoute.Inbox> {
+                    val vm: TestLifecycleViewModel = viewModel(
+                        factory = object : ViewModelProvider.Factory {
+                            @Suppress("UNCHECKED_CAST")
+                            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                                return TestLifecycleViewModel() as T
+                            }
+                        }
+                    )
+                    inboxVm = vm
+                }
+                composable<MainRoute.Trash> {
+                    val vm: TestLifecycleViewModel = viewModel(
+                        factory = object : ViewModelProvider.Factory {
+                            @Suppress("UNCHECKED_CAST")
+                            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                                return TestLifecycleViewModel() as T
+                            }
+                        }
+                    )
+                    trashVm = vm
+                }
+                composable<MainRoute.Settings> {
+                    // Settings
+                }
+            }
+        }
+
+        composeRule.waitForIdle()
+        val vmInbox1 = inboxVm
+        assertTrue("Inbox ViewModel should be initialized", vmInbox1 != null)
+        assertTrue("Inbox Job should be active", vmInbox1!!.testJob.isActive)
+        assertTrue("Inbox ViewModel should not be cleared", !vmInbox1.isCleared)
+
+        // 1. Navigate to Trash using navigateToTopLevel (saveState = true)
+        composeRule.runOnUiThread {
+            localNavController.navigateToTopLevel(MainRoute.Trash)
+        }
+        composeRule.waitForIdle()
+
+        // Verify Trash is active
+        val vmTrash1 = trashVm
+        assertTrue("Trash ViewModel should be initialized", vmTrash1 != null)
+
+        // Inbox remains the graph root and must stay alive while Trash is active.
+        assertTrue("Inbox ViewModel should NOT be cleared on top-level navigation change", !vmInbox1.isCleared)
+        assertTrue("Inbox Job should still be active", vmInbox1.testJob.isActive)
+
+        // 2. Select Trash again (duplicate navigation)
+        composeRule.runOnUiThread {
+            localNavController.navigateToTopLevel(MainRoute.Trash)
+        }
+        composeRule.waitForIdle()
+        val vmTrashAfterDuplicate = trashVm
+        assertTrue("Trash ViewModel should be same instance", vmTrash1 === vmTrashAfterDuplicate)
+        assertTrue("Trash ViewModel should not be cleared", !vmTrash1!!.isCleared)
+
+        // 3. Return to Inbox, saving the Trash entry for a later restoration.
+        composeRule.runOnUiThread {
+            localNavController.navigateToTopLevel(MainRoute.Inbox)
+        }
+        composeRule.waitForIdle()
+
+        // Verify we got the exact same Inbox ViewModel instance and its scope is still active
+        val vmInboxRestored = inboxVm
+        assertTrue("Inbox ViewModel should be the same instance", vmInbox1 === vmInboxRestored)
+        assertTrue("Inbox ViewModel should not be cleared", !vmInbox1.isCleared)
+        assertTrue("Inbox Job should remain active", vmInbox1.testJob.isActive)
+
+        // 4. Restore Trash and verify that saveState/restoreState retained its ViewModelStore.
+        composeRule.runOnUiThread {
+            localNavController.navigateToTopLevel(MainRoute.Trash)
+        }
+        composeRule.waitForIdle()
+
+        val vmTrashRestored = trashVm
+        assertTrue("Trash ViewModel should be the same restored instance", vmTrash1 === vmTrashRestored)
+        assertTrue("Trash ViewModel should not be cleared while its entry is saved", !vmTrash1.isCleared)
+        assertTrue("Trash Job should remain active after restoration", vmTrash1.testJob.isActive)
+    }
 }

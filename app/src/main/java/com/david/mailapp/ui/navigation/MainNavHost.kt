@@ -12,7 +12,9 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -33,9 +35,6 @@ fun MainNavHost(
     inboxListState: LazyListState,
     trashListState: LazyListState,
     searchListState: LazyListState,
-    highlightedEmailId: String?,
-    onClearHighlight: () -> Unit,
-    onCloseDetail: (String) -> Unit,
     onMenuClick: () -> Unit,
     currentPalette: ColorPalette,
     isDarkMode: Boolean,
@@ -57,17 +56,22 @@ fun MainNavHost(
         composable<MainRoute.Inbox>(
             enterTransition = { fadeIn(spring(dampingRatio = 0.65f, stiffness = 350f)) },
             exitTransition = { fadeOut(spring(dampingRatio = 0.65f, stiffness = 350f)) }
-        ) {
+        ) { backStackEntry ->
+            val highlightedEmailId by backStackEntry.savedStateHandle
+                .getStateFlow<String?>(KEY_CLOSED_EMAIL_ID, null)
+                .collectAsStateWithLifecycle()
             InboxScreen(
                 listState = inboxListState,
                 highlightedEmailId = highlightedEmailId,
-                onClearHighlight = onClearHighlight,
+                onClearHighlight = {
+                    backStackEntry.savedStateHandle[KEY_CLOSED_EMAIL_ID] = null
+                },
                 onMenuClick = onMenuClick,
                 onSearchClick = {
-                    navController.navigate(MainRoute.Search)
+                    navController.navigateToOverlay(MainRoute.Search)
                 },
                 onEmailClick = { emailId ->
-                    navController.navigate(MainRoute.EmailDetail(emailId))
+                    navController.navigateToOverlay(MainRoute.EmailDetail(emailId))
                 }
             )
         }
@@ -75,14 +79,19 @@ fun MainNavHost(
         composable<MainRoute.Trash>(
             enterTransition = { fadeIn(spring(dampingRatio = 0.65f, stiffness = 350f)) },
             exitTransition = { fadeOut(spring(dampingRatio = 0.65f, stiffness = 350f)) }
-        ) {
+        ) { backStackEntry ->
+            val highlightedEmailId by backStackEntry.savedStateHandle
+                .getStateFlow<String?>(KEY_CLOSED_EMAIL_ID, null)
+                .collectAsStateWithLifecycle()
             TrashScreen(
                 listState = trashListState,
                 highlightedEmailId = highlightedEmailId,
-                onClearHighlight = onClearHighlight,
+                onClearHighlight = {
+                    backStackEntry.savedStateHandle[KEY_CLOSED_EMAIL_ID] = null
+                },
                 onMenuClick = onMenuClick,
                 onEmailClick = { emailId ->
-                    navController.navigate(MainRoute.EmailDetail(emailId))
+                    navController.navigateToOverlay(MainRoute.EmailDetail(emailId))
                 }
             )
         }
@@ -130,14 +139,19 @@ fun MainNavHost(
             }
         ) { backStackEntry ->
             val entryKey = backStackEntry.id
+            val highlightedEmailId by backStackEntry.savedStateHandle
+                .getStateFlow<String?>(KEY_CLOSED_EMAIL_ID, null)
+                .collectAsStateWithLifecycle()
             SearchScreen(
                 listState = searchListState,
                 entryKey = entryKey,
                 highlightedEmailId = highlightedEmailId,
-                onClearHighlight = onClearHighlight,
+                onClearHighlight = {
+                    backStackEntry.savedStateHandle[KEY_CLOSED_EMAIL_ID] = null
+                },
                 onBack = { navController.popBackStack() },
                 onEmailClick = { emailId ->
-                    navController.navigate(MainRoute.EmailDetail(emailId))
+                    navController.navigateToOverlay(MainRoute.EmailDetail(emailId))
                 }
             )
         }
@@ -150,16 +164,16 @@ fun MainNavHost(
         ) { backStackEntry ->
             val detailRoute: MainRoute.EmailDetail = backStackEntry.toRoute()
             BackHandler {
-                onCloseDetail(detailRoute.emailId)
+                navController.closeEmailDetail(detailRoute.emailId)
             }
             EmailDetailScreen(
                 emailId = detailRoute.emailId,
-                onBack = { onCloseDetail(detailRoute.emailId) },
+                onBack = { navController.closeEmailDetail(detailRoute.emailId) },
                 onReply = { emailId ->
-                    navController.navigate(MainRoute.Compose(ComposeMode.REPLY, emailId))
+                    navController.navigateToOverlay(MainRoute.Compose(ComposeMode.REPLY, emailId))
                 },
                 onForward = { emailId ->
-                    navController.navigate(MainRoute.Compose(ComposeMode.FORWARD, emailId))
+                    navController.navigateToOverlay(MainRoute.Compose(ComposeMode.FORWARD, emailId))
                 }
             )
         }
