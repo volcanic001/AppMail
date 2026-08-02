@@ -1,6 +1,7 @@
 package com.david.mailapp.feature.compose
 
 import com.david.mailapp.data.remote.provider.ReplyContext
+import com.david.mailapp.domain.model.Email
 
 /**
  * Internal contract isolating ComposeViewModel from the repository
@@ -11,6 +12,7 @@ import com.david.mailapp.data.remote.provider.ReplyContext
  */
 interface ComposeEmailSource {
     suspend fun getUserEmail(): String?
+    suspend fun getEmailById(emailId: String): Email?
     suspend fun sendEmail(
         to: String, cc: String?, bcc: String?,
         subject: String, body: String,

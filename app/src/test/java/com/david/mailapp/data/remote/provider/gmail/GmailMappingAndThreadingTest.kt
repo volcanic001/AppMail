@@ -213,9 +213,9 @@ class GmailMappingAndThreadingTest {
         val reply = Email("gmail-123", "th1", "from@test.com", "F", "me@t.com",
             "Orig", "", 1000L, false, false, false, emptyList(), EmailFolder.Inbox,
             rfcMessageId = "<o@m.com>", rfcReferences = "<anc@m.com>")
-        val source = RecordingComposeEmailSource()
+        val source = RecordingComposeEmailSource().apply { emailToReturn = reply }
         val viewModel = ComposeViewModel(
-            args = ComposeArgs.Reply(reply),
+            args = ComposeArgs.Reply(reply.id),
             emailSource = source,
             stringProvider = ComposeTestStringProvider
         )
@@ -232,6 +232,36 @@ class GmailMappingAndThreadingTest {
         assertEquals("inReplyTo = Message-ID", "<o@m.com>", ctx?.inReplyTo)
         assertEquals("references = prev + msgId", "<anc@m.com> <o@m.com>", ctx?.references)
         assertFalse("never uses internal Gmail ID", ctx.toString().contains("gmail-123"))
+    }
+
+    private fun outgoingBodyText(body: OutgoingContent): String = when (body) {
+        is TextContent -> body.text
+        is ByteArrayContent -> body.bytes().decodeToString()
+        else -> error("Unsupported outgoing body: ${body::class.qualifiedName}")
+    }
+
+    private class RecordingComposeEmailSource : ComposeEmailSource {
+        var sendCallCount: Int = 0
+            private set
+        var lastReplyContext: ReplyContext? = null
+            private set
+        var emailToReturn: Email? = null
+
+        override suspend fun getUserEmail(): String = "me@test.com"
+
+        override suspend fun getEmailById(emailId: String): Email? = emailToReturn
+
+        override suspend fun sendEmail(
+            to: String,
+            cc: String?,
+            bcc: String?,
+            subject: String,
+            body: String,
+            replyContext: ReplyContext?
+        ) {
+            sendCallCount++
+            lastReplyContext = replyContext
+        }
     }
 
     // ── helpers ─────────────────────────────────────────────────
@@ -293,32 +323,7 @@ class GmailMappingAndThreadingTest {
         return CapturedSend(paths.toList(), request, mime)
     }
 
-    private fun outgoingBodyText(body: OutgoingContent): String = when (body) {
-        is TextContent -> body.text
-        is ByteArrayContent -> body.bytes().decodeToString()
-        else -> error("Unsupported outgoing body: ${body::class.qualifiedName}")
-    }
 
-    private class RecordingComposeEmailSource : ComposeEmailSource {
-        var sendCallCount: Int = 0
-            private set
-        var lastReplyContext: ReplyContext? = null
-            private set
-
-        override suspend fun getUserEmail(): String = "me@test.com"
-
-        override suspend fun sendEmail(
-            to: String,
-            cc: String?,
-            bcc: String?,
-            subject: String,
-            body: String,
-            replyContext: ReplyContext?
-        ) {
-            sendCallCount++
-            lastReplyContext = replyContext
-        }
-    }
 
     private object ComposeTestStringProvider : StringProvider {
         override fun getString(resId: Int, vararg formatArgs: Any): String =

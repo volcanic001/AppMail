@@ -17,6 +17,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.testTag
 import com.david.mailapp.ui.theme.MotionTokens
 import kotlinx.coroutines.launch
 
@@ -25,7 +26,7 @@ import kotlinx.coroutines.launch
  */
 @Composable
 fun DrawerItem(
-    screen: Screen,
+    destination: DrawerDestination,
     isSelected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -33,12 +34,12 @@ fun DrawerItem(
     val scope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
     val scale = remember { Animatable(1f) }
-    val label = stringResource(screen.labelResId)
+    val label = stringResource(destination.labelResId)
 
     NavigationDrawerItem(
         icon = {
             Icon(
-                imageVector = if (isSelected) screen.filledIcon else screen.outlinedIcon,
+                imageVector = if (isSelected) destination.filledIcon else destination.outlinedIcon,
                 contentDescription = null
             )
         },
@@ -53,7 +54,9 @@ fun DrawerItem(
             }
             onClick()
         },
-        modifier = modifier.scale(scale.value),
+        modifier = modifier
+            .testTag("drawer_item_${destination.route::class.simpleName?.lowercase() ?: ""}")
+            .scale(scale.value),
         colors = NavigationDrawerItemDefaults.colors(
             selectedIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
             selectedTextColor = MaterialTheme.colorScheme.onSecondaryContainer,

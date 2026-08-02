@@ -23,8 +23,8 @@ import com.david.mailapp.R
  */
 @Composable
 fun DrawerContent(
-    selectedScreen: Screen,
-    onScreenSelected: (Screen) -> Unit,
+    currentRoute: MainRoute,
+    onRouteSelected: (MainRoute) -> Unit,
     modifier: Modifier = Modifier
 ) {
     ModalDrawerSheet(
@@ -51,11 +51,11 @@ fun DrawerContent(
         Spacer(modifier = Modifier.height(8.dp))
 
         // ── Navigation ────────────────────────────────────────
-        Screen.all.forEach { screen ->
+        DrawerDestination.all.forEach { destination ->
             DrawerItem(
-                screen = screen,
-                isSelected = screen == selectedScreen,
-                onClick = { onScreenSelected(screen) },
+                destination = destination,
+                isSelected = destination.route == currentRoute,
+                onClick = { onRouteSelected(destination.route) },
                 modifier = Modifier.padding(horizontal = 12.dp)
             )
         }

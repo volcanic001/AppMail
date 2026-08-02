@@ -1,7 +1,5 @@
 package com.david.mailapp.feature.compose
 
-import com.david.mailapp.domain.model.Email
-
 /**
  * Argumentos de navegación para [ComposeScreen].
  *
@@ -13,14 +11,14 @@ sealed class ComposeArgs {
     data object Write : ComposeArgs()
 
     /**
-     * Responder al remitente de [originalEmail].
+     * Responder al remitente del email original.
      * El ViewModel prerellenará: Para = from, Asunto = "Re: …"
      */
-    data class Reply(val originalEmail: Email) : ComposeArgs()
+    data class Reply(val originalEmailId: String) : ComposeArgs()
 
     /**
-     * Reenviar [originalEmail] a nuevos destinatarios.
+     * Reenviar el email original a nuevos destinatarios.
      * El ViewModel prerellenará: Asunto = "Fwd: …", Para vacío.
      */
-    data class Forward(val originalEmail: Email) : ComposeArgs()
+    data class Forward(val originalEmailId: String) : ComposeArgs()
 }

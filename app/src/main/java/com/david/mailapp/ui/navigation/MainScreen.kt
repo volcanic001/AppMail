@@ -1,17 +1,11 @@
 package com.david.mailapp.ui.navigation
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,7 +14,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalNavigationDrawer
-import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -30,14 +23,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import com.david.mailapp.feature.inbox.InboxScreen
-import com.david.mailapp.feature.compose.ComposeArgs
-import com.david.mailapp.feature.compose.ComposeScreen
-import com.david.mailapp.feature.emaildetail.EmailDetailScreen
-import com.david.mailapp.feature.search.SearchScreen
-import com.david.mailapp.feature.settings.SettingsScreen
-import com.david.mailapp.feature.trash.TrashScreen
+import androidx.navigation.NavDestination.Companion.hasRoute
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.toRoute
+import com.david.mailapp.feature.compose.ComposeMode
 import com.david.mailapp.ui.components.ComposeFab
 import com.david.mailapp.ui.theme.ColorPalette
 import com.david.mailapp.ui.theme.MotionTokens
@@ -54,12 +47,35 @@ fun MainScreen(
     onDarkModeChange: (Boolean) -> Unit = {},
     onUseCustomFontChange: (Boolean) -> Unit = {},
     onAmoledChange: (Boolean) -> Unit = {},
-    onSignOut: () -> Unit = {}
+    onSignOut: () -> Unit = {},
+    navController: NavHostController = rememberNavController()
 ) {
-    val navigator = rememberNavigator()
-    val selectedScreen = navigator.current
-    var searchEntryKey by remember { mutableStateOf(0L) }
-    // These screens are removed from AnimatedContent after navigating to a
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+
+    // Safely extract the current route object using hasRoute & toRoute
+    val currentRoute = remember(navBackStackEntry) {
+        val entry = navBackStackEntry ?: return@remember null
+        val destination = entry.destination
+        when {
+            destination.hasRoute<MainRoute.Inbox>() -> MainRoute.Inbox
+            destination.hasRoute<MainRoute.Trash>() -> MainRoute.Trash
+            destination.hasRoute<MainRoute.Settings>() -> MainRoute.Settings
+            destination.hasRoute<MainRoute.Search>() -> MainRoute.Search
+            destination.hasRoute<MainRoute.EmailDetail>() -> entry.toRoute<MainRoute.EmailDetail>()
+            destination.hasRoute<MainRoute.Compose>() -> entry.toRoute<MainRoute.Compose>()
+            else -> null
+        }
+    }
+
+    var highlightedEmailId by remember { mutableStateOf<String?>(null) }
+
+    val closeDetail: (String) -> Unit = { emailId ->
+        if (navController.popBackStack()) {
+            highlightedEmailId = emailId
+        }
+    }
+
+    // These screens are removed from NavHost after navigating to a
     // message. Keep their scroll state at this longer-lived navigation level
     // so returning from EmailDetail restores the exact list position.
     val inboxListState = rememberLazyListState()
@@ -72,21 +88,36 @@ fun MainScreen(
         scope.launch { drawerState.open() }
     }
 
+    val gesturesEnabled = currentRoute !is MainRoute.EmailDetail && currentRoute !is MainRoute.Compose
+
     ModalNavigationDrawer(
         drawerState = drawerState,
-        gesturesEnabled = selectedScreen !is Screen.EmailDetail,
+        gesturesEnabled = gesturesEnabled,
         drawerContent = {
             DrawerContent(
-                selectedScreen = selectedScreen,
-                onScreenSelected = { screen ->
-                    navigator.switchTab(screen)
+                currentRoute = currentRoute ?: MainRoute.Inbox,
+                onRouteSelected = { route ->
                     scope.launch { drawerState.close() }
+                    highlightedEmailId = null
+
+                    if (route == MainRoute.Inbox) {
+                        navController.navigate(MainRoute.Inbox) {
+                            popUpTo(MainRoute.Inbox) { inclusive = false }
+                            launchSingleTop = true
+                        }
+                    } else {
+                        navController.navigate(route) {
+                            popUpTo(MainRoute.Inbox) { inclusive = false }
+                            launchSingleTop = true
+                        }
+                    }
                 }
             )
         }
     ) {
-        BackHandler(enabled = navigator.canPop) {
-            navigator.pop()
+        // Intercept back button to close drawer first if it's open
+        BackHandler(enabled = drawerState.isOpen) {
+            scope.launch { drawerState.close() }
         }
 
         Box(
@@ -95,124 +126,41 @@ fun MainScreen(
                 .background(MaterialTheme.colorScheme.background)
         ) {
             // ── Content area ─────────────────────────────────
-            if (selectedScreen is Screen.EmailDetail) {
-                // EmailDetail renders directly without AnimatedContent,
-                // so no fade/slide/scale/alpha transform wraps the WebView.
-                EmailDetailScreen(
-                    emailId = (selectedScreen as Screen.EmailDetail).emailId,
-                    onBack = { navigator.pop() },
-                    onReply = { email -> navigator.openCompose(ComposeArgs.Reply(email)) },
-                    onForward = { email -> navigator.openCompose(ComposeArgs.Forward(email)) }
-                )
-            } else {
-                AnimatedContent(
-                    targetState = selectedScreen,
-                    transitionSpec = {
-                        when {
-                            targetState == Screen.Search -> {
-                                // Inbox → Search: Search slides up from below + fade in
-                                (slideInVertically(
-                                    animationSpec = spring(
-                                        dampingRatio = 0.55f,
-                                        stiffness = 280f
-                                    ),
-                                    initialOffsetY = { -it / 4 }
-                                ) + fadeIn(MotionTokens.searchExpand)).togetherWith(
-                                    fadeOut(MotionTokens.tweenShort()) + scaleOut(
-                                        targetScale = 0.95f,
-                                        animationSpec = MotionTokens.tweenShort()
-                                    )
-                                )
-                            }
-                            initialState == Screen.Search -> {
-                                // Search → Inbox: Search slides down + fade out
-                                (fadeIn(MotionTokens.tweenShort())).togetherWith(
-                                    slideOutVertically(
-                                        animationSpec = spring(
-                                            dampingRatio = 0.7f,
-                                            stiffness = 400f
-                                        ),
-                                        targetOffsetY = { -it / 4 }
-                                    ) + fadeOut(MotionTokens.searchCollapse)
-                                )
-                            }
-                            else -> {
-                                // Default: cross-fade
-                                fadeIn(spring(dampingRatio = 0.65f, stiffness = 350f)) togetherWith
-                                    fadeOut(spring(dampingRatio = 0.65f, stiffness = 350f))
-                            }
-                        }
-                    },
-                    modifier = Modifier.fillMaxSize(),
-                    label = "screenTransition"
-                ) { screen ->
-                    when (screen) {
-                        Screen.Inbox -> InboxScreen(
-                            listState = inboxListState,
-                            highlightedEmailId = navigator.highlightedEmailId,
-                            onClearHighlight = { navigator.clearHighlightedEmail() },
-                            onMenuClick = onMenuClick,
-                            onSearchClick = {
-                                searchEntryKey = System.currentTimeMillis()
-                                navigator.push(Screen.Search)
-                            },
-                            onEmailClick = { emailId ->
-                                navigator.push(Screen.EmailDetail(emailId))
-                            }
-                        )
-                        Screen.Trash -> TrashScreen(
-                            listState = trashListState,
-                            highlightedEmailId = navigator.highlightedEmailId,
-                            onClearHighlight = { navigator.clearHighlightedEmail() },
-                            onMenuClick = onMenuClick,
-                            onEmailClick = { emailId ->
-                                navigator.push(Screen.EmailDetail(emailId))
-                            }
-                        )
-                        Screen.Settings -> SettingsScreen(
-                            currentPalette = currentPalette,
-                            isDarkMode = isDarkMode,
-                            useCustomFont = useCustomFont,
-                            isAmoled = isAmoled,
-                            isSigningOut = isSigningOut,
-                            onPaletteChange = onPaletteChange,
-                            onDarkModeChange = onDarkModeChange,
-                            onUseCustomFontChange = onUseCustomFontChange,
-                            onAmoledChange = onAmoledChange,
-                            onSignOut = onSignOut,
-                            onBack = { navigator.pop() }
-                        )
-                        Screen.Search -> SearchScreen(
-                            listState = searchListState,
-                            entryKey = searchEntryKey,
-                            highlightedEmailId = navigator.highlightedEmailId,
-                            onClearHighlight = { navigator.clearHighlightedEmail() },
-                            onBack = { navigator.pop() },
-                            onEmailClick = { emailId ->
-                                navigator.push(Screen.EmailDetail(emailId))
-                            }
-                        )
-                        is Screen.EmailDetail -> {
-                            // Handled outside AnimatedContent — unreachable
-                        }
-                        is Screen.Compose -> ComposeScreen(
-                            args = screen.args,
-                            onClose = { navigator.pop() }
-                        )
-                    }
-                }
-            }
+            MainNavHost(
+                navController = navController,
+                inboxListState = inboxListState,
+                trashListState = trashListState,
+                searchListState = searchListState,
+                highlightedEmailId = highlightedEmailId,
+                onClearHighlight = { highlightedEmailId = null },
+                onCloseDetail = closeDetail,
+                onMenuClick = onMenuClick,
+                currentPalette = currentPalette,
+                isDarkMode = isDarkMode,
+                useCustomFont = useCustomFont,
+                isAmoled = isAmoled,
+                isSigningOut = isSigningOut,
+                onPaletteChange = onPaletteChange,
+                onDarkModeChange = onDarkModeChange,
+                onUseCustomFontChange = onUseCustomFontChange,
+                onAmoledChange = onAmoledChange,
+                onSignOut = onSignOut
+            )
 
-            // ── FAB "Redactar" (hidden on Search & Settings) ──────
+            // ── FAB "Redactar" (hidden on Search & Settings & Compose & Detail) ──────
+            val isFabVisible = currentRoute is MainRoute.Inbox || currentRoute is MainRoute.Trash
             AnimatedVisibility(
-                visible = selectedScreen == Screen.Inbox || selectedScreen == Screen.Trash,
+                visible = isFabVisible,
                 enter = fadeIn(MotionTokens.tweenShort()) + scaleIn(),
                 exit = fadeOut(MotionTokens.tweenShort()) + scaleOut(animationSpec = MotionTokens.tweenShort(), targetScale = 0.8f),
                 modifier = Modifier.align(Alignment.BottomEnd)
             ) {
                 ComposeFab(
-                    onClick = { navigator.openCompose(ComposeArgs.Write) },
+                    onClick = {
+                        navController.navigate(MainRoute.Compose(ComposeMode.WRITE))
+                    },
                     modifier = Modifier
+                        .testTag("fab_compose")
                         .padding(end = 20.dp, bottom = 24.dp)
                 )
             }

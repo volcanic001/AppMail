@@ -2,7 +2,9 @@ package com.david.mailapp.feature.compose
 
 import androidx.lifecycle.viewModelScope
 import com.david.mailapp.core.localization.StringProvider
+import com.david.mailapp.core.localization.UiErrorReason
 import com.david.mailapp.data.remote.provider.ReplyContext
+import com.david.mailapp.domain.model.Email
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -104,6 +106,7 @@ class ComposeSendContractsTest {
         val sentinel = CancellationException("sentinel-send")
         val fakeSource = object : ComposeEmailSource {
             override suspend fun getUserEmail(): String? = "test@example.com"
+            override suspend fun getEmailById(emailId: String): Email? = null
             override suspend fun sendEmail(
                 to: String, cc: String?, bcc: String?, subject: String, body: String, replyContext: ReplyContext?
             ) {
@@ -137,6 +140,7 @@ class ComposeSendContractsTest {
         val fakeSource = object : ComposeEmailSource {
             var sendCallCount = 0
             override suspend fun getUserEmail(): String? = "test@example.com"
+            override suspend fun getEmailById(emailId: String): Email? = null
             override suspend fun sendEmail(
                 to: String, cc: String?, bcc: String?, subject: String, body: String, replyContext: ReplyContext?
             ) {
@@ -212,6 +216,7 @@ class ComposeSendContractsTest {
         val fakeSource = object : ComposeEmailSource {
             var sendCallCount = 0
             override suspend fun getUserEmail(): String? = "test@example.com"
+            override suspend fun getEmailById(emailId: String): Email? = null
             override suspend fun sendEmail(
                 to: String, cc: String?, bcc: String?, subject: String, body: String, replyContext: ReplyContext?
             ) {
@@ -258,6 +263,183 @@ class ComposeSendContractsTest {
         assertFalse("isSending must be false", state.isSending)
     }
 
+    @Test
+    fun `reply empieza bloqueado y no permite onSend durante la carga`() = runTest(mainDispatcher) {
+        val originalEmail = Email(
+            id = "1", threadId = "t1", from = "from@test.com", fromInitials = "F",
+            to = "me@test.com", subject = "Subject", snippet = "", timestamp = 0L,
+            isRead = false, isStarred = false, hasAttachments = false, labels = emptyList(),
+            folder = com.david.mailapp.domain.model.EmailFolder.Inbox
+        )
+        val loadGate = CompletableDeferred<Email?>()
+        val source = object : ComposeEmailSource {
+            override suspend fun getUserEmail(): String = "me@test.com"
+            override suspend fun getEmailById(emailId: String): Email? = loadGate.await()
+            override suspend fun sendEmail(to: String, cc: String?, bcc: String?, subject: String, body: String, replyContext: ReplyContext?) {}
+        }
+
+        val viewModel = ComposeViewModel(
+            args = ComposeArgs.Reply("1"),
+            emailSource = source,
+            stringProvider = TestStringProvider()
+        )
+
+        // Verificamos que empieza bloqueado/cargando
+        assertTrue("Debe empezar cargando", viewModel.uiState.value.isLoadingOriginalEmail)
+        assertNull("No debe tener originalEmail cargado", viewModel.uiState.value.originalEmail)
+
+        // Llamar a onSend() durante la carga no debe hacer nada
+        viewModel.onToChanged("target@test.com")
+        viewModel.onSend()
+        testScheduler.runCurrent()
+        assertFalse("No debe estar enviando", viewModel.uiState.value.isSending)
+
+        // Completar la carga
+        loadGate.complete(originalEmail)
+        testScheduler.advanceUntilIdle()
+
+        // Verificar inicialización correcta tras carga exitosa
+        assertFalse("Debe terminar cargando", viewModel.uiState.value.isLoadingOriginalEmail)
+        assertEquals(originalEmail, viewModel.uiState.value.originalEmail)
+        assertEquals("from@test.com", viewModel.uiState.value.toField)
+        assertEquals("test_string", viewModel.uiState.value.subject)
+    }
+
+    @Test
+    fun `forward carga original conserva destinatario vacio y prepara asunto`() = runTest(mainDispatcher) {
+        val originalEmail = Email(
+            id = "forward-1", threadId = "thread-1", from = "from@test.com", fromInitials = "F",
+            to = "me@test.com", subject = "Subject", snippet = "Original", timestamp = 0L,
+            isRead = false, isStarred = false, hasAttachments = false, labels = emptyList(),
+            folder = com.david.mailapp.domain.model.EmailFolder.Inbox
+        )
+        val loadGate = CompletableDeferred<Email?>()
+        var sendCalls = 0
+        val source = object : ComposeEmailSource {
+            override suspend fun getUserEmail(): String = "me@test.com"
+            override suspend fun getEmailById(emailId: String): Email? = loadGate.await()
+            override suspend fun sendEmail(
+                to: String,
+                cc: String?,
+                bcc: String?,
+                subject: String,
+                body: String,
+                replyContext: ReplyContext?
+            ) {
+                sendCalls++
+            }
+        }
+
+        val viewModel = ComposeViewModel(
+            args = ComposeArgs.Forward(originalEmail.id),
+            emailSource = source,
+            stringProvider = TestStringProvider()
+        )
+
+        assertTrue("Forward debe empezar cargando", viewModel.uiState.value.isLoadingOriginalEmail)
+        viewModel.onToChanged("target@test.com")
+        viewModel.onSend()
+        testScheduler.runCurrent()
+        assertEquals("No debe enviar durante la carga", 0, sendCalls)
+
+        loadGate.complete(originalEmail)
+        testScheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertFalse("Forward debe terminar la carga", state.isLoadingOriginalEmail)
+        assertEquals(ComposeMode.FORWARD, state.composeMode)
+        assertEquals(originalEmail, state.originalEmail)
+        assertEquals("", state.toField)
+        assertEquals("test_string", state.subject)
+        assertNull(state.originalEmailError)
+    }
+
+    @Test
+    fun `original email nulo produce EMAIL_NOT_FOUND`() = runTest(mainDispatcher) {
+        val source = object : ComposeEmailSource {
+            override suspend fun getUserEmail(): String = "me@test.com"
+            override suspend fun getEmailById(emailId: String): Email? = null
+            override suspend fun sendEmail(to: String, cc: String?, bcc: String?, subject: String, body: String, replyContext: ReplyContext?) {}
+        }
+        val viewModel = ComposeViewModel(
+            args = ComposeArgs.Reply("1"),
+            emailSource = source,
+            stringProvider = TestStringProvider()
+        )
+        testScheduler.advanceUntilIdle()
+        assertEquals(UiErrorReason.EMAIL_NOT_FOUND, viewModel.uiState.value.originalEmailError)
+    }
+
+    @Test
+    fun `original email excepcion produce UNKNOWN`() = runTest(mainDispatcher) {
+        val source = object : ComposeEmailSource {
+            override suspend fun getUserEmail(): String = "me@test.com"
+            override suspend fun getEmailById(emailId: String): Email? = throw RuntimeException("Room error")
+            override suspend fun sendEmail(to: String, cc: String?, bcc: String?, subject: String, body: String, replyContext: ReplyContext?) {}
+        }
+        val viewModel = ComposeViewModel(
+            args = ComposeArgs.Reply("1"),
+            emailSource = source,
+            stringProvider = TestStringProvider()
+        )
+        testScheduler.advanceUntilIdle()
+        assertEquals(UiErrorReason.UNKNOWN, viewModel.uiState.value.originalEmailError)
+    }
+
+    @Test
+    fun `fuente de original que ignora cancelacion y responde tarde no actualiza estado`() = runTest(mainDispatcher) {
+        val originalEmail = Email(
+            id = "1", threadId = "t1", from = "from@test.com", fromInitials = "F",
+            to = "me@test.com", subject = "Subject", snippet = "", timestamp = 0L,
+            isRead = false, isStarred = false, hasAttachments = false, labels = emptyList(),
+            folder = com.david.mailapp.domain.model.EmailFolder.Inbox
+        )
+        val loadGate = CompletableDeferred<Email?>()
+        val loadStarted = CompletableDeferred<Unit>()
+        val cancellationObserved = CompletableDeferred<Unit>()
+        var sourceCompleted = false
+        val source = object : ComposeEmailSource {
+            override suspend fun getUserEmail(): String = "me@test.com"
+            override suspend fun getEmailById(emailId: String): Email? {
+                loadStarted.complete(Unit)
+                val result = try {
+                    loadGate.await()
+                } catch (e: CancellationException) {
+                    cancellationObserved.complete(Unit)
+                    withContext(NonCancellable) {
+                        loadGate.await()
+                    }
+                }
+                sourceCompleted = true
+                return result
+            }
+            override suspend fun sendEmail(to: String, cc: String?, bcc: String?, subject: String, body: String, replyContext: ReplyContext?) {}
+        }
+
+        val viewModel = ComposeViewModel(
+            args = ComposeArgs.Reply("1"),
+            emailSource = source,
+            stringProvider = TestStringProvider()
+        )
+
+        testScheduler.runCurrent()
+        loadStarted.await()
+
+        viewModel.viewModelScope.cancel()
+        testScheduler.runCurrent()
+
+        assertTrue("La fuente debe observar la cancelación", cancellationObserved.isCompleted)
+        assertFalse("La fuente debe seguir bloqueada", sourceCompleted)
+
+        loadGate.complete(originalEmail)
+        testScheduler.advanceUntilIdle()
+
+        assertTrue("La fuente no cooperativa debe haber retornado tarde", sourceCompleted)
+        assertNull("No debe haber guardado el email original", viewModel.uiState.value.originalEmail)
+        assertTrue("El estado de la instancia cerrada no debe publicarse como listo", viewModel.uiState.value.isLoadingOriginalEmail)
+        assertNull("La respuesta tardía no debe publicar error", viewModel.uiState.value.originalEmailError)
+    }
+
     private fun kotlinx.coroutines.test.TestCoroutineScheduler.advanceUntilLowerThan(limit: Long) {
         advanceTimeBy(limit)
         runCurrent()
@@ -274,6 +456,8 @@ class FakeComposeEmailSource(
         private set
 
     override suspend fun getUserEmail(): String? = emailResult
+
+    override suspend fun getEmailById(emailId: String): Email? = null
 
     override suspend fun sendEmail(
         to: String, cc: String?, bcc: String?,

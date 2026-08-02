@@ -7,12 +7,15 @@ import com.david.mailapp.core.auth.AuthManager
 import com.david.mailapp.core.localization.StringProvider
 import com.david.mailapp.data.remote.provider.ReplyContext
 import com.david.mailapp.data.repository.EmailRepository
+import com.david.mailapp.core.localization.UiErrorReason
+import com.david.mailapp.domain.model.Email
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class ComposeViewModel(
@@ -28,34 +31,62 @@ class ComposeViewModel(
     private var sendJob: Job? = null
 
     init {
-        // Set mode-dependent fields synchronously — no delay for UI.
-        _uiState.value = when (args) {
-            is ComposeArgs.Write -> ComposeUiState(
-                composeMode = ComposeMode.WRITE
-            )
-            is ComposeArgs.Reply -> {
-                val email = args.originalEmail
-                ComposeUiState(
-                    toField = ComposeFormatUtils.extractEmailAddress(email.from),
-                    subject = composeFormatUtils.buildReplySubject(email.subject),
-                    originalEmail = email,
-                    composeMode = ComposeMode.REPLY
-                )
-            }
-            is ComposeArgs.Forward -> {
-                val email = args.originalEmail
-                ComposeUiState(
-                    subject = composeFormatUtils.buildForwardSubject(email.subject),
-                    originalEmail = email,
-                    composeMode = ComposeMode.FORWARD
-                )
-            }
+        val initialMode = when (args) {
+            is ComposeArgs.Write -> ComposeMode.WRITE
+            is ComposeArgs.Reply -> ComposeMode.REPLY
+            is ComposeArgs.Forward -> ComposeMode.FORWARD
         }
 
-        // Only the sender address requires a suspend call — load it async.
+        _uiState.value = ComposeUiState(
+            composeMode = initialMode,
+            isLoadingOriginalEmail = initialMode != ComposeMode.WRITE
+        )
+
         viewModelScope.launch {
             val fromAddress = emailSource.getUserEmail().orEmpty()
             _uiState.value = _uiState.value.copy(fromAddress = fromAddress)
+        }
+
+        if (initialMode != ComposeMode.WRITE) {
+            viewModelScope.launch {
+                val originalEmailId = when (args) {
+                    is ComposeArgs.Reply -> args.originalEmailId
+                    is ComposeArgs.Forward -> args.originalEmailId
+                    else -> ""
+                }
+                try {
+                    val email = emailSource.getEmailById(originalEmailId)
+                    ensureActive()
+                    if (email == null) {
+                        _uiState.value = _uiState.value.copy(
+                            isLoadingOriginalEmail = false,
+                            originalEmailError = UiErrorReason.EMAIL_NOT_FOUND
+                        )
+                    } else {
+                        _uiState.value = _uiState.value.copy(
+                            isLoadingOriginalEmail = false,
+                            originalEmail = email,
+                            toField = if (initialMode == ComposeMode.REPLY) {
+                                ComposeFormatUtils.extractEmailAddress(email.from)
+                            } else {
+                                ""
+                            },
+                            subject = if (initialMode == ComposeMode.REPLY) {
+                                composeFormatUtils.buildReplySubject(email.subject)
+                            } else {
+                                composeFormatUtils.buildForwardSubject(email.subject)
+                            }
+                        )
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    _uiState.value = _uiState.value.copy(
+                        isLoadingOriginalEmail = false,
+                        originalEmailError = UiErrorReason.UNKNOWN
+                    )
+                }
+            }
         }
     }
 
@@ -87,6 +118,7 @@ class ComposeViewModel(
 
     fun onSend() {
         val state = _uiState.value
+        if (state.isLoadingOriginalEmail || state.originalEmailError != null) return
         if (state.toField.isBlank()) return
         if (sendJob?.isActive == true || state.isSending) return
 
@@ -169,6 +201,9 @@ class ComposeViewModel(
             if (modelClass.isAssignableFrom(ComposeViewModel::class.java)) {
                 val emailSource = object : ComposeEmailSource {
                     override suspend fun getUserEmail(): String? = repository.getUserEmail()
+                    override suspend fun getEmailById(emailId: String): Email? {
+                        return repository.getEmailById(emailId).first()
+                    }
                     override suspend fun sendEmail(
                         to: String, cc: String?, bcc: String?,
                         subject: String, body: String,

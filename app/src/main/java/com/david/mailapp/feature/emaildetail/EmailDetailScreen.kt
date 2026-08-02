@@ -121,21 +121,17 @@ import android.content.ActivityNotFoundException
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 
-import com.david.mailapp.ui.navigation.rememberDestinationViewModelStoreOwner
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EmailDetailScreen(
     emailId: String,
     onBack: () -> Unit,
-    onReply: (Email) -> Unit = {},
-    onForward: (Email) -> Unit = {},
+    onReply: (String) -> Unit = {},
+    onForward: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val repository = AppContainer.emailRepository
-    val owner = rememberDestinationViewModelStoreOwner()
     val viewModel: EmailDetailViewModel = viewModel(
-        viewModelStoreOwner = owner,
         key = emailId,
         factory = EmailDetailViewModel.Factory(emailId, repository)
     )
@@ -324,7 +320,7 @@ fun EmailDetailScreen(
                         ?: (uiState as? EmailDetailUiState.Ready)?.email
                     IconButton(
                         onClick = {
-                            currentEmail?.let { onReply(it) }
+                            currentEmail?.let { onReply(it.id) }
                         },
                         enabled = currentEmail != null
                     ) {
@@ -337,7 +333,7 @@ fun EmailDetailScreen(
                     }
                     IconButton(
                         onClick = {
-                            currentEmail?.let { onForward(it) }
+                            currentEmail?.let { onForward(it.id) }
                         },
                         enabled = currentEmail != null
                     ) {

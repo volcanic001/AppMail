@@ -2,8 +2,11 @@ package com.david.mailapp.feature.compose
 
 import com.david.mailapp.core.localization.UiErrorReason
 import com.david.mailapp.domain.model.Email
+import kotlinx.serialization.Serializable
 
+@Serializable
 enum class ComposeMode { WRITE, REPLY, FORWARD }
+
 
 sealed class SendResult {
     data object Success : SendResult()
@@ -32,5 +35,7 @@ data class ComposeUiState(
 
     // ── Contexto del email original (Reply / Forward) ────────
     val originalEmail: Email? = null,
-    val composeMode: ComposeMode = ComposeMode.WRITE
+    val composeMode: ComposeMode = ComposeMode.WRITE,
+    val isLoadingOriginalEmail: Boolean = false,
+    val originalEmailError: UiErrorReason? = null
 )

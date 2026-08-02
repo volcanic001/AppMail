@@ -28,7 +28,8 @@ fun ComposeTopBar(
     isSending: Boolean,
     onClose: () -> Unit,
     onSend: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    sendEnabled: Boolean = true
 ) {
     val titleRes = when (mode) {
         ComposeMode.WRITE -> R.string.compose_title_write
@@ -61,7 +62,7 @@ fun ComposeTopBar(
                     )
                 }
             } else {
-                IconButton(onClick = onSend) {
+                IconButton(onClick = onSend, enabled = sendEnabled) {
                     Icon(
                         Icons.AutoMirrored.Filled.Send,
                         contentDescription = stringResource(R.string.action_send)

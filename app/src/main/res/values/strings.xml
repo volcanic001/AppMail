@@ -209,6 +209,9 @@
     <!-- Resultado de envío -->
     <string name="compose_sent">Email enviado</string>
     <string name="compose_send_error">Error al enviar</string>
+    <string name="compose_error_email_not_found">El correo original no fue encontrado.</string>
+    <string name="compose_btn_go_back">Volver</string>
+    <string name="compose_loading_original">Cargando correo original…</string>
 
     <!-- Formatos de respuesta/reenvío -->
     <!-- Los prefijos Re: y Fwd: están en non_translatable.xml -->

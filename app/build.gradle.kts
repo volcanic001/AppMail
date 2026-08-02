@@ -145,4 +145,5 @@ dependencies {
     androidTestImplementation(libs.ktor.client.mock)
     androidTestImplementation(libs.room.testing)
     androidTestImplementation(libs.compose.ui.test.junit4)
+    androidTestImplementation(libs.navigation.testing)
 }

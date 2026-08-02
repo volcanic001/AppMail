@@ -8,15 +8,18 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import kotlinx.serialization.Serializable
 
 class DestinationLifecycleTest {
 
@@ -47,28 +50,34 @@ class DestinationLifecycleTest {
         }
     }
 
+    @Serializable
+    data object RouteA
+
+    @Serializable
+    data object RouteB
+
     @Test
-    fun destination_clears_viewmodel_when_removed_and_creates_new_one_on_remount() {
-        var showScreen by mutableStateOf(true)
+    fun destination_lifecycle_with_real_navigation() {
         var firstVm: TestLifecycleViewModel? = null
-        var secondVm: TestLifecycleViewModel? = null
+        var recomposeTrigger by mutableStateOf(0)
 
         composeRule.setContent {
-            if (showScreen) {
-                val owner = rememberDestinationViewModelStoreOwner()
-                val vm: TestLifecycleViewModel = viewModel(
-                    viewModelStoreOwner = owner,
-                    factory = object : ViewModelProvider.Factory {
-                        @Suppress("UNCHECKED_CAST")
-                        override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                            return TestLifecycleViewModel() as T
+            val navController = rememberNavController()
+            NavHost(navController = navController, startDestination = RouteA) {
+                composable<RouteA> {
+                    val trigger = recomposeTrigger
+                    val vm: TestLifecycleViewModel = viewModel(
+                        factory = object : ViewModelProvider.Factory {
+                            @Suppress("UNCHECKED_CAST")
+                            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                                return TestLifecycleViewModel() as T
+                            }
                         }
-                    }
-                )
-                if (firstVm == null) {
+                    )
                     firstVm = vm
-                } else {
-                    secondVm = vm
+                }
+                composable<RouteB> {
+                    // Route B
                 }
             }
         }
@@ -78,21 +87,111 @@ class DestinationLifecycleTest {
         assertTrue("ViewModel should be initialized", vm1 != null)
         assertTrue("Job should be active", vm1!!.testJob.isActive)
 
-        // Retire from composition
-        showScreen = false
+        // Trigger recomposition
+        recomposeTrigger++
+        composeRule.waitForIdle()
+        val vm1AfterRecompose = firstVm
+        assertTrue("ViewModel instance should be preserved after recomposition", vm1 === vm1AfterRecompose)
+        assertTrue("Job should remain active after recomposition", vm1.testJob.isActive)
+        assertTrue("ViewModel should not be cleared on recomposition", !vm1.isCleared)
+    }
+
+    @Test
+    fun navigate_away_to_overlay_retains_viewmodel() {
+        var firstVm: TestLifecycleViewModel? = null
+        lateinit var localNavController: androidx.navigation.NavHostController
+
+        composeRule.setContent {
+            localNavController = rememberNavController()
+            NavHost(navController = localNavController, startDestination = RouteA) {
+                composable<RouteA> {
+                    val vm: TestLifecycleViewModel = viewModel(
+                        factory = object : ViewModelProvider.Factory {
+                            @Suppress("UNCHECKED_CAST")
+                            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                                return TestLifecycleViewModel() as T
+                            }
+                        }
+                    )
+                    firstVm = vm
+                }
+                composable<RouteB> {
+                    // overlay/detail screen
+                }
+            }
+        }
+
+        composeRule.waitForIdle()
+        val vm1 = firstVm
+        assertTrue("ViewModel should be initialized", vm1 != null)
+        assertTrue("Job should be active", vm1!!.testJob.isActive)
+
+        // Navigate from RouteA to RouteB (retains RouteA in backstack)
+        composeRule.runOnUiThread {
+            localNavController.navigate(RouteB)
+        }
         composeRule.waitForIdle()
 
-        assertTrue("ViewModel should be cleared", vm1.isCleared)
-        assertEquals("Should be cleared exactly once", 1, vm1.clearCount)
-        assertTrue("Job should be cancelled", vm1.testJob.isCancelled)
+        // Verify vm1 is NOT cleared
+        assertTrue("ViewModel should NOT be cleared when covered by another screen", !vm1.isCleared)
+        assertTrue("Job should still be active", vm1.testJob.isActive)
 
-        // Mount again
-        showScreen = true
+        // Now pop back to RouteA
+        composeRule.runOnUiThread {
+            localNavController.popBackStack()
+        }
         composeRule.waitForIdle()
 
-        val vm2 = secondVm
-        assertTrue("Second ViewModel should be initialized", vm2 != null)
-        assertNotSame("Should be a fresh instance", vm1, vm2)
-        assertTrue("New job should be active", vm2!!.testJob.isActive)
+        // Verify vm1 is still not cleared
+        assertTrue("ViewModel should NOT be cleared after returning to it", !vm1.isCleared)
+    }
+
+    @Test
+    fun pop_definitively_clears_viewmodel_exactly_once() {
+        var bVm: TestLifecycleViewModel? = null
+        lateinit var localNavController: androidx.navigation.NavHostController
+
+        composeRule.setContent {
+            localNavController = rememberNavController()
+            NavHost(navController = localNavController, startDestination = RouteA) {
+                composable<RouteA> {
+                    // root
+                }
+                composable<RouteB> {
+                    val vm: TestLifecycleViewModel = viewModel(
+                        factory = object : ViewModelProvider.Factory {
+                            @Suppress("UNCHECKED_CAST")
+                            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                                return TestLifecycleViewModel() as T
+                            }
+                        }
+                    )
+                    bVm = vm
+                }
+            }
+        }
+
+        composeRule.waitForIdle()
+
+        // Navigate to RouteB
+        composeRule.runOnUiThread {
+            localNavController.navigate(RouteB)
+        }
+        composeRule.waitForIdle()
+
+        val vmB = bVm
+        assertTrue("RouteB ViewModel should be initialized", vmB != null)
+        assertTrue("Job should be active", vmB!!.testJob.isActive)
+
+        // Pop back to RouteA (definitively removes RouteB)
+        composeRule.runOnUiThread {
+            localNavController.popBackStack()
+        }
+        composeRule.waitForIdle()
+
+        // Verify vmB is cleared
+        assertTrue("ViewModel should be cleared when popped definitively", vmB.isCleared)
+        assertEquals("Should be cleared exactly once", 1, vmB.clearCount)
+        assertTrue("Job should be cancelled", vmB.testJob.isCancelled)
     }
 }
