@@ -5,8 +5,11 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.createSavedStateHandle
+import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.lifecycle.viewModelScope
 import com.david.mailapp.core.localization.toUiErrorReason
 import com.david.mailapp.core.session.SessionWriteGuard
@@ -32,17 +35,21 @@ fun interface SearchEmailSource {
 class SearchViewModel(
     private val source: SearchEmailSource,
     private val historyStore: DataStore<Preferences>,
-    private val writeGuard: SessionWriteGuard
+    private val writeGuard: SessionWriteGuard,
+    private val savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
     companion object {
         private val HISTORY_KEY = stringPreferencesKey("search_history")
+        internal const val KEY_QUERY = "search_query"
         private const val TAG = "SearchVM"
     }
 
     // ── Query ──────────────────────────────────────────────────
 
-    private val _queryFlow = MutableStateFlow("")
+    private val _queryFlow = MutableStateFlow(
+        savedStateHandle.get<String>(KEY_QUERY) ?: ""
+    )
 
     /** The current search query text. */
     val query: StateFlow<String> = _queryFlow.asStateFlow()
@@ -69,6 +76,23 @@ class SearchViewModel(
     private var searchJob: Job? = null
     private var paginationJob: Job? = null
     private var currentGeneration = 0L
+
+    // ── Restoration ────────────────────────────────────────────
+
+    init {
+        val restoredQuery = _queryFlow.value
+        if (restoredQuery.length >= 2) {
+            val myGen = ++currentGeneration
+            _uiState.value = SearchUiState.Loading
+            searchJob = viewModelScope.launch {
+                try {
+                    performSearch(restoredQuery, myGen)
+                } catch (e: CancellationException) {
+                    throw e
+                }
+            }
+        }
+    }
 
     private suspend fun performSearch(query: String, myGen: Long) {
         val lease = writeGuard.capture()
@@ -128,6 +152,7 @@ class SearchViewModel(
     fun onQueryChange(newQuery: String) {
         if (newQuery == _queryFlow.value) return
         _queryFlow.value = newQuery
+        savedStateHandle[KEY_QUERY] = newQuery
 
         val myGen = ++currentGeneration
         searchJob?.cancel()
@@ -264,14 +289,16 @@ class SearchViewModel(
         private val writeGuard: SessionWriteGuard
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
-        override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
             if (modelClass.isAssignableFrom(SearchViewModel::class.java)) {
+                val handle = extras.createSavedStateHandle()
                 return SearchViewModel(
                     source = SearchEmailSource { query, pageToken ->
                         repository.searchEmails(query, pageToken)
                     },
                     historyStore = historyStore,
-                    writeGuard = writeGuard
+                    writeGuard = writeGuard,
+                    savedStateHandle = handle
                 ) as T
             }
             throw IllegalArgumentException("Unknown ViewModel: ${modelClass.name}")

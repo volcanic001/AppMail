@@ -3,6 +3,7 @@ package com.david.mailapp.feature.search
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
+import androidx.lifecycle.SavedStateHandle
 import com.david.mailapp.domain.model.Email
 import com.david.mailapp.domain.model.EmailFolder
 import com.david.mailapp.domain.model.PaginatedResult
@@ -66,7 +67,7 @@ class SearchCoordinationContractsTest {
         val aPage2Entry = fakeSource.addResults("query-A", "A_page2", PaginatedResult(aPage2, null), gate = aPage2Gate, ignoreCancellation = true)
         fakeSource.addResults("query-B", null, PaginatedResult(bPage1, "B_page2"))
 
-        val viewModel = SearchViewModel(fakeSource, historyStore, FakeSessionWriteGuard()).also { activeViewModel = it }
+        val viewModel = SearchViewModel(fakeSource, historyStore, FakeSessionWriteGuard(), SavedStateHandle()).also { activeViewModel = it }
 
         viewModel.onQueryChange("query-A")
         testScheduler.advanceUntilIdle()
@@ -100,7 +101,7 @@ class SearchCoordinationContractsTest {
         fakeSource.addResults("query-B", null, PaginatedResult(bPage1, "B_page2"))
         fakeSource.addResults("query-B", "B_page2", PaginatedResult(bPage2, null))
 
-        val viewModel = SearchViewModel(fakeSource, historyStore, FakeSessionWriteGuard()).also { activeViewModel = it }
+        val viewModel = SearchViewModel(fakeSource, historyStore, FakeSessionWriteGuard(), SavedStateHandle()).also { activeViewModel = it }
         viewModel.onQueryChange("query-B")
         testScheduler.advanceUntilIdle()
 
@@ -126,7 +127,7 @@ class SearchCoordinationContractsTest {
         val aPage2Entry = fakeSource.addResults("query-A", "A_page2", PaginatedResult(aPage2, null), gate = aPage2Gate, ignoreCancellation = false)
         fakeSource.addResults("query-B", null, PaginatedResult(listOf(testEmail(id = "b_1")), null))
 
-        val viewModel = SearchViewModel(fakeSource, historyStore, FakeSessionWriteGuard()).also { activeViewModel = it }
+        val viewModel = SearchViewModel(fakeSource, historyStore, FakeSessionWriteGuard(), SavedStateHandle()).also { activeViewModel = it }
 
         viewModel.onQueryChange("query-A")
         testScheduler.advanceUntilIdle()

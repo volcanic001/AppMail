@@ -83,6 +83,7 @@ dependencies {
     // Lifecycle
     implementation(libs.lifecycle.runtime)
     implementation(libs.lifecycle.viewmodel)
+    implementation(libs.lifecycle.viewmodel.savedstate)
 
     // Room
     implementation(libs.room.runtime)

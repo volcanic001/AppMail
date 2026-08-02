@@ -3,6 +3,7 @@ package com.david.mailapp.feature.search
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.lifecycle.SavedStateHandle
 import com.david.mailapp.core.localization.UiErrorReason
 import com.david.mailapp.core.session.SessionWriteGuard
 import com.david.mailapp.core.session.SessionWriteLease
@@ -71,12 +72,14 @@ class SearchViewModelTest {
 
     private fun createViewModel(
         source: SearchEmailSource,
-        writeGuard: SessionWriteGuard = FakeWriteGuard()
+        writeGuard: SessionWriteGuard = FakeWriteGuard(),
+        savedStateHandle: SavedStateHandle = SavedStateHandle()
     ): SearchViewModel {
         return SearchViewModel(
             source = source,
             historyStore = testStore,
-            writeGuard = writeGuard
+            writeGuard = writeGuard,
+            savedStateHandle = savedStateHandle
         ).also { activeViewModel = it }
     }
 
@@ -593,5 +596,222 @@ class SearchViewModelTest {
 
         val state = vm.uiState.value as SearchUiState.Results
         assertEquals(listOf("1", "2"), state.emails.map { it.id })
+    }
+
+    // ── 4.4A Restoration tests ───────────────────
+
+    @Test
+    fun `cada cambio persiste inmediatamente la consulta en SavedStateHandle`() = testScope.runTest {
+        val handle = SavedStateHandle()
+        val vm = createViewModel(
+            source = SearchEmailSource { _, _ -> PaginatedResult(listOf(email("1")), null) },
+            savedStateHandle = handle
+        )
+
+        vm.onQueryChange("hello")
+        assertEquals("hello", handle.get<String>(SearchViewModel.KEY_QUERY))
+
+        vm.onQueryChange("world")
+        assertEquals("world", handle.get<String>(SearchViewModel.KEY_QUERY))
+    }
+
+    @Test
+    fun `ViewModel reconstruido conserva exactamente la consulta`() = testScope.runTest {
+        val handle = SavedStateHandle()
+        handle[SearchViewModel.KEY_QUERY] = "saved-query"
+
+        val vm = createViewModel(
+            source = SearchEmailSource { _, _ -> PaginatedResult(listOf(email("1")), null) },
+            savedStateHandle = handle
+        )
+
+        assertEquals("saved-query", vm.query.value)
+    }
+
+    @Test
+    fun `consulta valida restaurada realiza una sola peticion inicial con token nulo`() = testScope.runTest {
+        var callCount = 0
+        var receivedToken: String? = "NOT_CALLED"
+        val handle = SavedStateHandle()
+        handle[SearchViewModel.KEY_QUERY] = "restored"
+
+        val vm = createViewModel(
+            source = SearchEmailSource { _, pageToken ->
+                callCount++
+                receivedToken = pageToken
+                PaginatedResult(listOf(email("1")), "new-token")
+            },
+            savedStateHandle = handle
+        )
+
+        advanceUntilIdle()
+
+        assertEquals(1, callCount)
+        assertEquals(null, receivedToken)
+
+        val state = vm.uiState.value
+        assertTrue("Expected Results, got ${state::class.simpleName}", state is SearchUiState.Results)
+        val results = state as SearchUiState.Results
+        assertEquals("restored", results.query)
+        assertEquals("new-token", results.nextPageToken)
+    }
+
+    @Test
+    fun `consulta restaurada corta no ejecuta busquedas`() = testScope.runTest {
+        var callCount = 0
+        val handle = SavedStateHandle()
+        handle[SearchViewModel.KEY_QUERY] = "a"
+
+        val vm = createViewModel(
+            source = SearchEmailSource { _, _ ->
+                callCount++
+                PaginatedResult(listOf(email("1")), null)
+            },
+            savedStateHandle = handle
+        )
+
+        assertEquals(0, callCount)
+        assertTrue(vm.uiState.value is SearchUiState.Idle)
+        assertEquals("a", vm.query.value)
+    }
+
+    @Test
+    fun `resultados errores y tokens anteriores no se restauran`() = testScope.runTest {
+        var callCount = 0
+        val handle = SavedStateHandle()
+        handle[SearchViewModel.KEY_QUERY] = "fresh-search"
+
+        val vm = createViewModel(
+            source = SearchEmailSource { _, _ ->
+                callCount++
+                if (callCount == 1) throw java.io.IOException("first fail")
+                PaginatedResult(listOf(email("1")), "page-2")
+            },
+            savedStateHandle = handle
+        )
+
+        advanceUntilIdle()
+
+        // First attempt failed — should be in Error, with no stale results or token
+        val errorState = vm.uiState.value
+        assertTrue("Expected Error, got ${errorState::class.simpleName}", errorState is SearchUiState.Error)
+
+        // Reconstruct with same handle: should re-execute from scratch
+        activeViewModel?.viewModelScope?.cancel()
+        var secondVmCallCount = 0
+        var secondVmToken: String? = "NOT_CALLED"
+        val vm2 = createViewModel(
+            source = SearchEmailSource { _, pageToken ->
+                secondVmCallCount++
+                secondVmToken = pageToken
+                PaginatedResult(listOf(email("r1")), "restored-token")
+            },
+            savedStateHandle = handle
+        )
+
+        advanceUntilIdle()
+
+        assertEquals(1, secondVmCallCount)
+        assertEquals(null, secondVmToken)
+        val restoredState = vm2.uiState.value as SearchUiState.Results
+        assertEquals("restored-token", restoredState.nextPageToken)
+        assertEquals(listOf("r1"), restoredState.emails.map { it.id })
+    }
+
+    @Test
+    fun `nueva primera pagina establece su propio token`() = testScope.runTest {
+        val handle = SavedStateHandle()
+        handle[SearchViewModel.KEY_QUERY] = "token-test"
+
+        val vm = createViewModel(
+            source = SearchEmailSource { _, _ ->
+                PaginatedResult(listOf(email("t1")), "fresh-page-token")
+            },
+            savedStateHandle = handle
+        )
+
+        advanceUntilIdle()
+
+        val state = vm.uiState.value as SearchUiState.Results
+        assertEquals("fresh-page-token", state.nextPageToken)
+    }
+
+    @Test
+    fun `cambiar consulta restaurada mantiene garantias de cancelacion de Fase 3_3`() = testScope.runTest {
+        val gate = CompletableDeferred<Unit>()
+        var callCount = 0
+        val handle = SavedStateHandle()
+        handle[SearchViewModel.KEY_QUERY] = "restored-query"
+
+        val vm = createViewModel(
+            source = SearchEmailSource { query, _ ->
+                callCount++
+                if (query == "restored-query") {
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                        gate.await()
+                        PaginatedResult(listOf(email("old")), "old-token")
+                    }
+                } else {
+                    PaginatedResult(listOf(email("new")), "new-token")
+                }
+            },
+            savedStateHandle = handle
+        )
+
+        // First search from restoration should be in-flight (blocked on gate)
+        testScheduler.runCurrent()
+
+        // Change query before restored search completes
+        vm.onQueryChange("changed-query")
+        advanceUntilIdle()
+
+        val state = vm.uiState.value as SearchUiState.Results
+        assertEquals("changed-query", state.query)
+        assertEquals(listOf("new"), state.emails.map { it.id })
+        assertEquals("new-token", state.nextPageToken)
+
+        // Complete old search — must not affect state
+        gate.complete(Unit)
+        advanceUntilIdle()
+
+        val finalState = vm.uiState.value as SearchUiState.Results
+        assertEquals("changed-query", finalState.query)
+        assertEquals(listOf("new"), finalState.emails.map { it.id })
+    }
+
+    @Test
+    fun `limpiar consulta restaurada mantiene garantias de cancelacion de Fase 3_3`() = testScope.runTest {
+        val gate = CompletableDeferred<Unit>()
+        var callCount = 0
+        val handle = SavedStateHandle()
+        handle[SearchViewModel.KEY_QUERY] = "clear-me"
+
+        val vm = createViewModel(
+            source = SearchEmailSource { query, _ ->
+                callCount++
+                kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                    gate.await()
+                    PaginatedResult(listOf(email("stale")), "stale-token")
+                }
+            },
+            savedStateHandle = handle
+        )
+
+        // Restoration search in-flight
+        testScheduler.runCurrent()
+
+        // Clear query before it completes
+        vm.clearQuery()
+        advanceUntilIdle()
+
+        assertTrue(vm.uiState.value is SearchUiState.Idle)
+
+        // Complete stale search
+        gate.complete(Unit)
+        advanceUntilIdle()
+
+        // Must remain Idle
+        assertTrue(vm.uiState.value is SearchUiState.Idle)
+        assertEquals("", vm.query.value)
     }
 }
