@@ -1,5 +1,6 @@
 package com.david.mailapp.feature.emaildetail
 
+import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
@@ -121,6 +122,8 @@ import android.content.ActivityNotFoundException
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 
+private const val TAG = "EmailDetailScreen"
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EmailDetailScreen(
@@ -214,7 +217,9 @@ fun EmailDetailScreen(
                 // Try to clean up partial document
                 try {
                     screenContext.contentResolver.delete(uri, null, null)
-                } catch (_: Exception) { /* best-effort */ }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to delete partial SAF document", e)
+                }
                 snackbarHostState.showSnackbar(
                     message = pdfLabels.saveFailed
                 )

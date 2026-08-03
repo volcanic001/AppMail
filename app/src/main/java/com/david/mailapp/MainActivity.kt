@@ -16,8 +16,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.lifecycleScope
+import com.david.mailapp.core.auth.OAuthLaunchPreflightResult
 import com.david.mailapp.core.auth.OAuthLaunchResult
 import com.david.mailapp.core.auth.OAuthRedirectResult
+import com.david.mailapp.core.auth.runOAuthLaunchPreflight
 import com.david.mailapp.core.di.AppContainer
 import com.david.mailapp.core.localization.UiErrorReason
 import com.david.mailapp.core.localization.UiText
@@ -192,20 +194,20 @@ class MainActivity : ComponentActivity() {
         oauthBrowserWasLeft = false
 
         lifecycleScope.launch {
-            try {
-                if (AppContainer.authManager.isPendingPdfCleanup()) {
-                    val pdfResult = withContext(Dispatchers.IO) { AppContainer.pdfCacheManager.clearAll() }
-                    if (pdfResult is com.david.mailapp.data.pdf.PdfCacheClearResult.Failure) {
-                        resetOAuthUiState()
-                        showToast(UiErrorReason.TEMP_CLEANUP_FAILED.toUiText())
-                        return@launch
-                    }
-                    AppContainer.authManager.setPendingPdfCleanup(false)
+            val preflight = runOAuthLaunchPreflight(
+                isPendingPdfCleanup = { AppContainer.authManager.isPendingPdfCleanup() },
+                clearPdfCache = { withContext(Dispatchers.IO) { AppContainer.pdfCacheManager.clearAll() } },
+                markPdfCleanupCompleted = { AppContainer.authManager.setPendingPdfCleanup(false) }
+            )
+            when (preflight) {
+                is OAuthLaunchPreflightResult.Failed -> {
+                    resetOAuthUiState()
+                    showToast(preflight.reason.toUiText())
+                    return@launch
                 }
-            } catch (_: Exception) {
-                resetOAuthUiState()
-                showToast(UiErrorReason.LOCAL_CLEANUP_CHECK_FAILED.toUiText())
-                return@launch
+                is OAuthLaunchPreflightResult.Ready -> {
+                    // continue to OAuth launch below
+                }
             }
 
             when (val result = AppContainer.authClient.launchAuth(this@MainActivity)) {

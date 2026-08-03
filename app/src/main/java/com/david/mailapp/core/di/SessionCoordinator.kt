@@ -1,5 +1,6 @@
 package com.david.mailapp.core.di
 
+import android.util.Log
 import com.david.mailapp.core.auth.OAuthRevocationService
 import com.david.mailapp.core.localization.UiErrorReason
 import com.david.mailapp.core.session.SessionWriteGuard
@@ -42,6 +43,7 @@ class SessionCoordinator internal constructor(
     private var credentialsCommitted = false
 
     private companion object {
+        private const val TAG = "SessionCoordinator"
         private const val DEFAULT_REVOCATION_TIMEOUT_MS = 3_000L
     }
 
@@ -196,7 +198,9 @@ class SessionCoordinator internal constructor(
                     pdfCleanupSucceeded = result is PdfCacheClearResult.Success
                 } catch (e: kotlinx.coroutines.CancellationException) {
                     throw e
-                } catch (_: Exception) {}
+                } catch (e: Exception) {
+                    Log.w(TAG, "PDF cleanup failed during invalidation", e)
+                }
 
                 if (pdfCleanupSucceeded) {
                     withContext(NonCancellable) {

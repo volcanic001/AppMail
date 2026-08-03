@@ -182,12 +182,8 @@ class GmailAuthClient(
                 }
 
                 // 7. Exchange code for tokens
-                return try {
+                return runOAuthTokenExchange {
                     exchangeCodeForTokens(authCode = codeParams[0], codeVerifier = sessionResult.session.codeVerifier)
-                    OAuthRedirectResult.Success
-                } catch (e: Exception) {
-                    Log.w(TAG, "token exchange failed: ${e::class.simpleName}")
-                    OAuthRedirectResult.TokenExchangeFailed
                 }
             }
         }

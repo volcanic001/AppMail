@@ -2,6 +2,7 @@ package com.david.mailapp.feature.emaildetail.components
 
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
+import android.util.Log
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.WebChromeClient
@@ -566,6 +567,10 @@ private class CustomTabsWebViewClient(
     private val loadKey: String,
     private val onPageReady: () -> Unit
 ) : WebViewClient() {
+    companion object {
+        private const val TAG = "CustomTabsWebViewClient"
+    }
+
     override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
         super.onPageStarted(view, url, favicon)
         EmailRenderTrace.d(traceMail, "WV", "WV_PAGE_STARTED", "loadKey=$loadKey")
@@ -606,7 +611,9 @@ private class CustomTabsWebViewClient(
                 .setShowTitle(true)
                 .build()
                 .launchUrl(ctx, android.net.Uri.parse(url))
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to open link via modern WebView API", e)
+        }
         return true
     }
 
@@ -618,7 +625,9 @@ private class CustomTabsWebViewClient(
                 .setShowTitle(true)
                 .build()
                 .launchUrl(ctx, android.net.Uri.parse(safeUrl))
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to open link via legacy WebView API", e)
+        }
         return true
     }
 }
