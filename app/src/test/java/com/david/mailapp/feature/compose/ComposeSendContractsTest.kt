@@ -1,5 +1,6 @@
 package com.david.mailapp.feature.compose
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.david.mailapp.core.localization.StringProvider
 import com.david.mailapp.core.localization.UiErrorReason
@@ -50,7 +51,8 @@ class ComposeSendContractsTest {
         val viewModel = ComposeViewModel(
             args = ComposeArgs.Write,
             emailSource = fakeSource,
-            stringProvider = TestStringProvider()
+            stringProvider = TestStringProvider(),
+            savedStateHandle = SavedStateHandle()
         )
 
         viewModel.onToChanged("to@test.com")
@@ -81,7 +83,8 @@ class ComposeSendContractsTest {
         val viewModel = ComposeViewModel(
             args = ComposeArgs.Write,
             emailSource = fakeSource,
-            stringProvider = TestStringProvider()
+            stringProvider = TestStringProvider(),
+            savedStateHandle = SavedStateHandle()
         )
 
         viewModel.onToChanged("to@test.com")
@@ -117,7 +120,8 @@ class ComposeSendContractsTest {
         val viewModel = ComposeViewModel(
             args = ComposeArgs.Write,
             emailSource = fakeSource,
-            stringProvider = TestStringProvider()
+            stringProvider = TestStringProvider(),
+            savedStateHandle = SavedStateHandle()
         )
 
         viewModel.onToChanged("to@test.com")
@@ -154,7 +158,8 @@ class ComposeSendContractsTest {
         val viewModel = ComposeViewModel(
             args = ComposeArgs.Write,
             emailSource = fakeSource,
-            stringProvider = TestStringProvider()
+            stringProvider = TestStringProvider(),
+            savedStateHandle = SavedStateHandle()
         )
 
         viewModel.onToChanged("to@test.com")
@@ -188,7 +193,8 @@ class ComposeSendContractsTest {
         val viewModel = ComposeViewModel(
             args = ComposeArgs.Write,
             emailSource = fakeSource,
-            stringProvider = TestStringProvider()
+            stringProvider = TestStringProvider(),
+            savedStateHandle = SavedStateHandle()
         )
 
         viewModel.onToChanged("to@test.com")
@@ -237,7 +243,8 @@ class ComposeSendContractsTest {
         val viewModel = ComposeViewModel(
             args = ComposeArgs.Write,
             emailSource = fakeSource,
-            stringProvider = TestStringProvider()
+            stringProvider = TestStringProvider(),
+            savedStateHandle = SavedStateHandle()
         )
 
         viewModel.onToChanged("to@test.com")
@@ -281,7 +288,8 @@ class ComposeSendContractsTest {
         val viewModel = ComposeViewModel(
             args = ComposeArgs.Reply("1"),
             emailSource = source,
-            stringProvider = TestStringProvider()
+            stringProvider = TestStringProvider(),
+            savedStateHandle = SavedStateHandle()
         )
 
         // Verificamos que empieza bloqueado/cargando
@@ -301,7 +309,8 @@ class ComposeSendContractsTest {
         // Verificar inicialización correcta tras carga exitosa
         assertFalse("Debe terminar cargando", viewModel.uiState.value.isLoadingOriginalEmail)
         assertEquals(originalEmail, viewModel.uiState.value.originalEmail)
-        assertEquals("from@test.com", viewModel.uiState.value.toField)
+        // onToChanged persists value — auto-fill skipped, user edit preserved
+        assertEquals("target@test.com", viewModel.uiState.value.toField)
         assertEquals("test_string", viewModel.uiState.value.subject)
     }
 
@@ -333,7 +342,8 @@ class ComposeSendContractsTest {
         val viewModel = ComposeViewModel(
             args = ComposeArgs.Forward(originalEmail.id),
             emailSource = source,
-            stringProvider = TestStringProvider()
+            stringProvider = TestStringProvider(),
+            savedStateHandle = SavedStateHandle()
         )
 
         assertTrue("Forward debe empezar cargando", viewModel.uiState.value.isLoadingOriginalEmail)
@@ -349,7 +359,8 @@ class ComposeSendContractsTest {
         assertFalse("Forward debe terminar la carga", state.isLoadingOriginalEmail)
         assertEquals(ComposeMode.FORWARD, state.composeMode)
         assertEquals(originalEmail, state.originalEmail)
-        assertEquals("", state.toField)
+        // onToChanged persists value — preserved after load, not overridden
+        assertEquals("target@test.com", state.toField)
         assertEquals("test_string", state.subject)
         assertNull(state.originalEmailError)
     }
@@ -364,7 +375,8 @@ class ComposeSendContractsTest {
         val viewModel = ComposeViewModel(
             args = ComposeArgs.Reply("1"),
             emailSource = source,
-            stringProvider = TestStringProvider()
+            stringProvider = TestStringProvider(),
+            savedStateHandle = SavedStateHandle()
         )
         testScheduler.advanceUntilIdle()
         assertEquals(UiErrorReason.EMAIL_NOT_FOUND, viewModel.uiState.value.originalEmailError)
@@ -380,7 +392,8 @@ class ComposeSendContractsTest {
         val viewModel = ComposeViewModel(
             args = ComposeArgs.Reply("1"),
             emailSource = source,
-            stringProvider = TestStringProvider()
+            stringProvider = TestStringProvider(),
+            savedStateHandle = SavedStateHandle()
         )
         testScheduler.advanceUntilIdle()
         assertEquals(UiErrorReason.UNKNOWN, viewModel.uiState.value.originalEmailError)
@@ -419,7 +432,8 @@ class ComposeSendContractsTest {
         val viewModel = ComposeViewModel(
             args = ComposeArgs.Reply("1"),
             emailSource = source,
-            stringProvider = TestStringProvider()
+            stringProvider = TestStringProvider(),
+            savedStateHandle = SavedStateHandle()
         )
 
         testScheduler.runCurrent()
@@ -443,6 +457,418 @@ class ComposeSendContractsTest {
     private fun kotlinx.coroutines.test.TestCoroutineScheduler.advanceUntilLowerThan(limit: Long) {
         advanceTimeBy(limit)
         runCurrent()
+    }
+}
+
+// ── 4.4B Restoration tests ──────────────────────
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class ComposeRestorationTest {
+
+    private val mainDispatcher = StandardTestDispatcher()
+
+    @Before
+    fun setUp() {
+        Dispatchers.setMain(mainDispatcher)
+    }
+
+    @After
+    fun tearDown() {
+        Dispatchers.resetMain()
+    }
+
+    private fun email(id: String, from: String = "from@test.com", subject: String = "Subject") = Email(
+        id = id, threadId = "t1", from = from, fromInitials = "F",
+        to = "me@test.com", subject = subject, snippet = "", timestamp = 0L,
+        isRead = false, isStarred = false, hasAttachments = false, labels = emptyList(),
+        folder = com.david.mailapp.domain.model.EmailFolder.Inbox
+    )
+
+    private fun replySource(gate: CompletableDeferred<Email?>) = object : ComposeEmailSource {
+        override suspend fun getUserEmail(): String = "me@test.com"
+        override suspend fun getEmailById(emailId: String): Email? = gate.await()
+        override suspend fun sendEmail(to: String, cc: String?, bcc: String?, subject: String, body: String, replyContext: ReplyContext?) {}
+    }
+
+    // ── Mode persistence ──────────────────────────
+
+    @Test
+    fun `WRITE mode se persiste y reconstruye`() = runTest(mainDispatcher) {
+        val handle = SavedStateHandle()
+        val source = object : ComposeEmailSource {
+            override suspend fun getUserEmail(): String? = "me@test.com"
+            override suspend fun getEmailById(emailId: String): Email? = null
+            override suspend fun sendEmail(to: String, cc: String?, bcc: String?, subject: String, body: String, replyContext: ReplyContext?) {}
+        }
+        ComposeViewModel(ComposeArgs.Write, source, TestStringProvider(), handle)
+        testScheduler.advanceUntilIdle()
+        assertEquals("WRITE", handle.get<String>(ComposeViewModel.KEY_MODE))
+    }
+
+    @Test
+    fun `REPLY mode e ID se persisten y reconstruyen`() = runTest(mainDispatcher) {
+        val original = email("reply-123")
+        val loadGate = CompletableDeferred<Email?>()
+        val handle = SavedStateHandle()
+
+        ComposeViewModel(ComposeArgs.Reply("reply-123"), replySource(loadGate), TestStringProvider(), handle)
+        loadGate.complete(original)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals("REPLY", handle.get<String>(ComposeViewModel.KEY_MODE))
+        assertEquals("reply-123", handle.get<String>(ComposeViewModel.KEY_ORIGINAL_EMAIL_ID))
+    }
+
+    @Test
+    fun `FORWARD mode e ID se persisten y reconstruyen`() = runTest(mainDispatcher) {
+        val original = email("fwd-456")
+        val loadGate = CompletableDeferred<Email?>()
+        val handle = SavedStateHandle()
+
+        ComposeViewModel(ComposeArgs.Forward("fwd-456"), replySource(loadGate), TestStringProvider(), handle)
+        loadGate.complete(original)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals("FORWARD", handle.get<String>(ComposeViewModel.KEY_MODE))
+        assertEquals("fwd-456", handle.get<String>(ComposeViewModel.KEY_ORIGINAL_EMAIL_ID))
+    }
+
+    // ── Field restoration ─────────────────────────
+
+    @Test
+    fun `restauracion exacta de To Cc Bcc subject body y expansion`() = runTest(mainDispatcher) {
+        val handle = SavedStateHandle().apply {
+            set(ComposeViewModel.KEY_MODE, "WRITE")
+            set(ComposeViewModel.KEY_TO, "to@x.com")
+            set(ComposeViewModel.KEY_CC, "cc@x.com")
+            set(ComposeViewModel.KEY_BCC, "bcc@x.com")
+            set(ComposeViewModel.KEY_SUBJECT, "Hello")
+            set(ComposeViewModel.KEY_BODY, "Body text")
+            set(ComposeViewModel.KEY_CC_BCC_EXPANDED, true)
+        }
+
+        val source = object : ComposeEmailSource {
+            override suspend fun getUserEmail(): String? = "me@test.com"
+            override suspend fun getEmailById(emailId: String): Email? = null
+            override suspend fun sendEmail(to: String, cc: String?, bcc: String?, subject: String, body: String, replyContext: ReplyContext?) {}
+        }
+
+        val vm = ComposeViewModel(ComposeArgs.Write, source, TestStringProvider(), handle)
+        testScheduler.advanceUntilIdle()
+
+        val s = vm.uiState.value
+        assertEquals("to@x.com", s.toField)
+        assertEquals("cc@x.com", s.ccField)
+        assertEquals("bcc@x.com", s.bccField)
+        assertEquals("Hello", s.subject)
+        assertEquals("Body text", s.bodyText)
+        assertTrue(s.isCcBccExpanded)
+    }
+
+    @Test
+    fun `handlers persisten todos los campos antes de publicarlos`() = runTest(mainDispatcher) {
+        val handle = SavedStateHandle()
+        val source = object : ComposeEmailSource {
+            override suspend fun getUserEmail(): String? = "me@test.com"
+            override suspend fun getEmailById(emailId: String): Email? = null
+            override suspend fun sendEmail(to: String, cc: String?, bcc: String?, subject: String, body: String, replyContext: ReplyContext?) {}
+        }
+        val vm = ComposeViewModel(ComposeArgs.Write, source, TestStringProvider(), handle)
+
+        vm.onToChanged("to@test.com")
+        vm.onCcChanged("cc@test.com")
+        vm.onBccChanged("bcc@test.com")
+        vm.onSubjectChanged("Subject")
+        vm.onBodyChanged("Body")
+        vm.onToggleCcBcc()
+
+        assertEquals("to@test.com", handle.get<String>(ComposeViewModel.KEY_TO))
+        assertEquals("cc@test.com", handle.get<String>(ComposeViewModel.KEY_CC))
+        assertEquals("bcc@test.com", handle.get<String>(ComposeViewModel.KEY_BCC))
+        assertEquals("Subject", handle.get<String>(ComposeViewModel.KEY_SUBJECT))
+        assertEquals("Body", handle.get<String>(ComposeViewModel.KEY_BODY))
+        assertEquals(true, handle.get<Boolean>(ComposeViewModel.KEY_CC_BCC_EXPANDED))
+    }
+
+    @Test
+    fun `campos vacios editados en Reply se conservan tras restauracion`() = runTest(mainDispatcher) {
+        val original = email("r1")
+        val loadGate = CompletableDeferred<Email?>()
+        val handle = SavedStateHandle().apply {
+            set(ComposeViewModel.KEY_MODE, "REPLY")
+            set(ComposeViewModel.KEY_ORIGINAL_EMAIL_ID, "r1")
+            set(ComposeViewModel.KEY_TO, "")
+        }
+
+        val vm = ComposeViewModel(ComposeArgs.Reply("r1"), replySource(loadGate), TestStringProvider(), handle)
+        loadGate.complete(original)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(ComposeMode.REPLY, vm.uiState.value.composeMode)
+        assertEquals(original, vm.uiState.value.originalEmail)
+        // To was blank in handle — should stay blank, not auto-filled
+        assertEquals("", vm.uiState.value.toField)
+    }
+
+    @Test
+    fun `ediciones durante carga de Reply no son sobrescritas por autorrelleno`() = runTest(mainDispatcher) {
+        val original = email("r-race", from = "default@test.com", subject = "Original")
+        val loadGate = CompletableDeferred<Email?>()
+        val handle = SavedStateHandle()
+        val vm = ComposeViewModel(
+            ComposeArgs.Reply("r-race"),
+            replySource(loadGate),
+            TestStringProvider(),
+            handle
+        )
+
+        // Start the Room load before editing to exercise the asynchronous race.
+        testScheduler.runCurrent()
+        vm.onToChanged("")
+        vm.onSubjectChanged("")
+        loadGate.complete(original)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals("", vm.uiState.value.toField)
+        assertEquals("", vm.uiState.value.subject)
+        assertEquals("", handle.get<String>(ComposeViewModel.KEY_TO))
+        assertEquals("", handle.get<String>(ComposeViewModel.KEY_SUBJECT))
+    }
+
+    @Test
+    fun `campos vacios editados en Forward se conservan tras restauracion`() = runTest(mainDispatcher) {
+        val original = email("f1")
+        val loadGate = CompletableDeferred<Email?>()
+        val handle = SavedStateHandle().apply {
+            set(ComposeViewModel.KEY_MODE, "FORWARD")
+            set(ComposeViewModel.KEY_ORIGINAL_EMAIL_ID, "f1")
+            set(ComposeViewModel.KEY_TO, "")
+            set(ComposeViewModel.KEY_SUBJECT, "")
+            set(ComposeViewModel.KEY_BODY, "")
+        }
+
+        val vm = ComposeViewModel(ComposeArgs.Forward("f1"), replySource(loadGate), TestStringProvider(), handle)
+        loadGate.complete(original)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(ComposeMode.FORWARD, vm.uiState.value.composeMode)
+        // Explicit empty values exist in the handle — restore, don't auto-fill.
+        assertEquals("", vm.uiState.value.subject)
+        assertEquals("", vm.uiState.value.bodyText)
+        assertEquals("", vm.uiState.value.toField)
+    }
+
+    @Test
+    fun `Reply restaurado recarga original sin persistir objeto Email`() = runTest(mainDispatcher) {
+        val original = email("r2", from = "sender@test.com", subject = "Original")
+        val loadGate = CompletableDeferred<Email?>()
+        val handle = SavedStateHandle().apply {
+            set(ComposeViewModel.KEY_MODE, "REPLY")
+            set(ComposeViewModel.KEY_ORIGINAL_EMAIL_ID, "r2")
+        }
+
+        val vm = ComposeViewModel(ComposeArgs.Reply("r2"), replySource(loadGate), TestStringProvider(), handle)
+        loadGate.complete(original)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(original, vm.uiState.value.originalEmail)
+        // Auto-filled To (no KEY_TO in handle)
+        assertEquals("sender@test.com", vm.uiState.value.toField)
+        // Auto-filled subject (no KEY_SUBJECT in handle)
+        assertEquals("test_string", vm.uiState.value.subject)
+        // No value persisted in the handle may be a domain Email object.
+        assertFalse(handle.keys().any { key -> handle.get<Any?>(key) is Email })
+    }
+
+    @Test
+    fun `campos restaurados se usan al enviar`() = runTest(mainDispatcher) {
+        var sentTo = ""
+        var sentSubject = ""
+        var sentBody = ""
+        val handle = SavedStateHandle().apply {
+            set(ComposeViewModel.KEY_MODE, "WRITE")
+            set(ComposeViewModel.KEY_TO, "recipient@test.com")
+            set(ComposeViewModel.KEY_SUBJECT, "Restored subject")
+            set(ComposeViewModel.KEY_BODY, "Restored body")
+        }
+        val source = object : ComposeEmailSource {
+            override suspend fun getUserEmail(): String? = "me@test.com"
+            override suspend fun getEmailById(emailId: String): Email? = null
+            override suspend fun sendEmail(to: String, cc: String?, bcc: String?, subject: String, body: String, replyContext: ReplyContext?) {
+                sentTo = to
+                sentSubject = subject
+                sentBody = body
+            }
+        }
+
+        val vm = ComposeViewModel(ComposeArgs.Write, source, TestStringProvider(), handle)
+        testScheduler.advanceUntilIdle()
+
+        vm.onSend()
+        testScheduler.advanceUntilIdle()
+
+        assertEquals("recipient@test.com", sentTo)
+        assertEquals("Restored subject", sentSubject)
+        assertEquals("Restored body", sentBody)
+        assertTrue(vm.uiState.value.sendResult is SendResult.Success)
+    }
+
+    @Test
+    fun `sendResult e isSending no se restauran`() = runTest(mainDispatcher) {
+        val handle = SavedStateHandle().apply {
+            set(ComposeViewModel.KEY_MODE, "WRITE")
+            set(ComposeViewModel.KEY_TO, "to@x.com")
+        }
+        val source = object : ComposeEmailSource {
+            override suspend fun getUserEmail(): String? = "me@test.com"
+            override suspend fun getEmailById(emailId: String): Email? = null
+            override suspend fun sendEmail(to: String, cc: String?, bcc: String?, subject: String, body: String, replyContext: ReplyContext?) {}
+        }
+
+        val vm = ComposeViewModel(ComposeArgs.Write, source, TestStringProvider(), handle)
+        testScheduler.advanceUntilIdle()
+
+        assertNull(vm.uiState.value.sendResult)
+        assertFalse(vm.uiState.value.isSending)
+    }
+
+    @Test
+    fun `envio interrumpido no reanuda ni publica resultado tras restauracion`() = runTest(mainDispatcher) {
+        val handle = SavedStateHandle().apply {
+            set(ComposeViewModel.KEY_MODE, "WRITE")
+            set(ComposeViewModel.KEY_TO, "to@x.com")
+        }
+        val sendGate = CompletableDeferred<Unit>()
+        var firstInstanceSendCalls = 0
+        val firstSource = object : ComposeEmailSource {
+            override suspend fun getUserEmail(): String? = "me@test.com"
+            override suspend fun getEmailById(emailId: String): Email? = null
+            override suspend fun sendEmail(to: String, cc: String?, bcc: String?, subject: String, body: String, replyContext: ReplyContext?) {
+                firstInstanceSendCalls++
+                sendGate.await()
+            }
+        }
+
+        val firstVm = ComposeViewModel(ComposeArgs.Write, firstSource, TestStringProvider(), handle)
+        testScheduler.runCurrent()
+        firstVm.onSend()
+        testScheduler.runCurrent()
+        assertEquals(1, firstInstanceSendCalls)
+        assertTrue(firstVm.uiState.value.isSending)
+
+        firstVm.viewModelScope.cancel()
+        testScheduler.runCurrent()
+
+        var restoredInstanceSendCalls = 0
+        val restoredSource = object : ComposeEmailSource {
+            override suspend fun getUserEmail(): String? = "me@test.com"
+            override suspend fun getEmailById(emailId: String): Email? = null
+            override suspend fun sendEmail(to: String, cc: String?, bcc: String?, subject: String, body: String, replyContext: ReplyContext?) {
+                restoredInstanceSendCalls++
+            }
+        }
+        val restoredVm = ComposeViewModel(ComposeArgs.Write, restoredSource, TestStringProvider(), handle)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals("Interrupted send must not restart", 0, restoredInstanceSendCalls)
+        assertNull("sendResult must not be restored", restoredVm.uiState.value.sendResult)
+        assertFalse("isSending must be false after restoration", restoredVm.uiState.value.isSending)
+        assertEquals("to@x.com", restoredVm.uiState.value.toField)
+    }
+
+    // ── Validation ────────────────────────────────
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `modo restaurado incompatible con ruta lanza excepcion`() = runTest(mainDispatcher) {
+        val handle = SavedStateHandle().apply {
+            set(ComposeViewModel.KEY_MODE, "REPLY")
+            set(ComposeViewModel.KEY_ORIGINAL_EMAIL_ID, "xyz")
+        }
+        val source = object : ComposeEmailSource {
+            override suspend fun getUserEmail(): String? = "me@test.com"
+            override suspend fun getEmailById(emailId: String): Email? = null
+            override suspend fun sendEmail(to: String, cc: String?, bcc: String?, subject: String, body: String, replyContext: ReplyContext?) {}
+        }
+        // Route says WRITE, but handle says REPLY
+        ComposeViewModel(ComposeArgs.Write, source, TestStringProvider(), handle)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `ID restaurado incompatible con ruta lanza excepcion`() = runTest(mainDispatcher) {
+        val handle = SavedStateHandle().apply {
+            set(ComposeViewModel.KEY_MODE, "REPLY")
+            set(ComposeViewModel.KEY_ORIGINAL_EMAIL_ID, "wrong-id")
+        }
+        val source = object : ComposeEmailSource {
+            override suspend fun getUserEmail(): String? = "me@test.com"
+            override suspend fun getEmailById(emailId: String): Email? = null
+            override suspend fun sendEmail(to: String, cc: String?, bcc: String?, subject: String, body: String, replyContext: ReplyContext?) {}
+        }
+        // Route has different ID
+        ComposeViewModel(ComposeArgs.Reply("correct-id"), source, TestStringProvider(), handle)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `Reply restaurado sin ID lanza excepcion`() = runTest(mainDispatcher) {
+        val handle = SavedStateHandle().apply {
+            set(ComposeViewModel.KEY_MODE, "REPLY")
+        }
+        val source = object : ComposeEmailSource {
+            override suspend fun getUserEmail(): String? = "me@test.com"
+            override suspend fun getEmailById(emailId: String): Email? = null
+            override suspend fun sendEmail(to: String, cc: String?, bcc: String?, subject: String, body: String, replyContext: ReplyContext?) {}
+        }
+
+        ComposeViewModel(ComposeArgs.Reply("required-id"), source, TestStringProvider(), handle)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `WRITE restaurado con ID lanza excepcion`() = runTest(mainDispatcher) {
+        val handle = SavedStateHandle().apply {
+            set(ComposeViewModel.KEY_MODE, "WRITE")
+            set(ComposeViewModel.KEY_ORIGINAL_EMAIL_ID, "unexpected-id")
+        }
+        val source = object : ComposeEmailSource {
+            override suspend fun getUserEmail(): String? = "me@test.com"
+            override suspend fun getEmailById(emailId: String): Email? = null
+            override suspend fun sendEmail(to: String, cc: String?, bcc: String?, subject: String, body: String, replyContext: ReplyContext?) {}
+        }
+
+        ComposeViewModel(ComposeArgs.Write, source, TestStringProvider(), handle)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `ID restaurado sin modo lanza excepcion`() = runTest(mainDispatcher) {
+        val handle = SavedStateHandle().apply {
+            set(ComposeViewModel.KEY_ORIGINAL_EMAIL_ID, "orphan-id")
+        }
+        val source = object : ComposeEmailSource {
+            override suspend fun getUserEmail(): String? = "me@test.com"
+            override suspend fun getEmailById(emailId: String): Email? = null
+            override suspend fun sendEmail(to: String, cc: String?, bcc: String?, subject: String, body: String, replyContext: ReplyContext?) {}
+        }
+
+        ComposeViewModel(ComposeArgs.Write, source, TestStringProvider(), handle)
+    }
+
+    // ── Cancellation ──────────────────────────────
+
+    @Test
+    fun `cancelacion de carga original en restauracion se propaga`() = runTest(mainDispatcher) {
+        val loadGate = CompletableDeferred<Email?>()
+        val handle = SavedStateHandle().apply {
+            set(ComposeViewModel.KEY_MODE, "REPLY")
+            set(ComposeViewModel.KEY_ORIGINAL_EMAIL_ID, "r-cancel")
+        }
+
+        val vm = ComposeViewModel(ComposeArgs.Reply("r-cancel"), replySource(loadGate), TestStringProvider(), handle)
+        testScheduler.runCurrent()
+
+        vm.viewModelScope.cancel()
+        testScheduler.advanceUntilIdle()
+
+        assertTrue("Should still be loading (cancelled before completion)", vm.uiState.value.isLoadingOriginalEmail)
+        assertNull("Original email must not be set after cancellation", vm.uiState.value.originalEmail)
     }
 }
 

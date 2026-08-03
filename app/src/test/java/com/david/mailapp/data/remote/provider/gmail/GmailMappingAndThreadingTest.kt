@@ -4,6 +4,7 @@ import com.david.mailapp.data.remote.provider.ReplyContext
 import com.david.mailapp.core.localization.StringProvider
 import com.david.mailapp.domain.model.Email
 import com.david.mailapp.domain.model.EmailFolder
+import androidx.lifecycle.SavedStateHandle
 import com.david.mailapp.feature.compose.ComposeArgs
 import com.david.mailapp.feature.compose.ComposeEmailSource
 import com.david.mailapp.feature.compose.ComposeViewModel
@@ -217,7 +218,8 @@ class GmailMappingAndThreadingTest {
         val viewModel = ComposeViewModel(
             args = ComposeArgs.Reply(reply.id),
             emailSource = source,
-            stringProvider = ComposeTestStringProvider
+            stringProvider = ComposeTestStringProvider,
+            savedStateHandle = SavedStateHandle()
         )
 
         testScheduler.advanceUntilIdle()
