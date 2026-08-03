@@ -88,9 +88,6 @@ coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coi
 kotlin-stdlib = { group = "org.jetbrains.kotlin", name = "kotlin-stdlib", version.ref = "kotlin" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version = "1.7.3" }
 
-# Credential Manager (OAuth2)
-credentials = { group = "androidx.credentials", name = "credentials", version = "1.5.0" }
-
 # Chrome Custom Tabs (OAuth2 flow)
 browser = { group = "androidx.browser", name = "browser", version = "1.8.0" }
 

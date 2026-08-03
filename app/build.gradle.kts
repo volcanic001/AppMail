@@ -115,9 +115,6 @@ dependencies {
     implementation(libs.kotlin.stdlib)
     implementation(libs.kotlinx.serialization.json)
 
-    // Credential Manager (OAuth2)
-    implementation(libs.credentials)
-
     // Chrome Custom Tabs (OAuth2 flow)
     implementation(libs.browser)
 

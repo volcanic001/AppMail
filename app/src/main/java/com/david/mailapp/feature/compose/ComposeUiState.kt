@@ -1,9 +1,11 @@
 package com.david.mailapp.feature.compose
 
+import androidx.annotation.Keep
 import com.david.mailapp.core.localization.UiErrorReason
 import com.david.mailapp.domain.model.Email
 import kotlinx.serialization.Serializable
 
+@Keep
 @Serializable
 enum class ComposeMode { WRITE, REPLY, FORWARD }
 
