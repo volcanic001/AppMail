@@ -10,7 +10,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalNavigationDrawer
@@ -67,12 +66,6 @@ fun MainScreen(
         }
     }
 
-    // These screens are removed from NavHost after navigating to a
-    // message. Keep their scroll state at this longer-lived navigation level
-    // so returning from EmailDetail restores the exact list position.
-    val inboxListState = rememberLazyListState()
-    val trashListState = rememberLazyListState()
-    val searchListState = rememberLazyListState()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
@@ -111,9 +104,6 @@ fun MainScreen(
             // ── Content area ─────────────────────────────────
             MainNavHost(
                 navController = navController,
-                inboxListState = inboxListState,
-                trashListState = trashListState,
-                searchListState = searchListState,
                 onMenuClick = onMenuClick,
                 currentPalette = currentPalette,
                 isDarkMode = isDarkMode,

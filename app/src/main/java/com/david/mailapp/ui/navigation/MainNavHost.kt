@@ -10,7 +10,7 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -32,9 +32,6 @@ import com.david.mailapp.ui.theme.ColorPalette
 @Composable
 fun MainNavHost(
     navController: NavHostController,
-    inboxListState: LazyListState,
-    trashListState: LazyListState,
-    searchListState: LazyListState,
     onMenuClick: () -> Unit,
     currentPalette: ColorPalette,
     isDarkMode: Boolean,
@@ -57,6 +54,7 @@ fun MainNavHost(
             enterTransition = { fadeIn(spring(dampingRatio = 0.65f, stiffness = 350f)) },
             exitTransition = { fadeOut(spring(dampingRatio = 0.65f, stiffness = 350f)) }
         ) { backStackEntry ->
+            val inboxListState = rememberLazyListState()
             val highlightedEmailId by backStackEntry.savedStateHandle
                 .getStateFlow<String?>(KEY_CLOSED_EMAIL_ID, null)
                 .collectAsStateWithLifecycle()
@@ -80,6 +78,7 @@ fun MainNavHost(
             enterTransition = { fadeIn(spring(dampingRatio = 0.65f, stiffness = 350f)) },
             exitTransition = { fadeOut(spring(dampingRatio = 0.65f, stiffness = 350f)) }
         ) { backStackEntry ->
+            val trashListState = rememberLazyListState()
             val highlightedEmailId by backStackEntry.savedStateHandle
                 .getStateFlow<String?>(KEY_CLOSED_EMAIL_ID, null)
                 .collectAsStateWithLifecycle()
@@ -138,6 +137,7 @@ fun MainNavHost(
                 ) + fadeOut(MotionTokens.searchCollapse)
             }
         ) { backStackEntry ->
+            val searchListState = rememberLazyListState()
             val entryKey = backStackEntry.id
             val highlightedEmailId by backStackEntry.savedStateHandle
                 .getStateFlow<String?>(KEY_CLOSED_EMAIL_ID, null)
