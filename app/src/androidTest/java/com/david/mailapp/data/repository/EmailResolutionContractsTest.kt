@@ -129,6 +129,21 @@ class EmailResolutionContractsTest {
         assertEquals("no provider calls", 0, provider.fetchEmailByIdCalls)
     }
 
+    @Test fun remoteResolution_thenReopen_usesCacheWithoutSecondRemoteCall() = runTest {
+        provider.fetchEmailByIdResult = EmailLookupResult.Found(
+            testEmail("reopen", folder = EmailFolder.Other, subject = "Remote then cached")
+        )
+
+        val first = repository.resolveEmailById("reopen")
+        val second = repository.resolveEmailById("reopen")
+
+        assertTrue(first is EmailResolutionResult.Found)
+        assertTrue(second is EmailResolutionResult.Found)
+        assertEquals("Remote then cached", (second as EmailResolutionResult.Found).email.subject)
+        assertEquals("only the first opening reaches Gmail", 1, provider.fetchEmailByIdCalls)
+        assertEquals("other", checkNotNull(get("reopen")).folder)
+    }
+
     @Test fun remote_notFound_returns_notFound_and_creates_no_rows() = runTest {
         provider.fetchEmailByIdResult = EmailLookupResult.NotFound
         val result = repository.resolveEmailById("ne")

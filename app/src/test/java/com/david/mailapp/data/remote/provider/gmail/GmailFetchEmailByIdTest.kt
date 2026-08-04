@@ -192,6 +192,15 @@ class GmailFetchEmailByIdTest {
         assertEquals(EmailFolder.Trash, email.folder)
     }
 
+    @Test
+    fun trash_and_sent_classified_as_trash() = runTest {
+        val engine = ScriptedEngine()
+        engine.enqueue(HttpStatusCode.OK, detailOk(labelIds = listOf("TRASH", "SENT")))
+        val email = (provider(engine.client()).fetchEmailById("m1") as EmailLookupResult.Found).email
+        assertEquals(EmailFolder.Trash, email.folder)
+        assertEquals(listOf("TRASH", "SENT"), email.labels)
+    }
+
     // ── resultados de error sin reintento ──────────────────────
 
     @Test

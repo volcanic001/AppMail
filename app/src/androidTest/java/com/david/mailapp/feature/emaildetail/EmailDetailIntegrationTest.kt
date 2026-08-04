@@ -187,6 +187,10 @@ class EmailDetailIntegrationTest {
         assertResolutionMatrix("m-trash", listOf("TRASH"), EmailFolder.Trash, "trash")
     }
 
+    @Test fun matrix_trash_sent_absent_email_resolves_and_persists() = runTest {
+        assertResolutionMatrix("m-trash-sent", listOf("TRASH", "SENT"), EmailFolder.Trash, "trash")
+    }
+
     @Test fun matrix_email_absent_from_room_doesNotContaminate_inbox_or_trash() = runTest {
         seed("existing-inbox", EmailFolder.Inbox)
         seed("existing-trash", EmailFolder.Trash)
