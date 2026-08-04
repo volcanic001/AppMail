@@ -25,9 +25,15 @@ enum class UiErrorReason {
     SIGN_OUT_IN_PROGRESS,
     SIGN_OUT_FAILED,
     NO_ACTIVE_ACCOUNT,
+    ACCOUNT_CHANGED,
     SENDER_ADDRESS_UNAVAILABLE,
     SEND_FAILED,
     EMAIL_NOT_FOUND,
+    EMAIL_TEMPORARILY_UNAVAILABLE,
+    EMAIL_ACCESS_DENIED,
+    EMAIL_INVALID_REFERENCE,
+    EMAIL_RESOLUTION_FAILED,
+    EMAIL_LOCAL_CACHE_FAILED,
     EMAIL_BODY_LOAD_FAILED,
     EMAIL_BODY_PDFS_ONLY,
     IMAGE_INVALID_FORMAT,
@@ -65,9 +71,15 @@ fun UiErrorReason.toUiText(): UiText.Resource {
         UiErrorReason.SIGN_OUT_IN_PROGRESS -> UiText.Resource(R.string.session_signout_in_progress)
         UiErrorReason.SIGN_OUT_FAILED -> UiText.Resource(R.string.session_signout_failed)
         UiErrorReason.NO_ACTIVE_ACCOUNT -> UiText.Resource(R.string.error_no_active_account)
+        UiErrorReason.ACCOUNT_CHANGED -> UiText.Resource(R.string.detail_account_changed)
         UiErrorReason.SENDER_ADDRESS_UNAVAILABLE -> UiText.Resource(R.string.error_sender_address_unavailable)
         UiErrorReason.SEND_FAILED -> UiText.Resource(R.string.compose_send_error)
         UiErrorReason.EMAIL_NOT_FOUND -> UiText.Resource(R.string.detail_email_not_found)
+        UiErrorReason.EMAIL_TEMPORARILY_UNAVAILABLE -> UiText.Resource(R.string.detail_email_temporarily_unavailable)
+        UiErrorReason.EMAIL_ACCESS_DENIED -> UiText.Resource(R.string.detail_email_access_denied)
+        UiErrorReason.EMAIL_INVALID_REFERENCE -> UiText.Resource(R.string.detail_email_invalid_reference)
+        UiErrorReason.EMAIL_RESOLUTION_FAILED -> UiText.Resource(R.string.detail_email_resolution_failed)
+        UiErrorReason.EMAIL_LOCAL_CACHE_FAILED -> UiText.Resource(R.string.detail_email_local_cache_failed)
         UiErrorReason.EMAIL_BODY_LOAD_FAILED -> UiText.Resource(R.string.detail_body_load_error)
         UiErrorReason.EMAIL_BODY_PDFS_ONLY -> UiText.Resource(R.string.detail_body_pdfs_only)
         UiErrorReason.IMAGE_INVALID_FORMAT -> UiText.Resource(R.string.image_invalid_format)

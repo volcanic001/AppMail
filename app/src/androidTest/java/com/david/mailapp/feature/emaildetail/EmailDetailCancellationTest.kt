@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import androidx.test.platform.app.InstrumentationRegistry
 import com.david.mailapp.data.local.MailDatabase
 import com.david.mailapp.data.local.entity.EmailEntity
 import com.david.mailapp.data.pdf.PdfCacheManager
@@ -61,7 +62,12 @@ class EmailDetailCancellationTest {
 
     @After
     fun tearDown() {
-        viewModelStore.clear()
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        instrumentation.runOnMainSync { viewModelStore.clear() }
+        instrumentation.waitForIdleSync()
+        // Room Flow cancellation may already have dispatched a query to its
+        // executor. Let that cancellation settle before closing the pool.
+        runBlocking { delay(100) }
         database.close()
         cacheDir.deleteRecursively()
     }

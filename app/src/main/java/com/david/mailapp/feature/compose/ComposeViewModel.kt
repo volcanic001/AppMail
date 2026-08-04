@@ -135,7 +135,16 @@ class ComposeViewModel(
                         val shouldFillTo = !savedStateHandle.contains(KEY_TO)
                         val shouldFillSubject = !savedStateHandle.contains(KEY_SUBJECT)
                         val newTo = if (currentMode == ComposeMode.REPLY && shouldFillTo) {
-                            ComposeFormatUtils.extractEmailAddress(email.from)
+                            // Correos enviados (etiqueta SENT) → responder al destinatario
+                            // original; cualquier otro → al remitente. EmailFolder.Other
+                            // no se usa porque también agrupa archivados.
+                            if (email.labels.contains("SENT")) {
+                                // To may contain multiple RFC recipients; preserve the
+                                // complete header instead of extracting only the first.
+                                email.to.trim()
+                            } else {
+                                ComposeFormatUtils.extractEmailAddress(email.from)
+                            }
                         } else {
                             _uiState.value.toField
                         }

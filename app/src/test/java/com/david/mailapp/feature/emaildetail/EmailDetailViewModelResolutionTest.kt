@@ -105,13 +105,15 @@ class EmailDetailViewModelResolutionTest {
     fun eachResolutionFailure_mapsReasonAndRetryableCorrectly() = runTest {
         val cases = mapOf(
             EmailResolutionFailureReason.NO_ACTIVE_ACCOUNT to Pair(UiErrorReason.NO_ACTIVE_ACCOUNT, false),
-            EmailResolutionFailureReason.SESSION_CHANGED to Pair(UiErrorReason.NO_ACTIVE_ACCOUNT, false),
+            EmailResolutionFailureReason.SESSION_CHANGED to Pair(UiErrorReason.ACCOUNT_CHANGED, false),
             EmailResolutionFailureReason.SESSION_EXPIRED to Pair(UiErrorReason.SESSION_EXPIRED, false),
             EmailResolutionFailureReason.NO_CONNECTION to Pair(UiErrorReason.NO_CONNECTION, true),
-            EmailResolutionFailureReason.TEMPORARY_REMOTE to Pair(UiErrorReason.UNKNOWN, true),
-            EmailResolutionFailureReason.INVALID_RESPONSE to Pair(UiErrorReason.UNKNOWN, true),
-            EmailResolutionFailureReason.REMOTE_REJECTED to Pair(UiErrorReason.UNKNOWN, false),
-            EmailResolutionFailureReason.INVALID_ID to Pair(UiErrorReason.UNKNOWN, false),
+            EmailResolutionFailureReason.TEMPORARY_REMOTE to Pair(UiErrorReason.EMAIL_TEMPORARILY_UNAVAILABLE, true),
+            EmailResolutionFailureReason.INVALID_RESPONSE to Pair(UiErrorReason.EMAIL_RESOLUTION_FAILED, true),
+            EmailResolutionFailureReason.REMOTE_REJECTED to Pair(UiErrorReason.EMAIL_ACCESS_DENIED, false),
+            EmailResolutionFailureReason.INVALID_ID to Pair(UiErrorReason.EMAIL_INVALID_REFERENCE, false),
+            EmailResolutionFailureReason.LOCAL_READ_FAILED to Pair(UiErrorReason.EMAIL_LOCAL_CACHE_FAILED, true),
+            EmailResolutionFailureReason.LOCAL_WRITE_FAILED to Pair(UiErrorReason.EMAIL_LOCAL_CACHE_FAILED, true),
         )
         for ((failureReason, expected) in cases) {
             val source = FakeEmailDetailSource("e1")
@@ -122,6 +124,18 @@ class EmailDetailViewModelResolutionTest {
             assertEquals("$failureReason reason", expected.first, state.reason)
             assertEquals("$failureReason retryable", expected.second, state.retryable)
         }
+    }
+
+    @Test
+    fun unexpectedResolutionException_producesRetryableResolutionFailure() = runTest {
+        val source = FakeEmailDetailSource("e1")
+        source.resolveError = IllegalStateException("unexpected")
+
+        val vm = createViewModel(source)
+
+        val state = vm.uiState.value as EmailDetailUiState.ResolutionError
+        assertEquals(UiErrorReason.EMAIL_RESOLUTION_FAILED, state.reason)
+        assertTrue(state.retryable)
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -327,5 +341,28 @@ class EmailDetailViewModelResolutionTest {
 
         assertTrue(vm.uiState.value is EmailDetailUiState.BodyError)
         assertEquals("non-retryable error must not fetch again", 1, source.bodyFetchCallCount)
+    }
+
+    @Test
+    fun pdfsOnly_isNotRetryable() = runTest {
+        val source = FakeEmailDetailSource("e1")
+        source.resolveResult = EmailResolutionResult.Found(
+            FakeEmailDetailSource.sampleEmail(bodyBlank = true)
+        )
+        source.bodyFetchResult = BodyFetchResult(
+            rawBody = null,
+            inlineRefs = emptyList(),
+            pdfAttachments = listOf(
+                com.david.mailapp.domain.model.PdfAttachmentMetadata(
+                    "doc.pdf", "application/pdf", "att1", 1024L
+                )
+            )
+        )
+        val vm = createViewModel(source)
+
+        val error = vm.uiState.value as EmailDetailUiState.BodyError
+        assertEquals(UiErrorReason.EMAIL_BODY_PDFS_ONLY, error.reason)
+        assertEquals("PDFs only → no body retry", false, error.retryable)
+        assertTrue("PDF metadata preserved", error.email?.pdfAttachments?.isNotEmpty() == true)
     }
 }

@@ -120,7 +120,7 @@ class EmailDetailViewModel(
             } catch (e: Exception) {
                 EmailRenderTrace.d(traceMail, "VM", "VM_STATE_ERROR", "reason=unexpected ${e.javaClass.simpleName}")
                 _uiState.value = EmailDetailUiState.ResolutionError(
-                    UiErrorReason.UNKNOWN, retryable = true
+                    UiErrorReason.EMAIL_RESOLUTION_FAILED, retryable = true
                 )
             } finally {
                 isResolving = false
@@ -290,7 +290,7 @@ class EmailDetailViewModel(
                             "pdfCount=${fetchedResult.pdfAttachments.size} " +
                                 "durationMs=${EmailRenderTrace.now() - startedAt}")
                         _uiState.value = EmailDetailUiState.BodyError(
-                            pdfEmail, UiErrorReason.EMAIL_BODY_PDFS_ONLY, retryable = true
+                            pdfEmail, UiErrorReason.EMAIL_BODY_PDFS_ONLY, retryable = false
                         )
                     }
                 }
@@ -435,15 +435,15 @@ class EmailDetailViewModel(
     companion object {
         fun mapResolutionFailure(reason: EmailResolutionFailureReason): Pair<UiErrorReason, Boolean> = when (reason) {
             EmailResolutionFailureReason.NO_ACTIVE_ACCOUNT -> UiErrorReason.NO_ACTIVE_ACCOUNT to false
-            EmailResolutionFailureReason.SESSION_CHANGED -> UiErrorReason.NO_ACTIVE_ACCOUNT to false
+            EmailResolutionFailureReason.SESSION_CHANGED -> UiErrorReason.ACCOUNT_CHANGED to false
             EmailResolutionFailureReason.SESSION_EXPIRED -> UiErrorReason.SESSION_EXPIRED to false
-            EmailResolutionFailureReason.INVALID_ID -> UiErrorReason.UNKNOWN to false
-            EmailResolutionFailureReason.REMOTE_REJECTED -> UiErrorReason.UNKNOWN to false
+            EmailResolutionFailureReason.INVALID_ID -> UiErrorReason.EMAIL_INVALID_REFERENCE to false
+            EmailResolutionFailureReason.REMOTE_REJECTED -> UiErrorReason.EMAIL_ACCESS_DENIED to false
             EmailResolutionFailureReason.NO_CONNECTION -> UiErrorReason.NO_CONNECTION to true
-            EmailResolutionFailureReason.TEMPORARY_REMOTE -> UiErrorReason.UNKNOWN to true
-            EmailResolutionFailureReason.INVALID_RESPONSE -> UiErrorReason.UNKNOWN to true
-            EmailResolutionFailureReason.LOCAL_READ_FAILED -> UiErrorReason.UNKNOWN to true
-            EmailResolutionFailureReason.LOCAL_WRITE_FAILED -> UiErrorReason.UNKNOWN to true
+            EmailResolutionFailureReason.TEMPORARY_REMOTE -> UiErrorReason.EMAIL_TEMPORARILY_UNAVAILABLE to true
+            EmailResolutionFailureReason.INVALID_RESPONSE -> UiErrorReason.EMAIL_RESOLUTION_FAILED to true
+            EmailResolutionFailureReason.LOCAL_READ_FAILED -> UiErrorReason.EMAIL_LOCAL_CACHE_FAILED to true
+            EmailResolutionFailureReason.LOCAL_WRITE_FAILED -> UiErrorReason.EMAIL_LOCAL_CACHE_FAILED to true
         }
     }
 

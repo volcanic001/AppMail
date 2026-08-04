@@ -324,8 +324,9 @@ fun EmailDetailScreen(
                     }
                 },
                 actions = {
-                    val currentEmail = (uiState as? EmailDetailUiState.PreparingBody)?.email
-                        ?: (uiState as? EmailDetailUiState.Ready)?.email
+                    // Responder/Reenviar solo disponibles en Ready — durante
+                    // resolución, preparación o error permanecen deshabilitados.
+                    val currentEmail = (uiState as? EmailDetailUiState.Ready)?.email
                     IconButton(
                         onClick = {
                             currentEmail?.let { onReply(it.id) }

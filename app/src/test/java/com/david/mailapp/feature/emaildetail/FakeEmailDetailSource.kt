@@ -32,12 +32,14 @@ class FakeEmailDetailSource(
 
     // ── Resolution ──────────────────────────────────────────────
     var resolveResult: EmailResolutionResult = EmailResolutionResult.NotFound
+    var resolveError: Exception? = null
     var resolveGate: CompletableDeferred<Unit>? = null
     var resolveCallCount = 0
 
     override suspend fun resolveById(emailId: String): EmailResolutionResult {
         resolveCallCount++
         resolveGate?.await()
+        resolveError?.let { throw it }
         return resolveResult
     }
 

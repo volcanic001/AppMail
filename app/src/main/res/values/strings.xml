@@ -244,6 +244,12 @@
 
     <!-- Estados de contenido -->
     <string name="detail_email_not_found">Email no encontrado</string>
+    <string name="detail_account_changed">La cuenta cambió durante la carga. Abre el correo nuevamente.</string>
+    <string name="detail_email_temporarily_unavailable">Gmail no está disponible temporalmente. Reinténtalo.</string>
+    <string name="detail_email_access_denied">No se puede acceder a este correo.</string>
+    <string name="detail_email_invalid_reference">La referencia del correo no es válida.</string>
+    <string name="detail_email_resolution_failed">No se pudo abrir el correo. Reinténtalo.</string>
+    <string name="detail_email_local_cache_failed">No se pudo usar la caché local. Reinténtalo.</string>
     <string name="detail_body_load_error">No se pudo cargar el contenido del email</string>
     <string name="detail_body_pdfs_only">Este correo contiene PDF adjuntos pero no se pudo cargar el contenido del mensaje</string>
     <string name="detail_subject_missing">(Sin asunto)</string>

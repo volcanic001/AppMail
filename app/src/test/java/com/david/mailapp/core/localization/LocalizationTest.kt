@@ -83,8 +83,8 @@ class LocalizationTest {
             assertNotNull("toUiText() devolvio null para $reason", resource)
             // Solo verificamos que no lance: no podemos resolver sin R.string real
         }
-        // Verificar que son 29 valores (contra el enum actual)
-        assertEquals(29, UiErrorReason.values().size)
+        // Verificar que son 35 valores (contra el enum actual)
+        assertEquals(35, UiErrorReason.values().size)
     }
 
     @Test
