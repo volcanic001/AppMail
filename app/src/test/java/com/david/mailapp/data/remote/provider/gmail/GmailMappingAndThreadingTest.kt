@@ -102,7 +102,7 @@ class GmailMappingAndThreadingTest {
         assertEquals("null labels → empty", emptyList<String>(), eNull.labels)
         assertTrue("null labels → isRead", eNull.isRead)
         assertFalse("null labels → not starred", eNull.isStarred)
-        assertEquals("null labels → Inbox", EmailFolder.Inbox, eNull.folder)
+        assertEquals("null labels → Other (no INBOX/TRASH)", EmailFolder.Other, eNull.folder)
     }
 
     @Test fun real_mime_tree_preserves_pdf_metadata_and_flags() {

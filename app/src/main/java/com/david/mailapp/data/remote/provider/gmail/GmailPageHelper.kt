@@ -178,7 +178,7 @@ internal suspend fun fetchWithRetry(
     )
 }
 
-private fun isTransientHttpError(statusCode: Int): Boolean {
+internal fun isTransientHttpError(statusCode: Int): Boolean {
     return statusCode == 408 || statusCode == 429 || statusCode in 500..599
 }
 

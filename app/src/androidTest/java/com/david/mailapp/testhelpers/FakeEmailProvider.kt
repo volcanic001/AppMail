@@ -1,6 +1,7 @@
 package com.david.mailapp.testhelpers
 
 import com.david.mailapp.data.remote.provider.BodyFetchResult
+import com.david.mailapp.data.remote.provider.EmailLookupResult
 import com.david.mailapp.data.remote.provider.EmailProvider
 import com.david.mailapp.data.remote.provider.InlineImageRef
 import com.david.mailapp.data.remote.provider.ReplyContext
@@ -60,6 +61,7 @@ class FakeEmailProvider : EmailProvider {
     var fetchInboxResult: PaginatedResult<Email> = PaginatedResult(emptyList(), null)
     var fetchTrashResult: PaginatedResult<Email> = PaginatedResult(emptyList(), null)
     var searchResult: PaginatedResult<Email> = PaginatedResult(emptyList(), null)
+    var fetchEmailByIdResult: EmailLookupResult = EmailLookupResult.NotFound
     var fetchBodyResult: BodyFetchResult? = null
     var inlineImagesResult: Map<String, String> = emptyMap()
     var userEmailResult: String? = "test@example.com"
@@ -73,11 +75,13 @@ class FakeEmailProvider : EmailProvider {
     var downloadAttachmentCalls = 0
     var fetchInboxCalls = 0
     var fetchTrashCalls = 0
+    var fetchEmailByIdCalls = 0
     var fetchBodyCalls = 0
     var inlineImagesCalls = 0
     var eventLog: MutableList<String>? = null
     val receivedInboxTokens = mutableListOf<String?>()
     val receivedTrashTokens = mutableListOf<String?>()
+    val receivedFetchEmailByIdIds = mutableListOf<String>()
 
     var moveToTrashError: Exception? = null
     var restoreFromTrashError: Exception? = null
@@ -88,6 +92,14 @@ class FakeEmailProvider : EmailProvider {
     var fetchInboxError: Exception? = null
     var fetchTrashError: Exception? = null
     var searchError: Exception? = null
+    var fetchEmailByIdError: Exception? = null
+    var fetchEmailByIdDeferred: CompletableDeferred<Unit>? = null
+
+    /** Per-call gates: call N blocks on deferredByCall[N] before returning. Ignored when empty. */
+    var fetchEmailByIdDeferredByCall: List<CompletableDeferred<Unit>> = emptyList()
+
+    /** Per-call results: call N returns resultsByCall[N]. Falls back to [fetchEmailByIdResult] when empty. */
+    var fetchEmailByIdResultsByCall: List<EmailLookupResult> = emptyList()
     var fetchBodyError: Exception? = null
     var inlineImagesError: Exception? = null
 
@@ -127,6 +139,21 @@ class FakeEmailProvider : EmailProvider {
     }
 
     override suspend fun search(query: String, pageToken: String?) = searchResult
+
+    override suspend fun fetchEmailById(emailId: String): EmailLookupResult {
+        eventLog?.add("gmail.fetchEmailById")
+        fetchEmailByIdCalls++
+        receivedFetchEmailByIdIds += emailId
+        val callIndex = fetchEmailByIdCalls - 1
+        val perCallGate = fetchEmailByIdDeferredByCall.getOrNull(callIndex)
+        if (perCallGate != null) {
+            perCallGate.await()
+        } else {
+            fetchEmailByIdDeferred?.await()
+        }
+        fetchEmailByIdError?.let { throw it }
+        return fetchEmailByIdResultsByCall.getOrNull(callIndex) ?: fetchEmailByIdResult
+    }
 
     override suspend fun moveToTrash(emailId: String) {
         eventLog?.add("gmail.moveToTrash")

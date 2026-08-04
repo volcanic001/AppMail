@@ -134,9 +134,10 @@ fun EmailDetailScreen(
     modifier: Modifier = Modifier
 ) {
     val repository = AppContainer.emailRepository
+    val source = RepositoryEmailDetailSource(repository)
     val viewModel: EmailDetailViewModel = viewModel(
         key = emailId,
-        factory = EmailDetailViewModel.Factory(emailId, repository)
+        factory = EmailDetailViewModel.Factory(emailId, source)
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val pdfDownloadStates by viewModel.pdfDownloadStates.collectAsStateWithLifecycle()
@@ -290,6 +291,8 @@ fun EmailDetailScreen(
     LaunchedEffect(uiState) {
         val details = when (val state = uiState) {
             EmailDetailUiState.Loading -> "state=Loading"
+            is EmailDetailUiState.ResolutionError ->
+                "state=ResolutionError reason=${state.reason.name} retryable=${state.retryable}"
             is EmailDetailUiState.PreparingBody ->
                 "state=PreparingBody metadataBodyLen=${state.email.body.length} " +
                     "metadataBodyKey=${EmailRenderTrace.bodyKey(state.email.body)}"
@@ -364,6 +367,35 @@ fun EmailDetailScreen(
                     EmailDetailLoading(Modifier.fillMaxSize())
                 }
 
+                is EmailDetailUiState.ResolutionError -> {
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            Icons.Filled.ErrorOutline,
+                            contentDescription = null,
+                            modifier = Modifier.size(48.dp),
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                        Spacer(Modifier.height(16.dp))
+                        Text(
+                            text = state.reason.toUiText().asString(),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        if (state.retryable) {
+                            Spacer(Modifier.height(16.dp))
+                            androidx.compose.material3.TextButton(
+                                onClick = { viewModel.onRetry() }
+                            ) {
+                                Text(stringResource(R.string.action_retry))
+                            }
+                        }
+                    }
+                }
+
                 is EmailDetailUiState.BodyError -> {
                     val pdfEmail = state.email
                     Column(
@@ -389,6 +421,14 @@ fun EmailDetailScreen(
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
+                                if (state.retryable) {
+                                    Spacer(Modifier.height(8.dp))
+                                    androidx.compose.material3.TextButton(
+                                        onClick = { viewModel.onRetryBody() }
+                                    ) {
+                                        Text(stringResource(R.string.action_retry))
+                                    }
+                                }
                             }
                         }
                         if (pdfEmail?.pdfAttachments?.isNotEmpty() == true) {

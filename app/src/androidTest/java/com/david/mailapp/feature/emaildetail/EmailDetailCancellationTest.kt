@@ -342,9 +342,10 @@ class EmailDetailCancellationTest {
     }
 
     private fun createViewModel(emailId: String): EmailDetailViewModel {
+        val source = RepositoryEmailDetailSource(repository)
         return ViewModelProvider(
             viewModelStore,
-            EmailDetailViewModel.Factory(emailId, repository)
+            EmailDetailViewModel.Factory(emailId, source)
         )[EmailDetailViewModel::class.java]
     }
 

@@ -38,6 +38,15 @@ interface EmailProvider {
     suspend fun markAsRead(emailId: String)
 
     /**
+     * Recovers a single message by its id, independent of search and cache.
+     *
+     * The result distinguishes a found message, a confirmed-inexistent message,
+     * and the different reasons a lookup can fail. CancellationException is
+     * always propagated, never converted into a result.
+     */
+    suspend fun fetchEmailById(emailId: String): EmailLookupResult
+
+    /**
      * Fetch the full HTML body of a message along with references to any inline images (format=full).
      * Returns null if the message cannot be fetched or parsed.
      */
@@ -87,3 +96,34 @@ data class BodyFetchResult(
     val inlineRefs: List<InlineImageRef>,
     val pdfAttachments: List<PdfAttachmentMetadata> = emptyList()
 )
+
+/**
+ * Typed outcome of [EmailProvider.fetchEmailById].
+ *
+ * Null is never used because it cannot distinguish a confirmed-inexistent
+ * message from a network error or an unparseable response. The contract
+ * exposes no HTTP codes, exceptions, or technical messages to upper layers.
+ */
+sealed interface EmailLookupResult {
+    data class Found(val email: Email) : EmailLookupResult
+    data object NotFound : EmailLookupResult
+    data class Failure(val reason: EmailLookupFailureReason) : EmailLookupResult
+}
+
+/** Why an individual email lookup failed. */
+enum class EmailLookupFailureReason {
+    /** Network/IO failure after exhausting retries. */
+    NO_CONNECTION,
+
+    /** Session expired or invalidated — reauthentication required. */
+    SESSION_EXPIRED,
+
+    /** Remote transient failure after exhausting retries. */
+    TEMPORARY_REMOTE,
+
+    /** Remote rejected the request (4xx other than 401/404). */
+    REMOTE_REJECTED,
+
+    /** Response was rejected, incomplete, or could not be interpreted. */
+    INVALID_RESPONSE
+}

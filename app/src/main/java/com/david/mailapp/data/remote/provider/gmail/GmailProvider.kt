@@ -2,7 +2,10 @@ package com.david.mailapp.data.remote.provider.gmail
 
 import android.os.SystemClock
 import android.util.Log
+import com.david.mailapp.core.network.OAuthSessionExpiredException
 import com.david.mailapp.data.remote.provider.BodyFetchResult
+import com.david.mailapp.data.remote.provider.EmailLookupFailureReason
+import com.david.mailapp.data.remote.provider.EmailLookupResult
 import com.david.mailapp.data.remote.provider.EmailProvider
 import com.david.mailapp.data.remote.provider.InlineImageRef
 import com.david.mailapp.data.remote.provider.ReplyContext
@@ -16,13 +19,19 @@ import io.ktor.client.request.get
 import io.ktor.client.request.parameter
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
+import io.ktor.client.statement.HttpResponse
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.isSuccess
+import java.io.IOException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 
 // DEBUG_PERF: tag central para filtrar en Logcat → tag:MailPerfTrace
 private const val PERF_TAG = "MailPerfTrace"
+private const val LOOKUP_TAG = "EmailLookup"
 private fun perfNow() = SystemClock.elapsedRealtime()
 
 /**
@@ -34,8 +43,116 @@ private fun perfNow() = SystemClock.elapsedRealtime()
  *   The returned [PaginatedResult.nextPageToken] drives subsequent pages.
  */
 class GmailProvider(
-    private val client: HttpClient
+    private val client: HttpClient,
+    private val lookupBackoffMillis: List<Long> = DEFAULT_LOOKUP_BACKOFF_MILLIS,
+    private val lookupDelay: suspend (Long) -> Unit = { delay(it) }
 ) : EmailProvider {
+
+    companion object {
+        /** Initial attempt + 2 retries, exclusively for network, 408, 429 and 5xx. */
+        internal const val MAX_LOOKUP_ATTEMPTS = 3
+
+        /** 250 ms after the initial attempt, 750 ms after the first retry. */
+        private val DEFAULT_LOOKUP_BACKOFF_MILLIS = listOf(250L, 750L)
+    }
+
+    // ── individual recovery ────────────────────────────────────
+
+    /**
+     * Recovers a single message by id: `GET users/me/messages/{emailId}?format=full`.
+     *
+     * Result classification:
+     *  - HTTP 200 valid → [EmailLookupResult.Found]
+     *  - HTTP 404 → [EmailLookupResult.NotFound]
+     *  - HTTP 401 or OAuth-detected expiration → SESSION_EXPIRED
+     *  - HTTP 408/429/5xx → retried; exhausted → TEMPORARY_REMOTE
+     *  - Other 4xx → REMOTE_REJECTED
+     *  - IOException → retried; exhausted → NO_CONNECTION
+     *  - Unparseable JSON → INVALID_RESPONSE
+     *  - Cancellation → always propagated, never converted into a result.
+     *
+     * A blank id is treated as INVALID_RESPONSE without touching the network.
+     */
+    override suspend fun fetchEmailById(emailId: String): EmailLookupResult {
+        val t0 = perfNow()
+        if (emailId.isBlank()) {
+            logLookup(emailId, attempts = 0, t0, "INVALID_RESPONSE")
+            return EmailLookupResult.Failure(EmailLookupFailureReason.INVALID_RESPONSE)
+        }
+
+        var attempt = 0
+        while (true) {
+            attempt++
+            Log.d(LOOKUP_TAG, "[LOOKUP] ATTEMPT id=$emailId attempt=$attempt")
+            try {
+                val response: HttpResponse = client.get("users/me/messages/$emailId") {
+                    parameter("format", "full")
+                }
+                when {
+                    response.status == HttpStatusCode.NotFound -> {
+                        logLookup(emailId, attempt, t0, "NOT_FOUND")
+                        return EmailLookupResult.NotFound
+                    }
+                    response.status == HttpStatusCode.Unauthorized -> {
+                        logLookup(emailId, attempt, t0, "SESSION_EXPIRED")
+                        return EmailLookupResult.Failure(EmailLookupFailureReason.SESSION_EXPIRED)
+                    }
+                    isTransientHttpError(response.status.value) -> {
+                        if (attempt < MAX_LOOKUP_ATTEMPTS) {
+                            waitBeforeRetry(attempt)
+                            continue
+                        }
+                        logLookup(emailId, attempt, t0, "TEMPORARY_REMOTE")
+                        return EmailLookupResult.Failure(EmailLookupFailureReason.TEMPORARY_REMOTE)
+                    }
+                    response.status.isSuccess() -> {
+                        return try {
+                            val message: MessageResponse = response.body()
+                            val email = message.toDomainEmail()
+                            logLookup(emailId, attempt, t0, "FOUND")
+                            EmailLookupResult.Found(email)
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            logLookup(emailId, attempt, t0, "INVALID_RESPONSE")
+                            EmailLookupResult.Failure(EmailLookupFailureReason.INVALID_RESPONSE)
+                        }
+                    }
+                    else -> {
+                        // Other 4xx (400, 403, …): rejected, never retried.
+                        logLookup(emailId, attempt, t0, "REMOTE_REJECTED")
+                        return EmailLookupResult.Failure(EmailLookupFailureReason.REMOTE_REJECTED)
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: OAuthSessionExpiredException) {
+                logLookup(emailId, attempt, t0, "SESSION_EXPIRED")
+                return EmailLookupResult.Failure(EmailLookupFailureReason.SESSION_EXPIRED)
+            } catch (e: IOException) {
+                if (attempt < MAX_LOOKUP_ATTEMPTS) {
+                    waitBeforeRetry(attempt)
+                    continue
+                }
+                logLookup(emailId, attempt, t0, "NO_CONNECTION")
+                return EmailLookupResult.Failure(EmailLookupFailureReason.NO_CONNECTION)
+            } catch (e: Exception) {
+                logLookup(emailId, attempt, t0, "INVALID_RESPONSE")
+                return EmailLookupResult.Failure(EmailLookupFailureReason.INVALID_RESPONSE)
+            }
+        }
+    }
+
+    private suspend fun waitBeforeRetry(attempt: Int) {
+        if (lookupBackoffMillis.isEmpty()) return
+        val delayMillis = lookupBackoffMillis.getOrElse(attempt - 1) { lookupBackoffMillis.last() }
+        lookupDelay(delayMillis)
+    }
+
+    /** Logs only id, attempt count, duration and result category — never content. */
+    private fun logLookup(emailId: String, attempts: Int, t0: Long, category: String) {
+        Log.d(LOOKUP_TAG, "[LOOKUP] RESULT id=$emailId attempts=$attempts durationMs=${perfNow() - t0} category=$category")
+    }
 
     // ── fetch ───────────────────────────────────────────────────
 

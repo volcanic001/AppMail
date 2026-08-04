@@ -6,7 +6,7 @@ import com.david.mailapp.data.repository.EmailActionResult
 import com.david.mailapp.domain.model.Email
 import kotlinx.coroutines.CancellationException
 
-internal sealed interface EmailReadOnOpenOutcome {
+sealed interface EmailReadOnOpenOutcome {
     data object Marked : EmailReadOnOpenOutcome
     data class Failure(val reason: UiErrorReason) : EmailReadOnOpenOutcome
 }

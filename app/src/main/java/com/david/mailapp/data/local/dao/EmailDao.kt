@@ -56,6 +56,10 @@ interface EmailDao {
     @Query("SELECT * FROM emails WHERE id = :emailId LIMIT 1")
     fun getById(emailId: String): Flow<EmailEntity?>
 
+    /** Suspendable single-point read for resolution and merge operations. */
+    @Query("SELECT * FROM emails WHERE id = :emailId LIMIT 1")
+    suspend fun getByIdOnce(emailId: String): EmailEntity?
+
     /** Insert or update a batch of emails (from remote sync). */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(emails: List<EmailEntity>)
@@ -84,12 +88,21 @@ interface EmailDao {
 
     /**
      * Replace the cached first page for a folder as one atomic operation,
-     * while preserving any previously downloaded data (HTML bodies, PDF metadata).
+     * while preserving any previously downloaded data (HTML bodies, PDF metadata,
+     * RFC headers) — even when the same ID already exists in a different folder
+     * (e.g. Other → Inbox / Other → Trash transitions).
      */
     @Transaction
     suspend fun replaceFolder(folder: String, emails: List<EmailEntity>) {
-        val existingEntities = getEntitiesByFolderSync(folder)
-        val existingById = existingEntities.associateBy { it.id }
+        val existingInFolder = getEntitiesByFolderSync(folder)
+        val existingById = existingInFolder.associateBy { it.id }.toMutableMap()
+
+        // Also look up by incoming IDs to cover cross-folder transitions
+        val incomingIds = emails.map { it.id }
+        val existingByIncomingId = getEntitiesByIdsSync(incomingIds).associateBy { it.id }
+        for ((id, entity) in existingByIncomingId) {
+            existingById.putIfAbsent(id, entity)
+        }
 
         clearFolder(folder)
 
@@ -98,6 +111,19 @@ interface EmailDao {
             if (existing != null) mergeWithExisting(entity, existing) else entity
         }
         upsertAll(preservedEmails)
+    }
+
+    /**
+     * Upsert a single entity, merging with any existing row to preserve
+     * body, cleanBody, PDF metadata, and RFC headers. Returns the merged
+     * entity as persisted in Room.
+     */
+    @Transaction
+    suspend fun upsertWithMerge(entity: EmailEntity): EmailEntity {
+        val existing = getByIdOnce(entity.id)
+        val merged = if (existing != null) mergeWithExisting(entity, existing) else entity
+        upsertAll(listOf(merged))
+        return getByIdOnce(entity.id) ?: merged
     }
 
     /**

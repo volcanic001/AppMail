@@ -33,7 +33,7 @@ internal fun MessageResponse.toDomainEmail(): Email {
         isStarred = labels.contains("STARRED"),
         hasAttachments = pdfAttachments.isNotEmpty(),
         labels = labels,
-        folder = if (labels.contains("TRASH")) EmailFolder.Trash else EmailFolder.Inbox,
+        folder = classifyGmailFolder(labels),
         pdfAttachments = pdfAttachments,
         pdfMetadataScanned = payload != null,
         rfcMessageId = msgId,
@@ -58,4 +58,24 @@ internal fun extractInitials(from: String): String {
         return email.firstOrNull { it.isLetterOrDigit() }?.uppercase() ?: "?"
     }
     return initials
+}
+
+/**
+ * Classifies a Gmail label set into the local primary [EmailFolder].
+ *
+ * Precedence:
+ *  1. Contains TRASH → [EmailFolder.Trash]
+ *  2. Contains INBOX → [EmailFolder.Inbox]
+ *  3. Any other combination → [EmailFolder.Other]
+ *
+ * Other represents sent, archived, spam, and any message that does not
+ * genuinely belong to Inbox or Trash. All original labels are preserved in
+ * [Email.labels]; this classifier only decides the primary local folder.
+ * Used both for individual recovery and for search results, always through
+ * [MessageResponse.toDomainEmail].
+ */
+internal fun classifyGmailFolder(labels: List<String>): EmailFolder = when {
+    labels.contains("TRASH") -> EmailFolder.Trash
+    labels.contains("INBOX") -> EmailFolder.Inbox
+    else -> EmailFolder.Other
 }

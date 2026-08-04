@@ -38,5 +38,6 @@ data class Email(
 @Stable
 enum class EmailFolder {
     Inbox,
-    Trash
+    Trash,
+    Other
 }
