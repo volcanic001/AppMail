@@ -37,11 +37,13 @@ fun MainNavHost(
     isDarkMode: Boolean,
     useCustomFont: Boolean,
     isAmoled: Boolean,
+    showEmailDividers: Boolean,
     isSigningOut: Boolean,
     onPaletteChange: (ColorPalette) -> Unit,
     onDarkModeChange: (Boolean) -> Unit,
     onUseCustomFontChange: (Boolean) -> Unit,
     onAmoledChange: (Boolean) -> Unit,
+    onShowEmailDividersChange: (Boolean) -> Unit,
     onSignOut: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -61,6 +63,7 @@ fun MainNavHost(
             InboxScreen(
                 listState = inboxListState,
                 highlightedEmailId = highlightedEmailId,
+                showEmailDividers = showEmailDividers,
                 onClearHighlight = {
                     backStackEntry.savedStateHandle[KEY_CLOSED_EMAIL_ID] = null
                 },
@@ -85,6 +88,7 @@ fun MainNavHost(
             TrashScreen(
                 listState = trashListState,
                 highlightedEmailId = highlightedEmailId,
+                showEmailDividers = showEmailDividers,
                 onClearHighlight = {
                     backStackEntry.savedStateHandle[KEY_CLOSED_EMAIL_ID] = null
                 },
@@ -104,11 +108,13 @@ fun MainNavHost(
                 isDarkMode = isDarkMode,
                 useCustomFont = useCustomFont,
                 isAmoled = isAmoled,
+                showEmailDividers = showEmailDividers,
                 isSigningOut = isSigningOut,
                 onPaletteChange = onPaletteChange,
                 onDarkModeChange = onDarkModeChange,
                 onUseCustomFontChange = onUseCustomFontChange,
                 onAmoledChange = onAmoledChange,
+                onShowEmailDividersChange = onShowEmailDividersChange,
                 onSignOut = onSignOut,
                 onBack = { navController.popBackStack() }
             )

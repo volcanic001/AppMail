@@ -33,10 +33,12 @@ fun SettingsNavHost(
     isDarkMode: Boolean,
     useCustomFont: Boolean,
     isAmoled: Boolean = false,
+    showEmailDividers: Boolean = true,
     onPaletteChange: (ColorPalette) -> Unit,
     onDarkModeChange: (Boolean) -> Unit,
     onUseCustomFontChange: (Boolean) -> Unit,
     onAmoledChange: (Boolean) -> Unit = {},
+    onShowEmailDividersChange: (Boolean) -> Unit = {},
     isSigningOut: Boolean = false,
     onSignOut: () -> Unit,
     onBack: () -> Unit,
@@ -96,10 +98,12 @@ fun SettingsNavHost(
                 isDarkMode = isDarkMode,
                 useCustomFont = useCustomFont,
                 isAmoled = isAmoled,
+                showEmailDividers = showEmailDividers,
                 onPaletteChange = onPaletteChange,
                 onDarkModeChange = onDarkModeChange,
                 onUseCustomFontChange = onUseCustomFontChange,
                 onAmoledChange = onAmoledChange,
+                onShowEmailDividersChange = onShowEmailDividersChange,
                 onBack = { navController.popBackStack() }
             )
         }

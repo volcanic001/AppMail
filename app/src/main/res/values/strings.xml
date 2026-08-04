@@ -104,6 +104,10 @@
     <string name="color_basic_title">Colores básicos</string>
     <string name="color_basic_description">Elige un tono sólido de Material Design 3</string>
 
+    <!-- Separadores -->
+    <string name="dividers_title">Líneas separadoras</string>
+    <string name="dividers_description">Muestra las líneas entre cada correo en la lista</string>
+
     <!-- Paletas -->
     <string name="palette_dynamic">Dinámico</string>
     <string name="palette_blue">Azul</string>

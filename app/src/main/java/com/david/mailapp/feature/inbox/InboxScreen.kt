@@ -83,6 +83,7 @@ import kotlinx.coroutines.launch
 fun InboxScreen(
     listState: LazyListState,
     highlightedEmailId: String? = null,
+    showEmailDividers: Boolean = true,
     onClearHighlight: () -> Unit = {},
     onMenuClick: () -> Unit = {},
     onSearchClick: () -> Unit = {},
@@ -274,6 +275,7 @@ fun InboxScreen(
                                     onClick = onClickRemembered,
                                     onDelete = onDeleteRemembered,
                                     actionsEnabled = email.id !in state.activeActionEmailIds,
+                                    showDivider = showEmailDividers,
                                     isHighlighted = (email.id == highlightedEmailId),
                                     onClearHighlight = onClearHighlight,
                                     modifier = Modifier.animateItem(

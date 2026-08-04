@@ -74,6 +74,7 @@ fun EmailListItem(
     onDelete: () -> Unit,
     onRestore: (() -> Unit)? = null,
     actionsEnabled: Boolean = true,
+    showDivider: Boolean = true,
     isHighlighted: Boolean = false,
     onClearHighlight: () -> Unit = {},
     modifier: Modifier = Modifier
@@ -330,11 +331,13 @@ fun EmailListItem(
                     )
                 }
             }
-            HorizontalDivider(
-                modifier = Modifier.padding(start = 72.dp),
-                thickness = 0.5.dp,
-                color = MaterialTheme.colorScheme.outlineVariant
-            )
+            if (showDivider) {
+                HorizontalDivider(
+                    modifier = Modifier.padding(start = 72.dp),
+                    thickness = 0.5.dp,
+                    color = MaterialTheme.colorScheme.outlineVariant
+                )
+            }
         }
     }
 }

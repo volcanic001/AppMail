@@ -74,6 +74,7 @@ fun TrashContent(
     listState: LazyListState,
     snackbarHostState: SnackbarHostState,
     highlightedEmailId: String?,
+    showEmailDividers: Boolean = true,
     onEmailClick: (String) -> Unit,
     onDeletePermanently: (String) -> Unit,
     onRestoreToInbox: (String) -> Unit,
@@ -170,6 +171,7 @@ fun TrashContent(
                             onRestore = onRestoreRemembered,
                             actionsEnabled = email.id !in state.activeActionEmailIds &&
                                 email.id != pendingDeleteEmailId,
+                            showDivider = showEmailDividers,
                             isHighlighted = (email.id == highlightedEmailId),
                             onClearHighlight = onClearHighlight,
                             modifier = Modifier.animateItem(placementSpec = MotionTokens.listReorganize)

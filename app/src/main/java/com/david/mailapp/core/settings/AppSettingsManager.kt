@@ -22,6 +22,7 @@ class AppSettingsManager(private val context: Context) {
         private val IS_DARK_MODE_KEY = booleanPreferencesKey("is_dark_mode")
         private val USE_CUSTOM_FONT_KEY = booleanPreferencesKey("use_custom_font")
         private val IS_AMOLED_KEY = booleanPreferencesKey("is_amoled")
+        private val SHOW_EMAIL_DIVIDERS_KEY = booleanPreferencesKey("show_email_dividers")
     }
 
     val paletteFlow: Flow<ColorPalette?> = store.data.map { prefs ->
@@ -45,6 +46,10 @@ class AppSettingsManager(private val context: Context) {
         prefs[IS_AMOLED_KEY]
     }
 
+    val showEmailDividersFlow: Flow<Boolean?> = store.data.map { prefs ->
+        prefs[SHOW_EMAIL_DIVIDERS_KEY]
+    }
+
     suspend fun setPalette(palette: ColorPalette) {
         store.edit { prefs ->
             prefs[PALETTE_KEY] = palette.name
@@ -66,6 +71,12 @@ class AppSettingsManager(private val context: Context) {
     suspend fun setAmoled(isAmoled: Boolean) {
         store.edit { prefs ->
             prefs[IS_AMOLED_KEY] = isAmoled
+        }
+    }
+
+    suspend fun setShowEmailDividers(show: Boolean) {
+        store.edit { prefs ->
+            prefs[SHOW_EMAIL_DIVIDERS_KEY] = show
         }
     }
 }

@@ -41,11 +41,13 @@ fun MainScreen(
     isDarkMode: Boolean = false,
     useCustomFont: Boolean = false,
     isAmoled: Boolean = false,
+    showEmailDividers: Boolean = true,
     isSigningOut: Boolean = false,
     onPaletteChange: (ColorPalette) -> Unit = {},
     onDarkModeChange: (Boolean) -> Unit = {},
     onUseCustomFontChange: (Boolean) -> Unit = {},
     onAmoledChange: (Boolean) -> Unit = {},
+    onShowEmailDividersChange: (Boolean) -> Unit = {},
     onSignOut: () -> Unit = {},
     navController: NavHostController = rememberNavController()
 ) {
@@ -109,11 +111,13 @@ fun MainScreen(
                 isDarkMode = isDarkMode,
                 useCustomFont = useCustomFont,
                 isAmoled = isAmoled,
+                showEmailDividers = showEmailDividers,
                 isSigningOut = isSigningOut,
                 onPaletteChange = onPaletteChange,
                 onDarkModeChange = onDarkModeChange,
                 onUseCustomFontChange = onUseCustomFontChange,
                 onAmoledChange = onAmoledChange,
+                onShowEmailDividersChange = onShowEmailDividersChange,
                 onSignOut = onSignOut
             )
 

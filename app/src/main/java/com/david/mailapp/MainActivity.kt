@@ -86,6 +86,7 @@ class MainActivity : ComponentActivity() {
             val savedDarkMode by AppContainer.appSettingsManager.isDarkModeFlow.collectAsState(initial = null)
             val savedUseCustomFont by AppContainer.appSettingsManager.useCustomFontFlow.collectAsState(initial = null)
             val savedIsAmoled by AppContainer.appSettingsManager.isAmoledFlow.collectAsState(initial = null)
+            val savedShowEmailDividers by AppContainer.appSettingsManager.showEmailDividersFlow.collectAsState(initial = null)
             val isSignedIn by isSignedInFlow.collectAsState()
             val oauthUiState by oauthUiStateFlow.collectAsState()
             var isSigningOut by remember { mutableStateOf(false) }
@@ -96,6 +97,7 @@ class MainActivity : ComponentActivity() {
             val isDark = savedDarkMode ?: systemDark
             val useCustomFont = savedUseCustomFont ?: false
             val isAmoled = savedIsAmoled ?: false
+            val showEmailDividers = savedShowEmailDividers ?: true
 
             // Transparent edge-to-edge — updates dynamically with dark/light mode
             LaunchedEffect(isDark) {
@@ -120,6 +122,7 @@ class MainActivity : ComponentActivity() {
                         isDarkMode = isDark,
                         useCustomFont = useCustomFont,
                         isAmoled = isAmoled,
+                        showEmailDividers = showEmailDividers,
                         isSigningOut = isSigningOut,
                         onPaletteChange = { newPalette ->
                             scope.launch { AppContainer.appSettingsManager.setPalette(newPalette) }
@@ -132,6 +135,9 @@ class MainActivity : ComponentActivity() {
                         },
                         onAmoledChange = { newAmoled ->
                             scope.launch { AppContainer.appSettingsManager.setAmoled(newAmoled) }
+                        },
+                        onShowEmailDividersChange = { newShow ->
+                            scope.launch { AppContainer.appSettingsManager.setShowEmailDividers(newShow) }
                         },
                         onSignOut = {
                             scope.launch {

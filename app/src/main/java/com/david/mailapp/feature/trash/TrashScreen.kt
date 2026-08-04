@@ -56,6 +56,7 @@ import com.david.mailapp.core.localization.toUiText
 fun TrashScreen(
     listState: LazyListState,
     highlightedEmailId: String? = null,
+    showEmailDividers: Boolean = true,
     onClearHighlight: () -> Unit = {},
     onMenuClick: () -> Unit = {},
     onEmailClick: (String) -> Unit = {},
@@ -117,6 +118,7 @@ fun TrashScreen(
                     listState = listState,
                     snackbarHostState = snackbarHostState,
                     highlightedEmailId = highlightedEmailId,
+                    showEmailDividers = showEmailDividers,
                     onEmailClick = onEmailClick,
                     onDeletePermanently = viewModel::deletePermanently,
                     onRestoreToInbox = viewModel::restoreToInbox,

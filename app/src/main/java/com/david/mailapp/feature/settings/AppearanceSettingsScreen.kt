@@ -50,10 +50,12 @@ fun AppearanceSettingsScreen(
     isDarkMode: Boolean,
     useCustomFont: Boolean,
     isAmoled: Boolean = false,
+    showEmailDividers: Boolean = true,
     onPaletteChange: (ColorPalette) -> Unit,
     onDarkModeChange: (Boolean) -> Unit,
     onUseCustomFontChange: (Boolean) -> Unit,
     onAmoledChange: (Boolean) -> Unit = {},
+    onShowEmailDividersChange: (Boolean) -> Unit = {},
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -182,6 +184,21 @@ fun AppearanceSettingsScreen(
                                 newPalette = newPalette
                             )
                             onPaletteChange(newPalette)
+                        }
+                    )
+                }
+            }
+
+            // ── Email Dividers ────────────────────────────────
+            item(key = "email_dividers") {
+                SettingsCard(position = SettingsCardPosition.Middle) {
+                    SettingsListItem(
+                        headline = stringResource(R.string.dividers_title),
+                        supporting = stringResource(R.string.dividers_description),
+                        trailingSwitch = true,
+                        checked = showEmailDividers,
+                        onCheckedChange = { checked ->
+                            onShowEmailDividersChange(checked)
                         }
                     )
                 }
