@@ -152,6 +152,7 @@ fun MainNavHost(
                 listState = searchListState,
                 entryKey = entryKey,
                 highlightedEmailId = highlightedEmailId,
+                showEmailDividers = showEmailDividers,
                 onClearHighlight = {
                     backStackEntry.savedStateHandle[KEY_CLOSED_EMAIL_ID] = null
                 },

@@ -62,6 +62,7 @@ fun SearchResultItem(
     delayMs: Int,
     onClick: () -> Unit,
     isHighlighted: Boolean = false,
+    showDivider: Boolean = true,
     onClearHighlight: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -193,11 +194,13 @@ fun SearchResultItem(
             }
         }
     }
-    HorizontalDivider(
-        modifier = Modifier.padding(start = 72.dp),
-        thickness = 0.5.dp,
-        color = MaterialTheme.colorScheme.outlineVariant
-    )
+    if (showDivider) {
+        HorizontalDivider(
+            modifier = Modifier.padding(start = 72.dp),
+            thickness = 0.5.dp,
+            color = MaterialTheme.colorScheme.outlineVariant
+        )
+    }
 }
 }
 

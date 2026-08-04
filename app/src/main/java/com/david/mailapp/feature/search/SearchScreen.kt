@@ -46,6 +46,7 @@ fun SearchScreen(
     onEmailClick: (String) -> Unit,
     listState: LazyListState,
     highlightedEmailId: String? = null,
+    showEmailDividers: Boolean = true,
     onClearHighlight: () -> Unit = {},
     modifier: Modifier = Modifier,
     entryKey: Any = Unit
@@ -139,6 +140,7 @@ fun SearchScreen(
                         viewModel = viewModel,
                         listState = listState,
                         highlightedEmailId = highlightedEmailId,
+                        showEmailDividers = showEmailDividers,
                         onClearHighlight = onClearHighlight,
                         onEmailClick = onEmailClick
                     )
@@ -165,6 +167,7 @@ private fun ResultList(
     viewModel: SearchViewModel,
     listState: LazyListState,
     highlightedEmailId: String? = null,
+    showEmailDividers: Boolean = true,
     onClearHighlight: () -> Unit = {},
     onEmailClick: (String) -> Unit
 ) {
@@ -181,6 +184,7 @@ private fun ResultList(
                 query = state.query,
                 delayMs = index * MotionTokens.staggerDelayMs,
                 isHighlighted = (email.id == highlightedEmailId),
+                showDivider = showEmailDividers,
                 onClearHighlight = onClearHighlight,
                 onClick = { onEmailClick(email.id) }
             )
