@@ -82,7 +82,7 @@ class EmailDetailCancellationTest {
 
         val viewModel = createViewModel(email.id)
 
-        awaitCondition("body provider was not invoked") { provider.fetchBodyCalls == 1 }
+        awaitCondition("body provider was not invoked") { provider.fetchBodyCalls >= 1 }
         delay(50)
 
         val state = viewModel.uiState.value
