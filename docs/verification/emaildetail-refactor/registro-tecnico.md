@@ -46,7 +46,7 @@ crearán únicamente en las subfases 1.3 y 1.4, cuando existan evidencias reales
 | Subfase 1.2   | Baseline JVM, compilación y análisis | Aprobada |
 | Subfase 1.3   | Baseline instrumentado en emulador | Aprobada |
 | Subfase 1.4   | Baseline manual y visual en dispositivo físico | Aprobada |
-| Etapa 2       | Extraer código independiente       | Pendiente  |
+| Etapa 2       | Extraer código independiente       | Aprobada   |
 | Etapa 3       | Extraer bloques visuales           | Pendiente  |
 | Etapa 4       | Separar Route y UI                 | Pendiente  |
 | Etapa 5       | Cierre integral                    | Pendiente  |
@@ -757,3 +757,234 @@ La subfase queda aprobada únicamente si:
 **Resultado final: Subfase 1.4 APROBADA el 2026-08-06.**
 **Etapa 1 (Baseline y protección) COMPLETADA — commit de etapa verificado con `git log --oneline -1`.**
 **Siguiente paso: Etapa 2 — Subfase 2.1 (Política de nombres PDF).**
+
+## 16. Subfase 2.1 — Política de nombres PDF
+
+**Estado: APROBADA** (2026-08-06).
+
+### 16.1 Cambios de implementación
+
+- Creado `PdfFileNaming.kt` en `com.david.mailapp.feature.emaildetail` con:
+  - `internal fun sanitizeDisplayName(name: String, defaultName: String): String` (textual, incluyendo KDoc)
+  - `internal fun buildPdfSuggestedName(displayName: String, defaultName: String): String` (textual, incluyendo KDoc)
+- Eliminados ambos bloques de `EmailDetailScreen.kt` (líneas 1052–1066 originales).
+- Sin cambios en consumidores, imports ni pruebas (mismo paquete).
+- Sin modificar repositorio, ViewModel, navegación, recursos, Gradle, HTML/WebView, MainActivity.kt ni SearchScreen.kt.
+
+### 16.2 Validación
+
+- `./gradlew testDebugUnitTest --tests 'PdfAttachmentFormattingTest' --rerun-tasks` → BUILD SUCCESSFUL, **35/35** (0 fallos, 0 errores, 0 omitidas).
+- `./gradlew compileDebugKotlin` → BUILD SUCCESSFUL.
+- Búsqueda estática: ambas funciones tienen una sola definición, en `PdfFileNaming.kt`; cero ocurrencias residuales en `EmailDetailScreen.kt`.
+- Firma pública de `EmailDetailScreen(emailId, onBack, onReply, onForward, modifier)` intacta.
+- Hashes protegidos: MainActivity.kt `a8275404...` ✓, SearchScreen.kt `3966a9fe...` ✓.
+- Working tree: solo los cambios de esta subfase (`PdfFileNaming.kt` nuevo, `EmailDetailScreen.kt` reducido, registro actualizado) más los cambios previos ajenos del usuario (MainActivity.kt, SearchScreen.kt).
+
+### 16.3 Criterios de aceptación
+
+- [x] Misma API interna y comportamiento byte por byte de las dos funciones.
+- [x] 35/35 pruebas específicas verdes.
+- [x] Compilación verde.
+- [x] Ningún cambio de producción fuera de EmailDetailScreen.kt y PdfFileNaming.kt.
+- [x] Hashes de MainActivity.kt y SearchScreen.kt conservados.
+- [x] Firma pública de EmailDetailScreen conservada.
+- [x] Registro técnico actualizado.
+- [x] Working tree conserva los dos cambios previos del usuario sin stagear.
+- [x] No se crea commit hasta cerrar toda la Etapa 2 (Subfase 2.5).
+
+**Resultado final: Subfase 2.1 APROBADA el 2026-08-06.**
+**Siguiente paso: Subfase 2.2 — Copiado de archivos PDF.**
+
+## 17. Subfase 2.2 — Copiado de archivos PDF
+
+**Estado: APROBADA** (2026-08-06).
+
+### 17.1 Cambios de implementación
+
+- Creado `PdfFileCopy.kt` en `com.david.mailapp.feature.emaildetail` con:
+  - `internal fun copyFileToUri(context, source, destinationUri): Boolean` (textual, incluyendo KDoc y tipos cualificados)
+  - `internal fun copyFileToStream(source, output): Boolean` (textual, incluyendo KDoc y tipos cualificados)
+- Eliminados ambos bloques de `EmailDetailScreen.kt` (líneas 1049–1097 originales tras 2.1).
+- Sin cambios en consumidores, imports ni pruebas (mismo paquete).
+- Hash baseline de entrada de `EmailDetailScreen.kt`: `e9b96a5ecb7f76eb6e7906dc469293af8346f1d53b3f3b6fcc04d562286e80f2` (verificado antes de la extracción).
+
+### 17.2 Validación
+
+- `./gradlew testDebugUnitTest --tests 'PdfSaveFileCopyTest' --rerun-tasks` → BUILD SUCCESSFUL, **2/2** (0 fallos, 0 errores, 0 omitidas).
+- `./gradlew assembleDebug --rerun-tasks` → BUILD SUCCESSFUL.
+- Búsqueda estática: ambas funciones solo en `PdfFileCopy.kt`; cero residuales en `EmailDetailScreen.kt`.
+- Hashes protegidos: MainActivity.kt `a8275404...` ✓, SearchScreen.kt `3966a9fe...` ✓.
+- Cambios propios acumulados Etapa 2: `EmailDetailScreen.kt`, `PdfFileNaming.kt`, `PdfFileCopy.kt`, `registro-tecnico.md`.
+
+### 17.3 Criterios de aceptación
+
+- [x] API interna y comportamiento exactos (buffer 8192, `.use`, `"wt"`, `totalWritten == sourceSize`, captura `catch (_: Exception)`).
+- [x] 2/2 pruebas `PdfSaveFileCopyTest` verdes.
+- [x] `assembleDebug` verde.
+- [x] Ningún cambio de producción fuera de los archivos permitidos.
+- [x] Hashes de MainActivity.kt y SearchScreen.kt conservados.
+- [x] Registro técnico actualizado.
+- [x] Working tree conserva los cambios previos del usuario sin stagear.
+- [x] No se crea commit hasta cerrar toda la Etapa 2 (Subfase 2.5).
+
+**Resultado final: Subfase 2.2 APROBADA el 2026-08-06.**
+**Siguiente paso: Subfase 2.3 — Etiquetas de acciones PDF.**
+
+## 18. Subfase 2.3 — Etiquetas de acciones PDF
+
+**Estado: APROBADA** (2026-08-06).
+
+### 18.1 Cambios de implementación
+
+- Creado `PdfActionLabels.kt` en `com.david.mailapp.feature.emaildetail` con:
+  - `internal data class PdfActionLabels` (7 campos: `cacheExpired`, `saved`, `saveFailed`, `noFilePicker`, `pickerOpenFailed`, `noViewer`, `openFailed` — mismo orden, visibilidad y comentario de sección).
+- Eliminado de `EmailDetailScreen.kt` el comentario y la clase (líneas 1134–1145 originales tras 2.2).
+- Sin cambios en la construcción de `pdfLabels` (línea 165) ni en consumidores.
+- Hash baseline de entrada de `EmailDetailScreen.kt`: `2e6df4d1333a3da67590ffcf54f3f330fb661cd39bffe7253e638aa281769f95` (verificado antes de la extracción).
+
+### 18.2 Validación
+
+- `./gradlew testDebugUnitTest --tests 'EmailDetailContractsTest' --rerun-tasks` → BUILD SUCCESSFUL, **5/5** (0 fallos, 0 errores, 0 omitidas).
+- `./gradlew assembleDebug --rerun-tasks` → BUILD SUCCESSFUL.
+- Búsqueda estática: `PdfActionLabels` definido una sola vez, en `PdfActionLabels.kt`; cero residuales en `EmailDetailScreen.kt`. Siete campos, mismo orden y nombres. Construcción en línea 165 conserva los siete recursos.
+- Hashes protegidos: MainActivity.kt `a8275404...` ✓, SearchScreen.kt `3966a9fe...` ✓.
+- Cambios propios acumulados Etapa 2: `EmailDetailScreen.kt`, `PdfFileNaming.kt`, `PdfFileCopy.kt`, `PdfActionLabels.kt`, `registro-tecnico.md`.
+- Corregidos los pendientes "[ ] No se crea commit…" de 2.1 (16.3) y 2.2 (17.3) → `[x]`.
+
+### 18.3 Criterios de aceptación
+
+- [x] PdfActionLabels conserva visibilidad `internal`, 7 campos, orden y semántica.
+- [x] Ningún mensaje ni recurso resuelto cambió.
+- [x] 5/5 pruebas `EmailDetailContractsTest` verdes.
+- [x] `assembleDebug` verde.
+- [x] Ningún cambio de producción fuera de los archivos permitidos.
+- [x] Hashes de MainActivity.kt y SearchScreen.kt conservados.
+- [x] Registro técnico actualizado.
+- [x] Working tree conserva los cambios previos del usuario sin stagear.
+- [x] No se crea commit hasta cerrar toda la Etapa 2 (Subfase 2.5).
+
+**Resultado final: Subfase 2.3 APROBADA el 2026-08-06.**
+**Siguiente paso: Subfase 2.4 — Iconos de detalle.**
+
+## 19. Subfase 2.4 — Iconos de detalle
+
+**Estado: APROBADA** (2026-08-06).
+
+### 19.1 Cambios de implementación
+
+- Creado `EmailDetailIcons.kt` en `com.david.mailapp.feature.emaildetail` con:
+  - `val MaterialSymbolsReply: ImageVector` + caché privada (textual, geometría, viewport, paths, colores)
+  - `val TablerArrowForwardUpDouble: ImageVector` + caché privada (textual, geometría, viewport, paths, strokes, caps, joins)
+  - Imports exclusivos añadidos: `Color`, `SolidColor`, `StrokeCap`, `StrokeJoin`, `ImageVector`, `vector.path`, `dp`.
+- Eliminado de `EmailDetailScreen.kt` el bloque completo de iconos (líneas 1047–1132) y los imports exclusivos (`SolidColor`, `StrokeCap`, `StrokeJoin`, `vector.path`).
+- Sin cambios en consumidores de responder/reenviar (mismo paquete).
+- Hash baseline de entrada de `EmailDetailScreen.kt`: `ebc5569f7fd173a482f869520bcd7a331deac8df3111d447a441976d980ab0d6` (verificado).
+
+### 19.2 Validación automatizada
+
+- `./gradlew testDebugUnitTest --tests 'EmailDetailContractsTest' --rerun-tasks` → BUILD SUCCESSFUL, **5/5** (0 fallos, 0 errores, 0 omitidas).
+- `./gradlew compileDebugKotlin` → BUILD SUCCESSFUL.
+- `./gradlew assembleDebug --rerun-tasks` → BUILD SUCCESSFUL.
+- Búsqueda estática: cada vector tiene una sola definición, en `EmailDetailIcons.kt`; cada caché privada junto a su vector; cero paths/cachés residuales en `EmailDetailScreen.kt`.
+- Hashes protegidos: MainActivity.kt `a8275404...` ✓, SearchScreen.kt `3966a9fe...` ✓.
+- Cambios propios acumulados Etapa 2: `EmailDetailScreen.kt`, `PdfFileNaming.kt`, `PdfFileCopy.kt`, `PdfActionLabels.kt`, `EmailDetailIcons.kt`, `registro-tecnico.md`.
+
+### 19.3 Gate visual
+
+- [x] APK instalado con `adb install -r` preservando sesión y datos.
+- [x] Configuración baseline aplicada temporalmente: Pixel 9, oscuro, Blue, sin AMOLED, fuente estándar.
+- [x] Fixture `MAILAPP_BASELINE_1_4_20260805` abierto con encabezado cerrado.
+- [x] Iconos de responder/reenviar comparados contra `03-ready-header-cerrado.png`: misma forma, tamaño, color, alineación y separación — sin diferencias.
+- [x] Preferencias del usuario restauradas, sesión/red estables confirmadas.
+
+### 19.4 Criterios de aceptación
+
+- [x] Ninguna API pública cambia.
+- [x] Vectores y cachés conservan contenido exacto (geometría, paths, colores, strokes, viewports, caches).
+- [x] 5/5 pruebas `EmailDetailContractsTest` verdes.
+- [x] Compilación y `assembleDebug --rerun-tasks` verdes.
+- [x] Comparación visual sin diferencias (gate 19.3).
+- [x] Cambios propios acumulados correctos (6 archivos).
+- [x] Hashes de MainActivity.kt y SearchScreen.kt conservados.
+- [x] Working tree conserva los cambios previos del usuario sin stagear.
+- [x] No se crea commit hasta cerrar toda la Etapa 2 (Subfase 2.5).
+
+**Resultado final: Subfase 2.4 APROBADA el 2026-08-06.**
+**Siguiente paso: Subfase 2.5 — Helpers de apertura PDF (última de Etapa 2).**
+
+## 20. Subfase 2.5 — Helpers de apertura PDF
+
+**Estado: APROBADA** (2026-08-06).
+
+### 20.1 Cambios de implementación
+
+- Creado `PdfExternalActionHandler.kt` en `com.david.mailapp.feature.emaildetail` con:
+  - `internal suspend fun handlePdfExternalActionRequest(...)`, extraída sin alterar la resolución del repositorio, el trabajo en `Dispatchers.IO`, la expiración de caché, el saneamiento del nombre ni los mensajes mostrados.
+  - `private suspend fun openPdfIntent(...)`, extraída conservando `FileProvider`, `ACTION_VIEW`, MIME PDF, flags, `ClipData` y manejo de excepciones.
+- Eliminados de `EmailDetailScreen.kt` ambos helpers y sus imports exclusivos (`Intent` y `FileProvider`).
+- Se conserva `ActivityNotFoundException` en `EmailDetailScreen.kt` porque también lo utiliza el launcher SAF.
+- La llamada consumidora permanece sin cambios funcionales; la visibilidad de `handlePdfExternalActionRequest` pasa de `private` a `internal`, el mínimo necesario para compartirla dentro del paquete/módulo.
+- Hash baseline de entrada de `EmailDetailScreen.kt`: `4652aedbe20e868275da4304e27323dc69d4c248ea9021897e50d7603b12de7b` (verificado antes de la extracción).
+
+### 20.2 Validación
+
+- Suite PDF focalizada → BUILD SUCCESSFUL, **85/85** (0 fallos, 0 errores, 0 omitidas):
+  - `PdfAttachmentFormattingTest`: 35.
+  - `PdfSaveFileCopyTest`: 2.
+  - `EmailDetailViewModelPdfTest`: 26.
+  - `PdfCacheManagerTest`: 22.
+- `./gradlew assembleDebug --rerun-tasks` → BUILD SUCCESSFUL.
+- Búsqueda estática: una sola definición de cada helper; `openPdfIntent` continúa privado; no quedan bloques residuales ni imports exclusivos en `EmailDetailScreen.kt`.
+- Hash final de `EmailDetailScreen.kt`: `201e2c0e6131f7f92653a8c424abd4b5df1460280fe2672b58b5ab4a2c85086b`.
+- Hash de `PdfExternalActionHandler.kt`: `9cf44133e3107c4859d8d1e972dd4bc858e8503fd2683f3c5c695862fc82219c`.
+- Hashes protegidos: MainActivity.kt `a8275404...` ✓, SearchScreen.kt `3966a9fe...` ✓; diff combinado protegido `84adbdbe...` ✓.
+- Cambios propios acumulados Etapa 2: `EmailDetailScreen.kt`, `PdfFileNaming.kt`, `PdfFileCopy.kt`, `PdfActionLabels.kt`, `EmailDetailIcons.kt`, `PdfExternalActionHandler.kt`, `registro-tecnico.md`.
+
+### 20.3 Criterios de aceptación
+
+- [x] Flujo de apertura PDF y mensajes conservados sin cambios funcionales.
+- [x] La única ampliación de visibilidad es `handlePdfExternalActionRequest`: `private` → `internal`.
+- [x] `openPdfIntent` continúa privado.
+- [x] Suite PDF focalizada: 85/85 pruebas verdes.
+- [x] `assembleDebug --rerun-tasks` verde.
+- [x] Ninguna API pública cambia.
+- [x] Hashes de MainActivity.kt y SearchScreen.kt conservados.
+- [x] Working tree conserva los cambios previos del usuario sin stagear.
+- [x] Registro técnico actualizado y Etapa 2 marcada `En curso`.
+- [x] No se crea commit antes de la auditoría consolidada de Etapa 2.
+
+**Resultado final: Subfase 2.5 APROBADA el 2026-08-06.**
+**Siguiente paso: auditoría consolidada de Etapa 2 y, si todos sus gates pasan, commit de Etapa 2.**
+
+## 21. Auditoría consolidada — Etapa 2
+
+**Estado: APROBADA** (2026-08-06).
+
+### 21.1 Gates automatizados
+
+- `./gradlew testDebugUnitTest --rerun-tasks` → BUILD SUCCESSFUL, **573/573** pruebas (0 fallos, 0 errores, 0 omitidas).
+- Cobertura PDF focalizada incluida y previamente ejecutada de forma aislada: **85/85** pruebas verdes (`PdfAttachmentFormattingTest` 35, `PdfSaveFileCopyTest` 2, `EmailDetailViewModelPdfTest` 26 y `PdfCacheManagerTest` 22).
+- `./gradlew assembleDebug --rerun-tasks` → BUILD SUCCESSFUL; APK generado correctamente.
+- `git diff --check` → sin errores.
+- Las advertencias emitidas corresponden a deprecaciones preexistentes; no hubo errores nuevos de compilación ni pruebas.
+
+### 21.2 Auditoría de alcance y comportamiento
+
+- Los cinco bloques previstos fueron extraídos a archivos cohesivos: política de nombres PDF, copiado PDF, etiquetas PDF, iconos de detalle y helpers de apertura PDF.
+- Cada función, clase, vector y caché extraídos tiene una sola definición; no existe duplicación residual en `EmailDetailScreen.kt`.
+- No cambió ningún archivo de recursos, ViewModel, repositorio, capa de datos ni dominio.
+- Se conservaron firmas, lógica, buffers, nombres, orden de campos, strings, geometría vectorial, FileProvider, MIME, flags, `clipData`, errores y snackbars.
+- La única ampliación de visibilidad fue la mecánicamente necesaria para `handlePdfExternalActionRequest`: `private` → `internal`; no se introdujo API pública.
+- La comparación visual de Subfase 2.4 quedó aprobada sin diferencias en los iconos de responder/reenviar.
+- Archivos propios de Etapa 2: `EmailDetailScreen.kt`, `PdfFileNaming.kt`, `PdfFileCopy.kt`, `PdfActionLabels.kt`, `EmailDetailIcons.kt`, `PdfExternalActionHandler.kt` y este registro técnico.
+
+### 21.3 Protección y cierre
+
+- `MainActivity.kt`: `a8275404afe60158d08616487124020b64d6aa1df2cb0f02f4c56c1d3b52cd55` ✓.
+- `SearchScreen.kt`: `3966a9feace5bbae418969414e7a543c26ee4909a0914ddc75eee450401d89b3` ✓.
+- Diff combinado protegido: `84adbdbeee0dd263c5b3ab94b56b996dd5adf51c08a2f60c6e2f2f7bbb9c224e` ✓.
+- Los dos archivos ajenos permanecen fuera del alcance y del commit de Etapa 2.
+- Commit de etapa previsto por el plan maestro: `refactor(emaildetail): extract independent pdf and icon support`.
+
+**Resultado final: Etapa 2 APROBADA el 2026-08-06.**
+**Siguiente paso después del commit: Etapa 3, Subfase 3.1 — Encabezado flotante.**
