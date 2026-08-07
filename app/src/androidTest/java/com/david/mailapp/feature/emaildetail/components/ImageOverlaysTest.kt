@@ -4,6 +4,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -29,10 +30,12 @@ class ImageOverlaysTest {
 
         composeRule.setContent {
             MaterialTheme {
+                val imageSaveScope = rememberCoroutineScope()
                 var activeUrl by remember { mutableStateOf<String?>(VALID_IMAGE_DATA_URI) }
                 activeUrl?.let { imageUrl ->
                     ImageActionSheet(
                         activeImageUrl = imageUrl,
+                        saveCoroutineScope = imageSaveScope,
                         onOpenFullscreen = { openedUrl = it },
                         onDismiss = { activeUrl = null }
                     )
@@ -58,10 +61,12 @@ class ImageOverlaysTest {
 
         composeRule.setContent {
             MaterialTheme {
+                val imageSaveScope = rememberCoroutineScope()
                 var activeUrl by remember { mutableStateOf<String?>(VALID_IMAGE_DATA_URI) }
                 activeUrl?.let { imageUrl ->
                     ImageActionSheet(
                         activeImageUrl = imageUrl,
+                        saveCoroutineScope = imageSaveScope,
                         onOpenFullscreen = {},
                         onDismiss = {
                             dismissCount++

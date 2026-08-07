@@ -52,7 +52,11 @@ crearán únicamente en las subfases 1.3 y 1.4, cuando existan evidencias reales
 | Subfase 4.1   | Fachada pública y Route interna    | Aprobada   |
 | Subfase 4.2   | Contrato de presentación y efectos PDF | Aprobada   |
 | Subfase 4.3   | Pruebas de caracterización de presentación | Aprobada   |
-| Etapa 5       | Cierre integral                    | Pendiente  |
+| Etapa 5       | Cierre integral                    | En curso   |
+| Subfase 5.1   | Validación JVM, build y lint       | Aprobada   |
+| Subfase 5.2   | Instrumentación y emulador         | Aprobada   |
+| Subfase 5.3   | Verificación manual en Pixel 9     | Aprobada   |
+| Subfase 5.4   | Auditoría final y cierre           | Pendiente  |
 
 Estados posibles: `Pendiente`, `En curso`, `Aprobada`, `Bloqueada`.
 
@@ -1634,3 +1638,559 @@ commit reservados para el agente auditor.
   de caracterización y este registro técnico.
 - Commit de cierre previsto:
   `refactor(emaildetail): separate route from presentation`.
+
+---
+
+## 31. Subfase 5.1 — Validación JVM, build y lint
+
+Plan cerrado: `Etapa 5 Cierre integral/Subfase 5.1.md` (2026-08-06).
+Subfase exclusivamente de validación y documentación — sin cambios de código,
+configuración, dependencias ni recursos. Sin staging ni commit.
+
+### 31.1 Preflight
+
+- **HEAD**: `98b2258 refactor(emaildetail): separate route from presentation`
+  (confirmado antes y después de los gates).
+- **Working tree**: únicamente `MainActivity.kt` y `SearchScreen.kt`
+  modificados (cambios protegidos del usuario).
+- **Diff conjunto protegido**: `84adbdbeee0dd263c5b3ab94b56b996dd5adf51c08a2f60c6e2f2f7bbb9c224e`
+  (`84adbdbe…c224e`) ✅.
+- **Hashes congelados de los archivos del refactor** (SHA-256):
+  - `EmailDetailScreen.kt`:
+    `cbf868c9c226188600e3036133626f9fa558c34338f165bca76366e605303d65` ✅
+  - `EmailDetailRoute.kt`:
+    `88c4cbe58be98f385fbb20d18b9ba2e032f9f151cccfacaeda01505b3881f91c` ✅
+  - `EmailDetailPresentation.kt`:
+    `547e4ff67b04c87875e2f20438d2df8891d4abc67d073a4d9160e3d6be4f4022` ✅
+  - `EmailDetailPdfEffects.kt`:
+    `9dfddcf7c0cb9305ca0b8b6d6b14a2b3a58e4420b5e6b43996c3e5220884c040` ✅
+  - `EmailDetailPresentationTest.kt`:
+    `a403a54068f598eebd2d4a772dd457fae23d811d55df9e163f2fc632ac872441` ✅
+- **Entorno**:
+  - Java: Launcher JVM 25.0.2 (Eclipse Adoptium); toolchain del proyecto
+    `jvmToolchain(17)`.
+  - Gradle: 9.6.1 (wrapper `gradle-9.6.1-bin.zip`).
+  - AGP: 9.0.0; Kotlin: 2.1.20; KSP: 2.1.20-1.0.31.
+  - SDK: `/Users/david/Library/Android/sdk`; compileSdk 36, minSdk 26,
+    targetSdk 36.
+- No se ejecutó `clean`.
+
+### 31.2 Gates (ejecutados separadamente)
+
+| Gate | Comando | Resultado | Duración |
+|---|---|---|---|
+| JVM | `./gradlew testDebugUnitTest --rerun-tasks` | BUILD SUCCESSFUL (exit 0) | 32 s |
+| Build | `./gradlew assembleDebug --rerun-tasks` | BUILD SUCCESSFUL (exit 0) | 27 s |
+| Lint | `./gradlew lintDebug --rerun-tasks` | BUILD SUCCESSFUL (exit 0) | 1 m 24 s |
+
+### 31.3 Resultados objetivos
+
+- **JVM** (suma de XML `app/build/test-results/testDebugUnitTest`):
+  **573 tests, 0 skipped, 0 fallos, 0 errores** — coincide con el esperado
+  573/573.
+- **APK debug** (`app/build/outputs/apk/debug/app-debug.apk`):
+  - Tamaño: 25.642.958 bytes (24,45 MiB).
+  - Fecha: 2026-08-06 23:09.
+  - SHA-256:
+    `b72fc3c4361ca086a7281a4ecb591372608c0126dfc58cef428f286608c8df57`.
+- **Lint** (`app/build/reports/lint-results-debug.xml`):
+  **0 errores, 0 fatales, 0 information, 64 warnings** — idéntico al baseline
+  de la sección 10.4.
+
+#### Warnings por ID (comparación con baseline 10.4)
+
+| ID | Baseline | 5.1 | Diferencia |
+|---|---|---|---|
+| GradleDependency | 16 | 16 | 0 |
+| NewerVersionAvailable | 15 | 15 | 0 |
+| ModifierParameter | 15 | 15 | 0 |
+| FrequentlyChangingValue | 6 | 6 | 0 |
+| UseKtx | 3 | 3 | 0 |
+| UnusedResources | 3 | 3 | 0 |
+| UseOfNonLambdaOffsetOverload | 1 | 1 | 0 |
+| OldTargetApi | 1 | 1 | 0 |
+| ObsoleteSdkInt | 1 | 1 | 0 |
+| IconLocation | 1 | 1 | 0 |
+| ConfigurationScreenWidthHeight | 1 | 1 | 0 |
+| AndroidGradlePluginVersion | 1 | 1 | 0 |
+| **Total** | **64** | **64** | **0** |
+
+- Ubicación de `ModifierParameter` (15, sin cambios): una en
+  `EmailDetailScreen.kt` (mismo símbolo preexistente — la fachada conserva la
+  firma original con `modifier` en último lugar) y el resto en componentes de
+  Etapa 3 y otras features; ninguna en los archivos nuevos (Route,
+  Presentation, PdfEffects).
+
+### 31.4 Recheck post-gates
+
+- `git diff --check` → sin errores.
+- Working tree: solo `MainActivity.kt` y `SearchScreen.kt` modificados.
+- HEAD: `98b2258` sin cambios.
+- Hashes congelados (31.1) re-verificados intactos.
+
+### 31.5 Incidencias
+
+- Ninguna. Los 3 gates pasaron a la primera ejecución; no hubo fallos que
+  clasificar.
+
+### 31.6 Clasificación y cierre
+
+- JVM: 573/573 verde — cumple (una ejecución completa, sin necesidad de
+  reproducción).
+- Build: exit 0 + APK válido — cumple.
+- Lint: 0 errores / 64 warnings, desglose idéntico al baseline; sin
+  Error/Fatal ni warnings nuevos atribuibles al refactor — cumple.
+- Sin actualizaciones de dependencias, Gradle, SDK, lint baseline,
+  suppressions ni código.
+- Subfase 5.1 marcada **Aprobada**; **Etapa 5 En curso**; 5.2–5.4 pendientes.
+- No se ejecutó instrumentación, emulador, dispositivo, smoke ni
+  comparación visual (corresponden a 5.2/5.3). No se realizó la auditoría
+  final (5.4). Sin staging ni commit (reservado a 5.4).
+
+---
+
+## 32. Subfase 5.2 — Instrumentación en emulador
+
+Plan cerrado: `Etapa 5 Cierre integral/Subfase 5.2.md` (2026-08-06).
+Subfase exclusivamente de instrumentación y documentación. Sin cambios de
+producción, pruebas, configuración ni recursos. Sin staging ni commit.
+
+### 32.1 Preflight
+
+- **HEAD**: `98b2258 refactor(emaildetail): separate route from presentation`
+  (confirmado antes y después de los gates).
+- **Subfase 5.1 Aprobada**; working tree: `MainActivity.kt`,
+  `SearchScreen.kt` y `registro-tecnico.md` modificados.
+- **Sin staging**.
+- **Diff conjunto protegido**: `84adbdbeee0dd263c5b3ab94b56b996dd5adf51c08a2f60c6e2f2f7bbb9c224e`
+  (`84adbdbe…c224e`) ✅.
+- **Registro técnico** (hash de entrada):
+  `bb3d38de636bcb6a7b109d79bab578520c3ceddf96e717af2ee2b54e5d91cac0`
+  (`bb3d38de…cac0`) ✅.
+- **Hashes congelados** (5 archivos del refactor): sin cambios (Screen
+  `cbf868c9…03d65`, Route `88c4cbe5…f91c`, Presentation `547e4ff6…f4022`,
+  PdfEffects `9dfddcf7…4c040`, PresentationTest `a403a540…2441`) ✅.
+
+### 32.2 Identidad del AVD
+
+- **AVD**: `Medium_Phone_API_36.1` (arranque frío: `-no-snapshot-load`,
+  `-no-boot-anim`, `-no-audio`).
+- **Serial**: `emulator-5554`. **Pixel 9 físico excluido**.
+- `sys.boot_completed` = 1.
+- Modelo: `sdk_gphone64_x86_64`.
+- Android: 16, API: 36.
+- ABI: `x86_64`.
+- Fingerprint:
+  `google/sdk_gphone64_x86_64/emu64xa:16/BE4B.251210.005/14574095:user/release-keys`.
+- Resolución: 1080×2400 (Physical size). Densidad: 420 (Physical density).
+- Pantalla: `mWakefulness=Awake`. Keyguard: `mKeyguardOccluded=false`.
+- Ajustes originales: `always_finish_activities=null` (default 0),
+  `window_animation_scale=1.0`, `transition_animation_scale=1.0`,
+  `animator_duration_scale=null` (default 1.0).
+  → Normalizados para las pruebas (`always_finish_activities=0`,
+  `animator_duration_scale=1.0`). Restaurados al cerrar (`settings delete`).
+
+### 32.3 Gate dirigido (9 suites, 71 tests)
+
+- Comando:
+  `ANDROID_SERIAL=emulator-5554 ./gradlew connectedDebugAndroidTest --rerun-tasks -Pandroid.testInstrumentationRunnerArguments.class=<9 clases>`.
+- Resultado: BUILD SUCCESSFUL, **71/71 tests, 0 fallos/errores/omitidos**.
+  Duración: 3 m 18 s.
+
+| Suite | Tests | Resultado |
+|---|---|---|
+| EmailDetailPresentationTest | 8 | ✅ |
+| EmailDetailIntegrationTest | 11 | ✅ |
+| EmailDetailCancellationTest | 7 | ✅ |
+| EmailDetailReadFailureEffectTest | 1 | ✅ |
+| EmailDetailStateContentTest | 3 | ✅ |
+| ImageOverlaysTest | 4 | ✅ |
+| EmailResolutionContractsTest | 26 | ✅ |
+| PdfCancellationContractsTest | 2 | ✅ |
+| MainNavigationTest | 9 | ✅ |
+| **Total** | **71** | **0 fallos** |
+
+- XML del gate dirigido copiado a `/Users/david/Desktop/mailapp-5.2-dir/`
+  (SHA-256: `e0b88de03f9cbfd16789bf4976db1f58fb1b2633db61ff87afbdc7c08222ce3b`).
+- Limpieza de paquetes entre gates (`pm clear`, estado limpio asumido).
+
+### 32.4 Gate completo (sin filtro, 146 tests)
+
+- Comando:
+  `ANDROID_SERIAL=emulator-5554 ./gradlew connectedDebugAndroidTest --rerun-tasks`
+  (sin filtro de clases).
+- Resultado: BUILD SUCCESSFUL, **146/146 tests, 0 fallos/errores/omitidos**,
+  **20 clases**. Duración: 4 m 54 s.
+
+| Clase | Tests |
+|---|---|
+| EmailResolutionContractsTest | 26 |
+| EmailRepositoryActionContractsTest | 20 |
+| RestorationTest | 12 |
+| EmailDetailIntegrationTest | 11 |
+| SafeRefreshContractsTest | 11 |
+| AndroidKeystoreSecretCipherInstrumentedTest | 10 |
+| MainNavigationTest | 9 |
+| EmailDetailPresentationTest | 8 |
+| ScrollStatePresentationTest | 7 |
+| TrashContentActionTest | 7 |
+| EmailDetailCancellationTest | 7 |
+| DestinationLifecycleTest | 4 |
+| ImageOverlaysTest | 4 |
+| EmailDetailStateContentTest | 3 |
+| PdfCancellationContractsTest | 2 |
+| ExpressiveLoadingIndicatorAnimationTest | 1 |
+| EmailListItemGestureTest | 1 |
+| EmailDetailReadFailureEffectTest | 1 |
+| PartialPageContractsTest | 1 |
+| MailDatabaseMigrationTest | 1 |
+| **Total** | **146** |
+
+- XML del gate completo copiado a
+  `/Users/david/Desktop/mailapp-5.2-dir/complete-gate.xml`
+  (SHA-256: `7b841da24248035feeb65f1d7736549183304214f6b0296ca79f4441be1f6ca2`,
+  tamaño: 23.445 bytes).
+
+### 32.5 Metadatos de los APK
+
+- **App APK** (`app/build/outputs/apk/debug/app-debug.apk`):
+  25.642.958 bytes (24,45 MiB), SHA-256:
+  `b72fc3c4361ca086a7281a4ecb591372608c0126dfc58cef428f286608c8df57`.
+- **Test APK** (`app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk`):
+  1.350.415 bytes (1,29 MiB), SHA-256:
+  `44e90101e302c2b2827602e8b6d4a5134e5cad59bf4cee076cbe244ed614aa7a`.
+- Sin credenciales ni datos reales en el emulador.
+
+### 32.6 Incidencias y flakiness
+
+- Ningún fallo. Ambos gates pasaron a la primera ejecución (71/71 y 146/146).
+- `inlineCancellationKeepsPendingReadyStateAndDoesNotWriteFallback` no falló
+  en esta subfase; el timeout histórico documentado en 4.3 no se reprodujo.
+- Sin fallos de ADB, instalación, arranque ni worker KSP.
+
+### 32.7 Cierre y restauración
+
+- Ajustes del sistema restaurados: `always_finish_activities` y
+  `animator_duration_scale` vueltos a sus valores por defecto (null).
+- AVD apagado con `adb -s emulator-5554 emu kill`.
+- `git diff --check` → sin errores. HEAD `98b2258` sin cambios. Sin staging.
+- Sección 31 de 5.1 intacta.
+- Hashes congelados de los 5 archivos del refactor y del diff protegido
+  re-verificados intactos.
+- Subfase 5.2 marcada **Aprobada**; **Etapa 5 En curso**; 5.3 y 5.4
+  pendientes. Sin staging ni commit (reservado a 5.4).
+
+---
+
+## 33. Subfase 5.3 — Smoke y comparación en Pixel 9
+
+Plan cerrado: `Etapa 5 Cierre integral/Subfase 5.3.md` (2026-08-07).
+Subfase ejecutada en Pixel 9 físico. Durante el grupo 6 (Imagen) se detectó una
+regresión funcional real, posteriormente corregida y revalidada manualmente.
+Los ocho grupos y las quince evidencias quedaron aprobados; 5.4 permanece
+pendiente.
+
+### 33.1 Estado de entrada y evidencia anterior a la incidencia
+
+- **HEAD**: `98b2258 refactor(emaildetail): separate route from presentation`.
+- **Dispositivo exclusivo**: Pixel 9 (`tokay`), serial USB
+  `55080DLAQ002CK`, Android 17/API 37, 1080×2424, 420 dpi.
+- Los archivos `01-loading.png` a `11-pdf-guardado.png` ya estaban presentes
+  en `capturas/etapa-5/subfase-5.3/pixel9-api37/oscuro/` cuando se investigó
+  el grupo 6.
+- `MainActivity.kt` y `SearchScreen.kt` conservaron durante toda la
+  investigación su diff conjunto protegido:
+  `84adbdbeee0dd263c5b3ab94b56b996dd5adf51c08a2f60c6e2f2f7bbb9c224e`.
+
+### 33.2 Regresión observada en Imagen
+
+- La imagen inline se renderizaba y la pulsación larga abría el menú.
+- Al pulsar `Guardar imagen`, el menú se cerraba, pero no aparecía la
+  notificación de resultado ni se creaba una imagen en galería/MediaStore.
+- La incidencia se reproducía también con correos antiguos que habían
+  guardado correctamente en el baseline 1.4.
+- Conceder `READ_MEDIA_IMAGES`, cambiar AppOps o buscar un permiso de Fotos y
+  videos no resolvía la incidencia. En Android 10 o posterior la aplicación
+  puede insertar y publicar sus propias filas mediante MediaStore sin ese
+  permiso de lectura.
+
+### 33.3 Causa raíz confirmada contra el pre-refactor
+
+La extracción de overlays del commit `91e419d` cambió accidentalmente la
+duración del `CoroutineScope` usado por el guardado:
+
+1. Antes de la extracción, el scope se recordaba en la pantalla completa de
+   Detail. Pulsar Guardar lanzaba la operación y luego ocultaba el menú; la
+   pantalla seguía compuesta y el scope sobrevivía hasta terminar MediaStore.
+2. Después de la extracción, `ImageActionSheet` creó su propio
+   `rememberCoroutineScope()`.
+3. El callback lanzaba `saveImageToGallery(...)` y llamaba inmediatamente a
+   `onDismiss()`.
+4. `onDismiss()` eliminaba `ImageActionSheet` de la composición y Compose
+   cancelaba su scope. `ImageUtils` propagaba correctamente esa cancelación,
+   limpiaba cualquier fila parcial y no mostraba éxito ni error.
+
+La causa explica simultáneamente la ausencia de archivo y de feedback, así
+como que permisos y correos distintos no cambiaran el resultado.
+
+### 33.4 Corrección aplicada
+
+- `EmailDetailPresentation.kt` vuelve a ser propietario del scope de guardado,
+  con una duración equivalente a la pantalla original.
+- `ImageActionSheet` recibe ese scope y conserva sin cambios la llamada a
+  `ImageUtils`, el cierre inmediato del menú, las etiquetas, el formato y el
+  destino `Pictures/MailApp`.
+- `ImageOverlaysTest.kt` se adaptó al contrato explícito del scope.
+- No se modificaron manifest, permisos, recursos, `ImageUtils`, repositorio,
+  ViewModel, navegación, WebView, HTML ni JS.
+
+### 33.5 Verificación objetiva del arreglo
+
+- `testDebugUnitTest`: **573/573**, 0 fallos, 0 errores, 0 omitidos.
+- `assembleDebug` y `assembleDebugAndroidTest`: **BUILD SUCCESSFUL**.
+- `lintDebug`: **0 errores, 64 warnings**, idéntico al baseline.
+- Gate dirigido `ImageUtilsTest`: **BUILD SUCCESSFUL**.
+- `ImageOverlaysTest` en Pixel 9: **4/4**, 0 fallos. Esta ejecución no debe
+  repetirse en el dispositivo físico por la incidencia descrita en 33.6.
+- APK corregido: 25.642.958 bytes; SHA-256
+  `e0a0fade1d0e83d88010e5920c305ac415493e3981fa0bd6460970901193c104`.
+- Instalación inicial con `adb install -r`: exitosa y conservó datos/sesión.
+- Antes de guardar había cinco filas históricas publicadas en
+  `Pictures/MailApp/`. La prueba automatizada de interacción añadió dos filas:
+  - `_id=32725`, `MailApp_Image_1786121448927.jpg`, `is_pending=0`.
+  - `_id=32726`, `MailApp_Image_1786121551904.jpg`, `is_pending=0`.
+- Verificación detallada de la última fila: MIME `image/jpeg`, tamaño
+  6.730.391 bytes, `relative_path=Pictures/MailApp/`, `is_pending=0` y
+  `owner_package_name=com.david.mailapp`.
+- Resultado funcional comprobado: la operación sobrevive al cierre del menú,
+  escribe los bytes y publica la imagen. No se conservó una captura del Toast
+  transitorio; ese punto y las capturas 12–14 requieren repetición manual.
+
+### 33.6 Incidencia de preservación durante la verificación
+
+- Se ejecutó por error `connectedDebugAndroidTest` dirigido contra el Pixel 9.
+  Aunque las 4 pruebas pasaron, el runner de Gradle desinstaló al finalizar el
+  APK de producción y con ello eliminó los datos privados y la sesión de
+  MailApp. Esta acción no formaba parte del plan protegido de 5.3.
+- El APK corregido se reinstaló inmediatamente con éxito. MailApp quedó en la
+  pantalla `Iniciar sesión con Google`; no se tocaron credenciales ni se
+  intentó reconstruir la sesión.
+- Las dos imágenes públicas indicadas en 33.5 permanecen en MediaStore. No se
+  borraron porque su eliminación sería destructiva y no fue solicitada.
+- Tras desinstalar/reinstalar el paquete, MediaStore conserva la fila 32726 y
+  sus bytes publicados, pero `owner_package_name` pasó de
+  `com.david.mailapp` a `NULL`; el resto de metadatos permanece intacto.
+- No se volverá a ejecutar instrumentación Gradle en el Pixel físico; cualquier
+  repetición instrumentada deberá hacerse exclusivamente en el emulador.
+
+### 33.7 Bloqueo temporal y siguiente gate
+
+- La causa raíz está corregida y el guardado físico en MediaStore está
+  comprobado.
+- **Subfase 5.3 Bloqueada** hasta que el usuario restaure manualmente la cuenta
+  temporal, sin compartir credenciales, y se repitan: feedback visible de
+  guardado, captura de menú, fullscreen, captura posterior al guardado, salida
+  durante descarga y cierre/restauración del entorno.
+- Subfase 5.4 permanece pendiente. Sin staging ni commit.
+
+### 33.8 Reanudación y cierre manual del grupo 6 — Imagen
+
+- El usuario restauró la sesión temporal y repitió el grupo 6 en el Pixel 9
+  físico con el APK corregido.
+- Pulsación larga: el menú de imagen se mostró correctamente; evidencia
+  `12-image-menu.png`.
+- `Abrir imagen`: el fullscreen se mostró correctamente y Back lo cerró,
+  regresando a Detail; evidencia `13-image-fullscreen.png` más observación
+  manual del cierre.
+- `Guardar imagen`: la imagen se guardó correctamente y apareció el snackbar
+  de resultado. La evidencia `14-image-guardada.png` conserva Detail después
+  de la acción; el guardado y el snackbar se acreditan por observación manual,
+  conforme al alcance definido por el plan.
+- Las tres capturas miden 1080×2424. SHA-256 de la evidencia de 5.3:
+  - `12-image-menu.png`: `8f036b23a5bffd64fef272270a428efb03219eb5850068b2e6438906b54a5a81`.
+  - `13-image-fullscreen.png`: `b70e3a1840d8d7a342ae96d3be92801a78f11d61d86179288b4a25e17f1b0a78`.
+  - `14-image-guardada.png`: `bfc7dbdcd79e36bdacf627d79c4cd0e752fb42f0a19bcbe3b32cb70858c21961`.
+- El bloqueo temporal descrito en 33.7 queda levantado. El grupo 6 queda
+  **Aprobado manualmente** y la Subfase 5.3 vuelve a **En curso**; el siguiente
+  gate es el grupo 7, salida durante descarga.
+
+### 33.9 Cierre de los grupos 7 y 8
+
+- Estado inicial por `run-as`: `cache/pdf_attachments` no existía; no había
+  archivo final ni `.tmp` pendiente.
+- Se abrió el fixture neutral, se inició `baseline-cancel.pdf` (14,3 MB) y se
+  capturó `Descargando...` antes de salir inmediatamente con Back.
+- La primera captura 15, tomada después de reabrir Detail, no representaba el
+  instante exigido por el plan y fue sustituida por el frame correcto sin
+  información personal visible.
+- Después de Back, `cache/pdf_attachments` seguía sin existir: cero archivo
+  final nuevo y cero `.tmp`; tampoco se abrió una acción externa.
+- Al reabrir Detail, ambos PDF aparecieron en reposo, sin estado Downloading
+  atascado. La navegación Detail → origen → Bandeja conservó una sola instancia
+  de cada destino.
+- MailApp quedó restaurada en Bandeja, con red activa, tema oscuro y el Pixel 9
+  conectado y operativo. Las capturas temporales con contenido de la Bandeja o
+  del resultado de búsqueda no se incorporaron al repositorio.
+
+### 33.10 Matriz final — 8/8 grupos aprobados
+
+| Grupo | Resultado |
+| - | - |
+| 1. Loading/error/ready | **Aprobado** |
+| 2. Encabezado y Back | **Aprobado** |
+| 3. Reply/Forward | **Aprobado** |
+| 4. PDF retry/open/cache | **Aprobado** |
+| 5. PDF SAF | **Aprobado**; guardado y feedback comprobados manualmente |
+| 6. Imagen | **Aprobado** tras corregir y documentar el scope de guardado |
+| 7. Salida durante descarga | **Aprobado**; captura 15 y caché limpia por ADB |
+| 8. Navegación final | **Aprobado**; regreso a Bandeja sin destinos duplicados |
+
+### 33.11 Evidencias finales — 15/15, 1080×2424
+
+| # | Archivo | SHA-256 |
+| - | - | - |
+| 01 | `01-loading.png` | `6f8ebe91da8ba8505b0f8b2467bcd93393d237328145814a152aea0b0e916c86` |
+| 02 | `02-error-recuperable.png` | `23945411adcb6a35cf5d5f8fde2a8bacc2ba558901f62ec1e800db22d8104937` |
+| 03 | `03-ready-header-cerrado.png` | `2cfeeae4d56ad04341106e941a461866ddc16bde797d20a151210caf2bb60bbc` |
+| 04 | `04-header-abierto-scrim.png` | `fec887d09230fb7b30e10fca8c63e05b976f5f68134b0c710354e76222a2a8db` |
+| 05 | `05-reply.png` | `df04f3dcffafd6d61ec95f4bf3323bbb7e2952394cd01c93d4fcef1e6b5165da` |
+| 06 | `06-forward.png` | `b627a2f9a452d16cfb09980c7874e7c8fa7ce9f96ce1e35fd11307ba03317d8b` |
+| 07 | `07-pdf-error-offline.png` | `6cdc5a5d4d6391aebabac23a2cc1422a7bdb3eea0293981569f4766545e85d83` |
+| 08 | `08-pdf-downloading.png` | `8b68d21f7ddeef5d656472b07ab6f4279e66d60ebc7d4629e9fc7d925b8b5917` |
+| 09 | `09-pdf-viewer.png` | `55a3e8294b8e51873d2f8d7252475ebebb15d60b4be1c4cff11921d9f9371fba` |
+| 10 | `10-pdf-saf-picker.png` | `0004defec84962050577fea0e04e8fda105bfc4fa1da2c11616c24512a17522e` |
+| 11 | `11-pdf-guardado.png` | `2c1d7cea6675e409c96ee59cea306c063017e06b45818dc399453a5d8542af73` |
+| 12 | `12-image-menu.png` | `8f036b23a5bffd64fef272270a428efb03219eb5850068b2e6438906b54a5a81` |
+| 13 | `13-image-fullscreen.png` | `b70e3a1840d8d7a342ae96d3be92801a78f11d61d86179288b4a25e17f1b0a78` |
+| 14 | `14-image-guardada.png` | `bfc7dbdcd79e36bdacf627d79c4cd0e752fb42f0a19bcbe3b32cb70858c21961` |
+| 15 | `15-salida-durante-descarga.png` | `98899ebbe0b27a40f55e46a2bbe08e7159c0fb08979fbc2f948d4c1a0df53bb9` |
+
+La revisión conjunta de las quince capturas no encontró correo, asunto,
+notificación ni identidad personal en la evidencia versionable. Los contenidos
+visibles del selector SAF son ambientales del sistema y no alteran la UI de
+EmailDetail.
+
+### 33.12 Comparación visual y cierre
+
+- Comparación uno a uno contra Etapa 1: sin diferencias funcionales ni visuales
+  atribuibles a EmailDetail.
+- Diferencias ambientales permitidas: hora y estado del sistema, contenido del
+  selector SAF, cuerpo HTML del fixture y fotografía inline distinta. Geometría,
+  jerarquía, barras, encabezado, scrim, WebView, tarjetas PDF, botones, menú de
+  imagen y fullscreen conservan sus contratos.
+- Los PNG 11 y 14 conservan el alcance previsto: guardado/feedback y
+  Files/galería se verificaron manualmente aunque todos esos efectos no queden
+  simultáneamente visibles en una sola captura.
+- Incidencia de 5.3: cancelación prematura del guardado de imagen por scope de
+  composición demasiado corto. Causa, corrección y pruebas quedan documentadas
+  en 33.2–33.5; el fix permanece sin commit para incorporarlo en 5.4.
+- Cierre técnico: HEAD `98b2258`; staging vacío; `git diff --check` limpio;
+  baseline de Etapa 1 sin cambios; diff protegido de `MainActivity.kt` y
+  `SearchScreen.kt` intacto con SHA-256
+  `84adbdbeee0dd263c5b3ab94b56b996dd5adf51c08a2f60c6e2f2f7bbb9c224e`.
+
+**Resultado final: Subfase 5.3 APROBADA el 2026-08-07. Etapa 5 permanece En
+curso y la Subfase 5.4 queda Pendiente. Sin staging ni commit.**
+
+## 34. Subfase 5.4 — Auditoría final y reporte
+
+### 34.1 Preflight y alcance protegido
+
+- Plan técnico cerrado creado en `Etapa 5 Cierre integral/Subfase 5.4.md`.
+- Punto de partida: HEAD `98b2258`, rama `main` cuatro commits por delante de
+  `origin/main`, staging vacío y `git diff --check` limpio.
+- El diff conjunto protegido de `MainActivity.kt` y `SearchScreen.kt` conserva
+  SHA-256
+  `84adbdbeee0dd263c5b3ab94b56b996dd5adf51c08a2f60c6e2f2f7bbb9c224e`.
+- El único archivo ambiental encontrado dentro de la evidencia de 5.3 fue
+  `.DS_Store`; se retiró antes del staging. No se añadieron archivos temporales
+  ni capturas con contenido personal.
+
+### 34.2 Auditoría integral del refactor
+
+- La comparación desde `e969662`, estado inmediatamente anterior al Plan
+  maestro 1, confirma que la firma pública continúa exactamente como
+  `EmailDetailScreen(emailId, onBack, onReply, onForward, modifier)`.
+- Cero diferencias en `ui/navigation`, capa `data`,
+  `EmailDetailViewModel.kt`, recursos, manifest o configuración atribuibles al
+  Plan maestro 1.
+- `EmailDetailScreen.kt` queda como fachada de 23 líneas; Route,
+  presentación, efectos PDF, componentes visuales y soporte PDF están
+  separados por responsabilidad.
+- La búsqueda estática encontró una sola definición de cada helper y bloque
+  extraído. No queda duplicación residual dentro de `EmailDetailScreen.kt`.
+- `AppContainer` permanece limitado a Route/coordinación y efectos existentes;
+  los componentes visuales extraídos no acceden al repositorio ni a
+  navegación.
+- Compilación y lint confirman ausencia de referencias rotas e imports muertos.
+- El diff pendiente de producción corresponde exclusivamente a la restauración
+  del guardado de imágenes: el scope se eleva a
+  `EmailDetailPresentation`, sobrevive al cierre inmediato del menú y conserva
+  sin cambios `ImageUtils`, formato, etiquetas y destino MediaStore.
+
+### 34.3 Incidencia Back descubierta después de 5.3
+
+- La APK histórica instalada en el Huawei el 2026-07-30 no reproduce la doble
+  navegación hacia atrás: una pulsación rápida o doble vuelve una sola vez al
+  destino esperado.
+- En el estado actual, dos pulsaciones rápidas pueden consumir dos destinos del
+  back stack. La reproducción no se limita a EmailDetail: también se observa
+  al regresar hacia o desde Papelera y dentro de Ajustes.
+- El historial ubica la introducción probable en la migración a Navigation
+  Compose del commit `55b8ecf`, del 2026-08-01. El contrato anterior
+  `Navigator.pop()` era no-op en la raíz; las llamadas posteriores a
+  `popBackStack()` no preservaron esa protección.
+- `55b8ecf` es anterior al inicio del Plan maestro 1 y la auditoría confirma que
+  sus archivos de navegación no cambiaron durante este refactor. La incidencia
+  se clasifica como **preexistente y no atribuible a EmailDetail**.
+- 5.3 conserva su aprobación respecto a la comparación conservadora. La matriz
+  verificó Back a velocidad normal, pero no caracterizó entradas rápidas
+  repetidas; esta limitación queda ahora explícita.
+- No se corrige navegación en 5.4. La solución queda reservada para el plan
+  correctivo independiente de Back idempotente, con planes técnicos cerrados
+  por subfase.
+
+### 34.4 Gates finales sobre el candidato de commit
+
+| Gate | Resultado | Duración / evidencia |
+| - | - | - |
+| `testDebugUnitTest --rerun-tasks` | **573/573**, 0 fallos, 0 errores, 0 omitidos | **BUILD SUCCESSFUL**, 2m25s; 57 XML |
+| `assembleDebug --rerun-tasks` | **Aprobado** | **BUILD SUCCESSFUL**, 1m37s |
+| `assembleDebugAndroidTest --rerun-tasks` | **Aprobado** | **BUILD SUCCESSFUL**, 52s |
+| `lintDebug --rerun-tasks` | **0 errores, 64 warnings** | **BUILD SUCCESSFUL**, 1m19s; idéntico al baseline |
+| `ImageOverlaysTest` en emulador | **4/4**, 0 fallos, 0 omitidos | **BUILD SUCCESSFUL**, 2m41s |
+| `connectedDebugAndroidTest --rerun-tasks` en emulador | **146/146**, 0 fallos, 0 errores, 0 omitidos | **BUILD SUCCESSFUL**, 5m |
+
+- Dispositivo instrumentado exclusivo: `Medium_Phone_API_36.1(AVD)`, API 36.1,
+  serial `emulator-5554`. No se ejecutó instrumentación Gradle en teléfonos
+  físicos.
+- APK debug: 25.642.958 bytes; SHA-256
+  `e0a0fade1d0e83d88010e5920c305ac415493e3981fa0bd6460970901193c104`.
+- APK androidTest: 1.351.295 bytes; SHA-256
+  `e69bca435041aa6f0e5dc2dd7e7ea9a2f2093137580b1d8e7dcdd1502c206009`.
+- Desglose lint: `GradleDependency` 16, `NewerVersionAvailable` 15,
+  `ModifierParameter` 15, `FrequentlyChangingValue` 6, `UseKtx` 3,
+  `UnusedResources` 3 y seis IDs con una advertencia cada uno. No apareció
+  ningún Error/Fatal ni warning nuevo atribuible al refactor.
+- Incidencias de infraestructura: el sandbox no pudo abrir inicialmente el
+  socket local de ADB ni el socket de locks de Gradle para instrumentación. ADB
+  y los dos gates instrumentados se ejecutaron después con la autorización
+  externa prevista; no hubo fallo de aplicación ni reintento funcional.
+
+### 34.5 Evidencias y decisión de cierre
+
+- Las quince capturas finales se revalidaron a 1080×2424 y sus SHA-256
+  coinciden uno a uno con la tabla 33.11.
+- `git diff --check` permanece limpio después de todos los gates.
+- La auditoría no encontró diferencias funcionales o visuales atribuibles al
+  refactor, referencias rotas, duplicación residual ni archivos monolíticos
+  sustitutos.
+- El commit que contiene esta sección es el cierre exacto autorizado con asunto
+  `test(emaildetail): close conservative screen refactor`.
+- El hash del commit de cierre se verifica externamente como el HEAD que
+  contiene esta sección; no se incrusta dentro del propio commit para evitar
+  una referencia circular del objeto Git.
+
+**Resultado final: Subfase 5.4, Etapa 5 y Plan maestro 1 APROBADOS y cerrados el
+2026-08-07. El siguiente trabajo queda separado en el plan correctivo Back
+idempotente.**

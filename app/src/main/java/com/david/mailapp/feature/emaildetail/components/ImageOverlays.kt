@@ -21,7 +21,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -32,12 +31,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.david.mailapp.R
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ImageActionSheet(
     activeImageUrl: String,
+    saveCoroutineScope: CoroutineScope,
     onOpenFullscreen: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -47,7 +48,6 @@ internal fun ImageActionSheet(
         saveErrorMessage = stringResource(R.string.image_save_error),
         filenameTemplate = stringResource(R.string.image_filename_format)
     )
-    val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
 
     ModalBottomSheet(
@@ -86,7 +86,7 @@ internal fun ImageActionSheet(
                 modifier = Modifier.clickable {
                     val urlToSave = activeImageUrl
                     val resolvedLabels = saveLabels
-                    coroutineScope.launch {
+                    saveCoroutineScope.launch {
                         ImageUtils.saveImageToGallery(context, urlToSave, resolvedLabels)
                     }
                     onDismiss()

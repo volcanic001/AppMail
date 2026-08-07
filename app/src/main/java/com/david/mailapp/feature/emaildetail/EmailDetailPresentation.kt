@@ -16,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,6 +53,10 @@ internal fun EmailDetailPresentation(
     var activeImageUrl by remember { mutableStateOf<String?>(null) }
     var showFullscreenImage by remember { mutableStateOf<String?>(null) }
     var showDetailsPanel by remember { mutableStateOf(false) }
+    // This scope must outlive ImageActionSheet. The sheet dismisses immediately
+    // after Save, so a scope remembered inside the sheet would be cancelled
+    // before the MediaStore write can finish.
+    val imageSaveScope = rememberCoroutineScope()
 
     // Close details panel on back press; second back press pops the screen.
     BackHandler(enabled = showDetailsPanel) {
@@ -155,6 +160,7 @@ internal fun EmailDetailPresentation(
             activeImageUrl?.let { imageUrl ->
                 ImageActionSheet(
                     activeImageUrl = imageUrl,
+                    saveCoroutineScope = imageSaveScope,
                     onOpenFullscreen = { showFullscreenImage = it },
                     onDismiss = { activeImageUrl = null }
                 )
