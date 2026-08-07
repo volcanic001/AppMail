@@ -47,8 +47,11 @@ crearán únicamente en las subfases 1.3 y 1.4, cuando existan evidencias reales
 | Subfase 1.3   | Baseline instrumentado en emulador | Aprobada |
 | Subfase 1.4   | Baseline manual y visual en dispositivo físico | Aprobada |
 | Etapa 2       | Extraer código independiente       | Aprobada   |
-| Etapa 3       | Extraer bloques visuales           | En curso   |
-| Etapa 4       | Separar Route y UI                 | Pendiente  |
+| Etapa 3       | Extraer bloques visuales           | Aprobada   |
+| Etapa 4       | Separar Route y UI                 | Aprobada   |
+| Subfase 4.1   | Fachada pública y Route interna    | Aprobada   |
+| Subfase 4.2   | Contrato de presentación y efectos PDF | Aprobada   |
+| Subfase 4.3   | Pruebas de caracterización de presentación | Aprobada   |
 | Etapa 5       | Cierre integral                    | Pendiente  |
 
 Estados posibles: `Pendiente`, `En curso`, `Aprobada`, `Bloqueada`.
@@ -1233,3 +1236,401 @@ La subfase queda aprobada únicamente si:
 **Resultado final: Etapa 3 APROBADA el 2026-08-06.**
 **Commit previsto: `refactor(emaildetail): extract presentation components`.**
 **Siguiente paso después del commit: Etapa 4, Subfase 4.1 — Fachada pública y Route interna.**
+
+---
+
+## 27. Subfase 4.1 — Fachada pública y Route interna
+
+Plan cerrado: `Etapa 4 Separar Route y UI/Subfase 4.1.md` (2026-08-06).
+
+### 27.1 Cambios de implementación
+
+- **`EmailDetailScreen.kt`** reducido a la fachada pública exacta (firma
+  idéntica al baseline, incluido `@OptIn(ExperimentalMaterial3Api::class)`);
+  delega con argumentos nombrados en `EmailDetailRoute`, sin transformar
+  `emailId`, callbacks ni `modifier`.
+- **`EmailDetailRoute.kt`** (nuevo, 349 líneas): traslado mecánico 1:1 del
+  cuerpo anterior de la pantalla como `internal fun EmailDetailRoute`:
+  - Acceso a `AppContainer.emailRepository` y `AppContainer.stringProvider`.
+  - Creación de `RepositoryEmailDetailSource` y del ViewModel con
+    `key = emailId` y la misma factory.
+  - Dos recolecciones `collectAsStateWithLifecycle` (uiState, pdfDownloadStates).
+  - `EmailDetailReadFailureEffect`.
+  - `traceMail`, `UI_SCREEN_ENTER`, `UI_SCREEN_DISPOSE` y `UI_STATE_CHANGED`.
+  - Coordinación PDF (etiquetas, launcher SAF, guardado `savingStableIds`,
+    colección de `pdfOpenEvents`), estados visuales, `BackHandler`, `Scaffold`
+    y componentes actuales, todavía sin separarlos.
+- El `private const val TAG = "EmailDetailScreen"` y los imports requeridos
+  se movieron al archivo Route. El import muerto preexistente
+  `android.app.Activity` (sin uso en el cuerpo desde las extracciones de
+  Etapa 2) no se trasladó; la compilación lo confirma.
+- Cero cambios en `MainNavHost.kt`, ViewModel, source, repositorio,
+  AppContainer, navegación, UiState, WebView, PDF, componentes, recursos y
+  modelos.
+
+### 27.2 Verificación estática (2026-08-06)
+
+- Una única definición pública de `EmailDetailScreen` → `EmailDetailScreen.kt:9`.
+- Una única definición interna de `EmailDetailRoute` → `EmailDetailRoute.kt:56`.
+- Una única creación de source y ViewModel, dentro de Route →
+  `EmailDetailRoute.kt:64-65`.
+- `key = emailId` intacta → `EmailDetailRoute.kt:66`.
+- Dos recolecciones `collectAsStateWithLifecycle` → `EmailDetailRoute.kt:69-70`.
+- Efecto de lectura (`EmailDetailReadFailureEffect`) y trazas
+  (`UI_SCREEN_ENTER`/`UI_SCREEN_DISPOSE`/`UI_STATE_CHANGED`) presentes
+  únicamente en Route → `EmailDetailRoute.kt:77, 210, 212, 230`.
+- La fachada no importa ni referencia AppContainer, ViewModel, lifecycle,
+  repositorio ni infraestructura (grep sin coincidencias).
+- Cero cambios en navegación y en los componentes extraídos durante Etapa 3
+  (`git status`: solo `EmailDetailScreen.kt` modificado + `EmailDetailRoute.kt`
+  nuevo, además de los dos archivos ajenos protegidos sin stagear).
+
+### 27.3 Validación automatizada (2026-08-06)
+
+- `./gradlew compileDebugKotlin` → BUILD SUCCESSFUL (solo warnings
+  preexistentes de Color.kt y deprecaciones; ninguno atribuible al refactor).
+- Traslado mecánico verificado por compilación y por `git diff --numstat`
+  (`EmailDetailScreen.kt`: 333 eliminaciones, 6 adiciones y reducción neta
+  de 327 líneas; se retiraron el cuerpo, el TAG y los imports trasladados).
+- `./gradlew testDebugUnitTest` (filtro detalle/PDF/imágenes) → BUILD
+  SUCCESSFUL, **166 pruebas, 0 fallos, 0 errores, 0 omitidas**
+  (superconjunto que cubre las 93 relevantes del plan):
+  - `EmailDetailViewModelPdfTest` 26, `PdfAttachmentFormattingTest` 35,
+    `EmailDetailViewModelResolutionTest` 15, `ImageUtilsTest` 12,
+    `EmailHtmlCleanerTest` 9, `EmailDetailViewModelTest` 7,
+    `EmailReadOnOpenCoordinatorTest` 6, `EmailDetailContractsTest` 5,
+    `EmailReadOnOpenGateTest` 3, `PdfSaveFileCopyTest` 2,
+    `PdfCacheManagerTest` 22, `GmailPdfAttachmentParserTest` 15,
+    `PdfAttachmentMetadataCodecTest` 7, `EmailEntityPdfMetadataTest` 2.
+- `./gradlew assembleDebug --rerun-tasks` → BUILD SUCCESSFUL.
+- `git diff --check` → sin errores.
+- 2026-08-06: `./gradlew testDebugUnitTest` sin filtro → BUILD SUCCESSFUL,
+  **573 pruebas, 0 fallos, 0 errores, 0 omitidas** (superconjunto de las 166
+  relevantes, sin regresiones en el resto de suites).
+
+### 27.4 Hashes protegidos (2026-08-06)
+
+- `MainActivity.kt`:
+  `a8275404afe60158d08616487124020b64d6aa1df2cb0f02f4c56c1d3b52cd55` ✓
+  (coincide con baseline).
+- `SearchScreen.kt`:
+  `3966a9feace5bbae418969414e7a543c26ee4909a0914ddc75eee450401d89b3` ✓
+  (coincide con baseline).
+- Diff conjunto protegido: `84adbdbeee0dd263c5b3ab94b56b996dd5adf51c08a2f60c6e2f2f7bbb9c224e` ✓
+  (verificado 2026-08-06 con `git diff -- MainActivity.kt SearchScreen.kt | shasum -a 256`).
+
+### 27.5 Instrumentación — ejecutada (2026-08-06)
+
+Ejecutada en emulador `Medium_Phone_API_36.1` (`ANDROID_SERIAL=emulator-5554`)
+con `connectedDebugAndroidTest` y filtro de clases:
+
+- `EmailDetailIntegrationTest` — 11 tests.
+- `EmailDetailCancellationTest` — 7 tests.
+- `EmailDetailReadFailureEffectTest` — 1 test.
+- `MainNavigationTest` — 9 tests.
+
+Resultado: **28 tests, 0 fallos, 0 errores, 0 omitidos** — BUILD SUCCESSFUL.
+
+### 27.6 Smoke en Pixel 9 — ejecutado (2026-08-06)
+
+- Fixture abierto desde la navegación existente: contenido idéntico al
+  baseline (HTML, inline 512×512, 2 PDFs, header) y transición
+  Loading → Ready.
+- Responder, reenviar y Back: funcionan correctamente.
+- Salir y reabrir el mismo correo: traza `MailRenderTrace` confirma la misma
+  key (`mail=9070275a`) en ambas aperturas, con ciclo de vida completo
+  (`UI_SCREEN_ENTER` → `UI_STATE_CHANGED` Loading/Ready → `UI_SCREEN_DISPOSE`
+  → reapertura `UI_SCREEN_ENTER` con el mismo mailKey; `VM_PDF_CACHE_CHECK
+  count=2`, inline resuelto y WebView renderizado).
+
+### 27.7 Criterios de aceptación (Subfase 4.1)
+
+- [x] Fachada pública idéntica y delegación con argumentos nombrados.
+- [x] Route conserva la coordinación sin cambios (traslado mecánico 1:1).
+- [x] Búsqueda estática completa (sección 27.2).
+- [x] Suite JVM de detalle/PDF/imágenes verde.
+- [x] `compileDebugKotlin`, `assembleDebug --rerun-tasks` y `git diff --check` verdes.
+- [x] Instrumentación (4 suites) verde.
+- [x] Smoke en Pixel 9 con misma key y ciclo de vida.
+- [x] Hash del diff conjunto protegido verificado.
+
+La subfase queda aprobada únicamente cuando los puntos pendientes anteriores
+terminen en verde; entonces se actualizará el estado en la sección 2 y se
+procederá a la Subfase 4.2. No se crea commit hasta cerrar 4.1–4.3 y la
+auditoría de Etapa 4.
+
+---
+
+## 28. Subfase 4.2 — Contrato de presentación y efectos PDF
+
+Plan cerrado: `Etapa 4 Separar Route y UI/Subfase 4.2.md` (2026-08-06).
+
+### 28.1 Cambios de implementación
+
+- **`EmailDetailPresentation.kt`** (nuevo, 172 líneas): `internal fun
+  EmailDetailPresentation` — presentación visual pura. Recibe `uiState`,
+  `pdfDownloadStates`, `savingStableIds`, `traceMail`, `snackbarHostState`,
+  callbacks de navegación/acción y `modifier`. Contiene el estado overlay
+  (`activeImageUrl`, `showFullscreenImage`, `showDetailsPanel`), `BackHandler`,
+  `Scaffold` con `EmailDetailTopBar`, matriz de estados (`Loading`,
+  `ResolutionError`, `BodyError`, `PreparingBody`/`Ready`), encabezado
+  flotante con scrim, `ImageActionSheet` y `FullscreenImageDialog`. Cero
+  infraestructura: sin AppContainer, ViewModel, repositorio, lifecycle, Intent,
+  SAF, ContentResolver ni FileProvider. Tipos importados: `PdfDownloadState`,
+  `PdfAttachmentMetadata`.
+
+- **`EmailDetailPdfEffects.kt`** (nuevo, 159 líneas): `internal fun
+  rememberEmailDetailPdfEffects(viewModel, lifecycleOwner, snackbarHostState):
+  State<Set<String>>` — coordinador PDF como único propietario de:
+  - El TAG `"EmailDetailScreen"`.
+  - `savingStableIds`, `savingState`, `savedSaveEmailId`,
+    `savedSaveStableId`, `savedSaveDisplayName`.
+  - `pdfLabels` (7 recursos) y `defaultPdfFilename`.
+  - `savePdfLauncher` (`CreateDocument` SAF + copia a URI + limpieza parcial +
+    snackbars).
+  - `LaunchedEffect` con `repeatOnLifecycle(STARTED)` para colección de
+    `pdfOpenEvents` (Open/Save + excepciones `ActivityNotFoundException` /
+    `SecurityException`).
+
+- **`EmailDetailRoute.kt`** reducido de 349 a 91 líneas. Conserva:
+  - ViewModel con `key = emailId`, 2 `collectAsStateWithLifecycle`.
+  - `EmailDetailReadFailureEffect`.
+  - Llamada a `rememberEmailDetailPdfEffects` y `EmailDetailPresentation`.
+  - Trazas `UI_SCREEN_ENTER` / `UI_SCREEN_DISPOSE` / `UI_STATE_CHANGED`.
+  - Sin TAG, sin BackHandler, sin Scaffold, sin overlays, sin infraestructura
+    PDF.
+
+- Cero cambios en `EmailDetailScreen.kt`, navegación, ViewModel, source,
+  repositorio, AppContainer, componentes de Etapa 3, recursos, WebView ni
+  modelos.
+
+### 28.2 Verificación estática (2026-08-06)
+
+- Presentation sin AppContainer/ViewModel/repositorio/lifecycle/Intent/SAF/
+  ContentResolver/FileProvider (grep limpio, solo `savingStableIds` como
+  parámetro recibido).
+- Route con 2 `collectAsStateWithLifecycle`, `key = emailId`,
+  `EmailDetailReadFailureEffect` y trazas. Sin BackHandler/Scaffold/overlays.
+- PdfEffects único propietario del launcher, `savedSave*`,
+  `repeatOnLifecycle`, `pdfOpenEvents`, `savingStableIds`, `pdfLabels`,
+  `savePdfLauncher`, `copyFileToUri`, `handlePdfExternalActionRequest`,
+  `buildPdfSuggestedName`.
+- Una sola composición de `Scaffold` y `BackHandler` (en Presentation).
+- API pública (`EmailDetailScreen`) y navegación sin cambios.
+
+### 28.3 Validación automatizada (2026-08-06)
+
+- `./gradlew compileDebugKotlin` → BUILD SUCCESSFUL (solo warning preexistente
+  de `LocalLifecycleOwner`).
+- `./gradlew testDebugUnitTest --rerun-tasks` → BUILD SUCCESSFUL,
+  **573 pruebas, 0 fallos, 0 errores, 0 omitidas**.
+- `./gradlew assembleDebug --rerun-tasks` → BUILD SUCCESSFUL.
+- `git diff --check` → sin errores.
+- Hash del diff conjunto protegido:
+  `84adbdbeee0dd263c5b3ab94b56b996dd5adf51c08a2f60c6e2f2f7bbb9c224e` ✓.
+
+### 28.4 Instrumentación (2026-08-06)
+
+Ejecutada en emulador `Medium_Phone_API_36.1` (`ANDROID_SERIAL=emulator-5554`):
+
+| Suite | Tests | Resultado |
+|---|---|---|
+| EmailDetailIntegrationTest | 11 | ✅ |
+| EmailDetailCancellationTest | 7 | ✅ |
+| EmailDetailReadFailureEffectTest | 1 | ✅ |
+| EmailDetailStateContentTest | 3 | ✅ |
+| ImageOverlaysTest | 4 | ✅ |
+| MainNavigationTest | 9 | ✅ |
+| PdfCancellationContractsTest | 2 | ✅ |
+| **Total** | **37** | **0 fallos** |
+
+### 28.5 Smoke en Pixel 9 (2026-08-06)
+
+- **Paso 1**: Loading → Ready, encabezado, cuerpo, imágenes, responder,
+  reenviar, Back — funcionan correctamente ✅.
+- **Paso 2**: Descarga y apertura de PDF (baseline-small.pdf) ✅.
+- **Paso 3**: Guardado SAF exitoso + cancelación SAF sin estado residual ✅.
+- **Paso 4**: Expiración manual de caché → estado Idle + snackbar «caché
+  expirado» ✅.
+- **Paso 5**: «No conservar actividades» → selector SAF se reabre solo tras
+  recreación, sin snackbar ni errores; configuración restaurada ✅.
+- **Paso 6**: Salir durante descarga (Back) → sin archivo parcial, estado
+  Idle ✅.
+
+### 28.6 Criterios de aceptación (Subfase 4.2)
+
+- [x] Contratos internos cerrados sin duplicación residual.
+- [x] Presentation sin infraestructura.
+- [x] PdfEffects como único propietario de launcher, savedSave*,
+  colección de eventos y savingStableIds.
+- [x] Route con 2 collectors, key=emailId, ReadFailureEffect y trazas.
+- [x] Una sola composición de Scaffold, BackHandler y overlays.
+- [x] API pública y navegación sin cambios.
+- [x] Suite JVM completa verde (573 tests, 0 fallos).
+- [x] `compileDebugKotlin`, `assembleDebug --rerun-tasks` y `git diff --check`
+  verdes.
+- [x] Instrumentación (7 suites, 37 tests) verde.
+- [x] Smoke en Pixel 9 con los 6 pasos completados.
+- [x] Hash del diff conjunto protegido verificado.
+
+La subfase queda aprobada. No se crea commit hasta cerrar 4.1–4.3 y la
+auditoría de Etapa 4 (commit previsto:
+`refactor(emaildetail): separate route from presentation`).
+
+---
+
+## 29. Subfase 4.3 — Pruebas de caracterización de presentación
+
+Plan cerrado: `Etapa 4 Separar Route y UI/Subfase 4.3.md` (2026-08-06).
+Subfase implementada por un agente IA; auditoría consolidada de Etapa 4 y
+commit reservados para el agente auditor.
+
+### 29.1 Cambios de implementación
+
+- Único archivo creado:
+  `app/src/androidTest/java/com/david/mailapp/feature/emaildetail/EmailDetailPresentationTest.kt`
+  (467 líneas) con **8 pruebas** que caracterizan directamente
+  `EmailDetailPresentation`:
+  1. `loading_showsProgressAndDisablesReplyForward`
+  2. `retryableResolutionError_showsMessageAndForwardsRetry`
+  3. `nonRetryableResolutionError_hidesRetry`
+  4. `bodyErrorWithoutAttachments_showsErrorWithoutPdfActions`
+  5. `bodyErrorWithAttachment_forwardsPdfCallbacksAndSavingState`
+  6. `replyForwardAndBack_areForwardedOnlyInReady`
+  7. `expandedHeader_consumesBackBeforeOuterHandler`
+  8. `imageLongPress_opensActionMenuAndFullscreen`
+- Fixtures/probes privados del archivo: `testEmail(...).copy(...)`,
+  `SnackbarHostState` recordado, `TRACE_KEY` fija sin datos reales, y
+  `WaitForWebViewProgress` (ViewAction de Espresso que espera
+  `WebView.progress == 100` con url cargada, 15 s de timeout).
+- Cero cambios de producción: sin `testTag`/semantics/hooks nuevos en
+  `app/src/main`, API pública y navegación intactas.
+
+### 29.2 Verificación (2026-08-06)
+
+- `./gradlew compileDebugAndroidTestKotlin` → BUILD SUCCESSFUL.
+- `./gradlew testDebugUnitTest --rerun-tasks` → BUILD SUCCESSFUL,
+  **573/573 pruebas, 0 fallos**.
+- `./gradlew assembleDebug --rerun-tasks` → BUILD SUCCESSFUL.
+- Instrumentación en emulador `Medium_Phone_API_36.1`
+  (`ANDROID_SERIAL=emulator-5554`), 8 suites → **45/45 tests, 0 fallos**:
+
+| Suite | Tests | Resultado |
+|---|---|---|
+| **EmailDetailPresentationTest (nueva)** | **8** | ✅ |
+| EmailDetailIntegrationTest | 11 | ✅ |
+| EmailDetailCancellationTest | 7 | ✅ |
+| EmailDetailReadFailureEffectTest | 1 | ✅ |
+| EmailDetailStateContentTest | 3 | ✅ |
+| ImageOverlaysTest | 4 | ✅ |
+| MainNavigationTest | 9 | ✅ |
+| PdfCancellationContractsTest | 2 | ✅ |
+| **Total** | **45** | **0 fallos** |
+
+- Incidencia transitoria documentada: en la **primera** ejecución
+  `inlineCancellationKeepsPendingReadyStateAndDoesNotWriteFallback` falló por
+  `TimeoutCancellationException` (5 s esperando `inlineImagesCalls == 1`).
+  Verificado que no es regresión: producción no modificada en 4.3 (hashes de
+  entrada intactos), el test pasa aislado y en la re-ejecución completa
+  45/45. Se atribuye a latencia del emulador recién arrancado bajo carga.
+- `git diff --check` → sin errores.
+
+### 29.3 Búsqueda estática
+
+- `EmailDetailPresentation.kt` sin AppContainer, ViewModel, repositorio,
+  lifecycle, Intent, SAF, ContentResolver, FileProvider ni launchers (grep
+  sin coincidencias).
+- Cero `testTag`/hooks nuevos en `app/src/main` (solo preexistentes en
+  navigation/trash; ninguno en emaildetail).
+- Ningún archivo de producción modificado durante 4.3 (`git status`: solo el
+  nuevo archivo de test añadido).
+
+### 29.4 Hashes de entrada protegidos
+
+| Archivo | Hash esperado | Verificado |
+|---|---|---|
+| `EmailDetailScreen.kt` | `cbf868c9…03d65` | ✅ |
+| `EmailDetailRoute.kt` | `88c4cbe5…f91c` | ✅ |
+| `EmailDetailPresentation.kt` | `547e4ff6…f4022` | ✅ |
+| `EmailDetailPdfEffects.kt` | `9dfddcf7…4c040` | ✅ |
+| Diff MainActivity + SearchScreen | `84adbdbe…c224e` | ✅ |
+
+### 29.5 Cierre
+
+- Subfase 4.3 marcada **Aprobada** en la tabla de estado.
+- **Etapa 4 permanece En curso** — pendiente de la auditoría consolidada
+  externa.
+- No se modifican los resultados registrados de 4.1 ni 4.2.
+- No se ejecuta la auditoría de Etapa 4 ni se hace stage/commit (reservados
+  al agente auditor, commit previsto:
+  `refactor(emaildetail): separate route from presentation`).
+
+---
+
+## 30. Auditoría consolidada y cierre de Etapa 4
+
+**Estado: APROBADA** (2026-08-06).
+
+### 30.1 Arquitectura y alcance
+
+- `EmailDetailScreen.kt` conserva la fachada pública y su firma original; su
+  única responsabilidad es delegar con argumentos nombrados en
+  `EmailDetailRoute`.
+- `EmailDetailRoute.kt` concentra ViewModel, repositorio/fuente, colecciones
+  ligadas al ciclo de vida, trazas y conexión entre efectos y presentación.
+- `EmailDetailPresentation.kt` contiene la UI pura y permanece libre de
+  AppContainer, ViewModel, repositorio, lifecycle, Intent, SAF,
+  ContentResolver, FileProvider y launchers.
+- `EmailDetailPdfEffects.kt` es el único coordinador de los efectos PDF:
+  launcher SAF, apertura/guardado, caché, estados persistibles y consumo de
+  eventos.
+- La extracción conserva el orden de efectos y la matriz visual de estados,
+  sin cambios en navegación, ViewModel, fuente, manejador PDF ni componentes
+  extraídos en la Etapa 3.
+- La Subfase 4.3 añade ocho pruebas directas de presentación sin incorporar
+  tags, semantics ni hooks de prueba en producción.
+
+### 30.2 Gates independientes del agente auditor
+
+- `./gradlew testDebugUnitTest assembleDebug --rerun-tasks` → BUILD
+  SUCCESSFUL: **573/573 pruebas JVM, 0 fallos**, y APK debug ensamblado
+  correctamente (25.642.958 bytes).
+- Instrumentación consolidada en `Medium_Phone_API_36.1`, con las ocho suites
+  de 4.3 → **45/45 pruebas, 0 fallos ni omitidas** en la primera ejecución de
+  la auditoría independiente.
+- `git diff --check` → limpio.
+- Las advertencias de compilación observadas son deprecaciones preexistentes;
+  no constituyen errores ni una regresión de la Etapa 4.
+
+### 30.3 Clasificación de la incidencia transitoria
+
+- El timeout informado durante la primera ejecución del implementador en
+  `inlineCancellationKeepsPendingReadyStateAndDoesNotWriteFallback` no es
+  atribuible a la Etapa 4: la ruta de producción implicada no fue modificada,
+  el test pasó aislado, pasó en la repetición completa del implementador y
+  volvió a pasar dentro de las **45/45** pruebas de la auditoría independiente.
+- Se clasifica como flakiness puntual por latencia del emulador recién
+  iniciado bajo carga, sin evidencia de regresión funcional.
+
+### 30.4 Evidencia manual y protección de cambios ajenos
+
+- Se revisó la evidencia de smoke de la Subfase 4.2 en Pixel 9: transición
+  Loading→Ready, apertura/descarga PDF, guardado y cancelación SAF, expiración
+  de caché, recreación de Activity y salida durante descarga.
+- Tras la prueba de recreación quedaron restaurados
+  `always_finish_activities=0` y las escalas de animación de ventana,
+  transición y animator en `1.0`.
+- El hash conjunto protegido de `MainActivity.kt` y `SearchScreen.kt` sigue
+  siendo `84adbdbeee0dd263c5b3ab94b56b996dd5adf51c08a2f60c6e2f2f7bbb9c224e`.
+  Ambos cambios del usuario quedan fuera del staging y del commit de esta
+  etapa.
+
+### 30.5 Cierre
+
+- Subfases 4.1, 4.2 y 4.3: **Aprobadas**.
+- Auditoría consolidada de Etapa 4: **Aprobada**.
+- Etapa 4 marcada **Aprobada** en la tabla de estado.
+- Staging limitado a la fachada, Route, Presentation, coordinador PDF, prueba
+  de caracterización y este registro técnico.
+- Commit de cierre previsto:
+  `refactor(emaildetail): separate route from presentation`.
