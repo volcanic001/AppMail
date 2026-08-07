@@ -47,7 +47,7 @@ crearán únicamente en las subfases 1.3 y 1.4, cuando existan evidencias reales
 | Subfase 1.3   | Baseline instrumentado en emulador | Aprobada |
 | Subfase 1.4   | Baseline manual y visual en dispositivo físico | Aprobada |
 | Etapa 2       | Extraer código independiente       | Aprobada   |
-| Etapa 3       | Extraer bloques visuales           | Pendiente  |
+| Etapa 3       | Extraer bloques visuales           | En curso   |
 | Etapa 4       | Separar Route y UI                 | Pendiente  |
 | Etapa 5       | Cierre integral                    | Pendiente  |
 
@@ -988,3 +988,248 @@ La subfase queda aprobada únicamente si:
 
 **Resultado final: Etapa 2 APROBADA el 2026-08-06.**
 **Siguiente paso después del commit: Etapa 3, Subfase 3.1 — Encabezado flotante.**
+
+## 22. Subfase 3.1 — Encabezado flotante
+
+**Estado: APROBADA** (2026-08-06).
+
+### 22.1 Cambios de implementación
+
+- Creado `components/FloatingHeaderPanel.kt` (`com.david.mailapp.feature.emaildetail.components`) con:
+  - `internal fun FloatingHeaderPanel(email, isExpanded, onToggle, traceMail, modifier)` — extraída textualmente con animaciones, offsets, heightIn(360.dp), scroll, formas, colores, elevaciones, espaciados, traza HEADER_LAYOUT y handle.
+  - `private fun HeaderDetailRow(icon, label, value, modifier)` — extraída textualmente.
+  - `private fun rememberDateFormat(): SimpleDateFormat` — extraída textualmente.
+- Trasladados desde `EmailDetailScreen.kt` los tres bloques y el comentario descriptivo original del panel; retirados también sus imports exclusivos, ya sin consumidores.
+- Añadido `import FloatingHeaderPanel` en `EmailDetailScreen.kt`.
+- Se conservan en `EmailDetailScreen.kt`: `showDetailsPanel` y su estado inicial cerrado, BackHandler cerrando primero el panel, scrim (alpha 0.48f, cierre por toque, zIndex 1f), contenedor del panel (alineado arriba, zIndex 2f), selección del correo solo para PreparingBody y Ready.
+
+### 22.2 Validación automatizada
+
+- `./gradlew testDebugUnitTest --tests 'EmailDetailContractsTest' --rerun-tasks` → BUILD SUCCESSFUL, **5/5**.
+- `./gradlew compileDebugKotlin` → BUILD SUCCESSFUL.
+- `./gradlew assembleDebug --rerun-tasks` → BUILD SUCCESSFUL.
+- Búsqueda estática: una sola definición de cada símbolo (`FloatingHeaderPanel`, `HeaderDetailRow`, `rememberDateFormat`) en `FloatingHeaderPanel.kt`; cero residuales en `EmailDetailScreen.kt`.
+- Firma pública de `EmailDetailScreen(emailId, onBack, onReply, onForward, modifier)` intacta.
+- Hashes protegidos: MainActivity.kt `a8275404...` ✓, SearchScreen.kt `3966a9fe...` ✓.
+
+### 22.3 Gate visual
+
+- [x] APK instalado con `adb install -r` preservando sesión y datos.
+- [x] Configuración baseline temporal: Pixel 9, oscuro, Blue, sin AMOLED, fuente estándar.
+- [x] Fixture `MAILAPP_BASELINE_1_4_20260805` abierto con encabezado cerrado → idéntico a `03-ready-header-cerrado.png`.
+- [x] Encabezado expandido con scrim → idéntico a `04-header-abierto-scrim.png`.
+- [x] Verificada animación, flecha, handle, contenido y scroll.
+- [x] Scrim tocado: cierra sin activar el WebView.
+- [x] Reabierto; primer Back cierra el panel conservando Detail; segundo Back regresa al origen.
+- [x] Preferencias del usuario restauradas, sesión/red estables confirmadas.
+
+### 22.4 Criterios de aceptación
+
+- [x] Comportamiento funcional y visual idéntico al baseline.
+- [x] Compilación, pruebas y APK verdes.
+- [x] FloatingHeaderPanel amplía su visibilidad de `private` a `internal`; sin otras APIs públicas nuevas.
+- [x] Ningún cambio fuera de `FloatingHeaderPanel.kt`, `EmailDetailScreen.kt` y el registro.
+- [x] Gate visual completado y aprobado.
+- [x] Hashes de MainActivity.kt y SearchScreen.kt conservados.
+- [x] Working tree conserva los cambios previos del usuario sin stagear.
+- [x] No se crea commit hasta cerrar toda la Etapa 3 (Subfase 3.4).
+
+**Resultado final: Subfase 3.1 APROBADA el 2026-08-06.**
+**Siguiente paso: Subfase 3.2 — Cuerpo y adjuntos.**
+
+## 23. Subfase 3.2 — Cuerpo y adjuntos
+
+**Estado: APROBADA** (2026-08-06).
+
+### 23.1 Cambios de implementación
+
+- Creado `components/EmailDetailContent.kt` (`com.david.mailapp.feature.emaildetail.components`) con `internal fun EmailDetailContent(...)` — extraída textualmente, visibilidad `private` → `internal`.
+- Conservado sin cambios: firma y orden de parámetros, `bodyKey` y dependencias del remember, estado `isBodyRendered`, condición y transición del loader, orden WebView → loader superpuesto → sección PDF, tamaños, `weight`, `fillMaxSize`, `zIndex`, trazas `UI_*`, callbacks `onPageRendered`/PDF/imagen.
+- Eliminado el bloque de `EmailDetailScreen.kt` + imports exclusivos (`withFrameNanos`, `onGloballyPositioned`, `positionInRoot`, `PdfDownloadState`, `EmailBodyWebView`, `LocalThemeConfig`).
+- Añadido `import EmailDetailContent` en `EmailDetailScreen.kt`.
+- Se mantiene el uso directo de `PdfAttachmentSection` en `BodyError` (sin cambios).
+- Sin acceso a AppContainer, ViewModel, repositorio ni navegación dentro del nuevo componente.
+
+### 23.2 Validación automatizada
+
+- Suites relevantes (4) → BUILD SUCCESSFUL, **81/81** (0 fallos, 0 errores, 0 omitidas):
+  - `EmailDetailContractsTest`: 5.
+  - `EmailDetailViewModelResolutionTest`: 15.
+  - `EmailDetailViewModelPdfTest`: 26.
+  - `PdfAttachmentFormattingTest`: 35.
+- `./gradlew compileDebugKotlin` → BUILD SUCCESSFUL.
+- `./gradlew assembleDebug --rerun-tasks` → BUILD SUCCESSFUL.
+- Búsqueda estática: una sola definición de `EmailDetailContent` en `EmailDetailContent.kt`; cero bloque residual en la pantalla.
+- Hashes congelados de componentes: EmailBodyWebView.kt `83cf07eb...` ✓, PdfAttachmentSection.kt `e0934ce4...` ✓.
+- Hashes protegidos: MainActivity.kt `a8275404...` ✓, SearchScreen.kt `3966a9fe...` ✓.
+- Firma pública de `EmailDetailScreen(emailId, onBack, onReply, onForward, modifier)` intacta.
+
+### 23.3 Gate físico
+
+- [x] APK instalado preservando datos.
+- [x] Configuración visual baseline temporal (oscuro, Blue, sin AMOLED, fuente estándar).
+- [x] Fixture `MAILAPP_BASELINE_1_4_20260805` abierto: cuerpo, loader y sección PDF con las mismas dimensiones y orden.
+- [x] MailRenderTrace verificado: `UI_CONTENT_ENTER` → `UI_BODY_LAYOUT` (1080×1481/1491) → `UI_BODY_INPUT` → `UI_LOADER_SHOWN` (awaiting_visual_callback) → `UI_RENDER_CALLBACK` → `UI_LOADER_HIDDEN` (rendered), repetido correctamente para cuerpo corto (992) y completo (9438).
+- [x] PDF pulsado → apertura del visor; Guardar como → SAF cancelado → Detail estable.
+- [x] Pulsación larga sobre la imagen → menú de acciones mostrado.
+- [x] Comparación visual de Ready y adjuntos sin diferencias.
+- [x] Preferencias, sesión y red restauradas.
+
+### 23.4 Criterios de aceptación
+
+- [x] Comportamiento, trazas, tamaños, transiciones y callbacks idénticos.
+- [x] Ninguna API pública nueva; solo `EmailDetailContent` pasa de `private` a `internal`.
+- [x] Componentes WebView/PDF y sus hashes permanecen intactos.
+- [x] Pruebas (81/81), compilación y APK verdes.
+- [x] Smoke físico verde (gate 23.3).
+- [x] MainActivity.kt y SearchScreen.kt sin stagear y con hashes protegidos.
+- [x] No se crea commit hasta cerrar toda la Etapa 3 (Subfase 3.4).
+
+**Resultado final: Subfase 3.2 APROBADA el 2026-08-06.**
+**Siguiente paso: Subfase 3.3 — Barra superior y estados de pantalla.**
+
+## 24. Subfase 3.3 — Barra superior y estados de pantalla
+
+**Estado: APROBADA** (2026-08-06).
+
+### 24.1 Cambios de implementación
+
+- Creado `components/EmailDetailTopBar.kt` con `internal fun EmailDetailTopBar(uiState, onBack, onReply, onForward)` — título, navegación, iconos, colores y cálculo currentEmail; responder/reenviar habilitados solo en Ready con tint deshabilitado y callbacks con el mismo ID.
+- Creado `components/EmailDetailStateContent.kt` con:
+  - `internal fun EmailDetailLoading(modifier)` — spinner 36.dp centrado.
+  - `internal fun EmailDetailResolutionError(state, onRetry, modifier)` — mensaje tipado + botón Reintentar condicional (`state.retryable`).
+  - `internal fun EmailDetailBodyError(state, pdfDownloadStates, onPdfAttachmentClick, onPdfSaveClick, savingStableIds, onRetry, modifier)` — error + PDF condicional.
+- Reemplazados los bloques inline en `EmailDetailScreen.kt` por llamadas que pasan datos y callbacks del ViewModel; ninguna referencia a AppContainer/ViewModel/repositorios en los nuevos componentes.
+- Eliminado `private fun EmailDetailLoading` del final.
+- Retirados los 13 imports exclusivos de los bloques extraídos, ya sin consumidores en `EmailDetailScreen.kt`.
+- Se mantienen sin cambios las ramas PreparingBody/Ready, overlays, Scaffold, snackbar y firma pública.
+
+### 24.2 Validación automatizada
+
+- Suites relevantes (4) → BUILD SUCCESSFUL, **81/81**.
+- `./gradlew compileDebugKotlin` → BUILD SUCCESSFUL.
+- `./gradlew assembleDebug --rerun-tasks` → BUILD SUCCESSFUL.
+- `EmailDetailStateContentTest` instrumentada → **3/3**: BodyError retryable, no retryable y PDF con callbacks Open/Save.
+- Búsqueda estática: una sola definición de cada componente; cero bloques residuales en `EmailDetailScreen.kt`.
+- Hashes protegidos: MainActivity.kt `a8275404...` ✓, SearchScreen.kt `3966a9fe...` ✓.
+- Firma pública de `EmailDetailScreen(emailId, onBack, onReply, onForward, modifier)` intacta.
+
+### 24.3 Gate funcional y visual
+
+- [x] Loading: spinner idéntico a `01-loading.png`; acciones deshabilitadas.
+- [x] ResolutionError: mensaje tipado + botón solo si retryable=true; Reintentar conserva el callback.
+- [x] PreparingBody: barra visible, responder/reenviar deshabilitados.
+- [x] Ready: acciones habilitadas; Responder/Reenviar abren destinos correctos (coinciden con `03`, `05`, `06`).
+- [x] Back, encabezado, PDF y overlays sin regresiones.
+- [x] BodyError cubierto de forma determinista por `EmailDetailStateContentTest`: mensaje, visibilidad condicional de Reintentar, PDF y callbacks Open/Save.
+- [x] Preferencias, sesión y red restauradas.
+
+### 24.4 Criterios de aceptación
+
+- [x] Matriz Loading/ResolutionError/BodyError/PreparingBody/Ready funcionalmente idéntica.
+- [x] Ninguna API pública nueva; solo componentes extraídos con visibilidad `internal`.
+- [x] Componentes nuevos sin dependencias de infraestructura.
+- [x] Pruebas (81/81), compilación y APK verdes.
+- [x] Smoke funcional/visual verde (gate 24.3) y BodyError instrumentado 3/3.
+- [x] MainActivity.kt y SearchScreen.kt sin stagear y con hashes protegidos.
+- [x] No se crea commit hasta cerrar toda la Etapa 3 (Subfase 3.4).
+
+**Resultado final: Subfase 3.3 APROBADA el 2026-08-06.**
+**Siguiente paso: Subfase 3.4 — Overlays de imágenes (última de Etapa 3).**
+
+## 25. Subfase 3.4 — Overlays de imágenes
+
+**Estado: APROBADA** (2026-08-06).
+
+### 25.1 Cambios de implementación
+
+- Creado `components/ImageOverlays.kt` como unidad visual cohesiva con:
+  - `internal fun ImageActionSheet(activeImageUrl, onOpenFullscreen, onDismiss)` — menú Abrir/Guardar, forma, espaciado, iconos, colores, etiquetas resueltas y llamada existente a `ImageUtils.saveImageToGallery`.
+  - `internal fun FullscreenImageDialog(imageUrl, onDismiss)` — decodificación existente mediante `ImageUtils.decodeDataUriToBitmap`, diálogo sin ancho de plataforma, cierre por Back/toque exterior/toque en contenido, imagen y error tipado.
+- `EmailDetailScreen.kt` conserva la propiedad de `activeImageUrl` y `showFullscreenImage`, sus valores iniciales y el mismo orden de transiciones Abrir → fullscreen y Guardar → cierre del menú.
+- El menú permanece dentro del `Box` de contenido y el diálogo permanece fuera de ese `Box`, conservando la composición original.
+- Retirados de la pantalla únicamente imports y dependencias visuales sin consumidores; no se modificaron recursos, `ImageUtils`, WebView, PDF, ViewModel, repositorio, navegación ni modelos.
+- `ImageUtils.kt` permanece intacto con hash `cea09ff8d5d3706929d33ff337979d98c3f8e295aca1309a7656d07306a8abaf`.
+
+### 25.2 Validación automatizada
+
+- Suites JVM relevantes (5) → BUILD SUCCESSFUL, **93/93** (0 fallos, 0 errores, 0 omitidas):
+  - `EmailDetailContractsTest`: 5.
+  - `EmailDetailViewModelResolutionTest`: 15.
+  - `EmailDetailViewModelPdfTest`: 26.
+  - `PdfAttachmentFormattingTest`: 35.
+  - `ImageUtilsTest`: 12.
+- `ImageOverlaysTest` instrumentada en `Medium_Phone_API_36.1` → **4/4**: acciones visibles, Abrir reenvía la misma data URI y cierra el menú, Back descarta el menú, fullscreen válido cierra por toque y formato inválido muestra error y cierra.
+- `./gradlew compileDebugKotlin compileDebugAndroidTestKotlin` → BUILD SUCCESSFUL.
+- `./gradlew assembleDebug --rerun-tasks` → BUILD SUCCESSFUL; APK generado correctamente.
+- `git diff --check` → sin errores.
+
+### 25.3 Gate funcional
+
+- [x] Pulsación larga conserva el callback que asigna la data URI a `activeImageUrl`.
+- [x] Abrir conserva la URL exacta, muestra el diálogo y descarta el menú.
+- [x] Guardar conserva etiquetas, corrutina y llamada exacta a `ImageUtils.saveImageToGallery`; los 12 contratos JVM de formato, almacenamiento, publicación, limpieza y cancelación permanecen verdes.
+- [x] Descartar el menú mediante Back invoca el mismo cierre.
+- [x] El diálogo conserva cierre por Back, exterior y toque; la decodificación válida y el error de carga están cubiertos de forma determinista.
+- [x] No cambian formato, calidad ni destino `Pictures/MailApp`.
+
+### 25.4 Criterios de aceptación
+
+- [x] Menú y diálogo extraídos como una unidad visual, sin duplicación residual en `EmailDetailScreen.kt`.
+- [x] Estado visual conservado en la pantalla; ninguna API pública nueva.
+- [x] Componentes nuevos sin acceso a AppContainer, ViewModel o repositorios.
+- [x] Apertura, guardado, descarte y cierre preservan el comportamiento baseline.
+- [x] Pruebas JVM 93/93, instrumentación 4/4, compilación y APK verdes.
+- [x] MainActivity.kt y SearchScreen.kt permanecen sin stagear y con hashes protegidos.
+- [x] No se crea commit antes de la auditoría consolidada de Etapa 3.
+
+**Resultado final: Subfase 3.4 APROBADA el 2026-08-06.**
+**Siguiente paso: auditoría consolidada y commit de Etapa 3.**
+
+## 26. Auditoría consolidada y cierre de Etapa 3
+
+**Estado: APROBADA** (2026-08-06).
+
+### 26.1 Gates automatizados finales
+
+- `./gradlew testDebugUnitTest --rerun-tasks` → BUILD SUCCESSFUL, **573/573** pruebas (0 fallos, 0 errores, 0 omitidas).
+- `./gradlew assembleDebug --rerun-tasks` → BUILD SUCCESSFUL; `app-debug.apk` generado correctamente (25.642.958 bytes).
+- Auditoría instrumentada consolidada en `Medium_Phone_API_36.1` → BUILD SUCCESSFUL, **26/26** (0 fallos, 0 errores, 0 omitidas):
+  - `EmailDetailIntegrationTest`.
+  - `EmailDetailCancellationTest`.
+  - `EmailDetailReadFailureEffectTest`.
+  - `EmailDetailStateContentTest`.
+  - `ImageOverlaysTest`.
+- `git diff --check` → sin errores.
+- Las advertencias corresponden a deprecaciones ya existentes; no aparecieron errores ni advertencias atribuibles a los componentes extraídos.
+
+### 26.2 Auditoría visual y funcional consolidada
+
+- Encabezado cerrado y abierto/scrim fueron comparados en 3.1 contra `03-ready-header-cerrado.png` y `04-header-abierto-scrim.png`, sin diferencias; animación, scroll, toque del scrim y prioridad de Back aprobados.
+- Cuerpo, loader, WebView y PDF fueron verificados físicamente en 3.2 con el fixture `MAILAPP_BASELINE_1_4_20260805`; dimensiones, orden, trazas, apertura PDF y cancelación SAF permanecieron iguales.
+- Matriz Loading/ResolutionError/BodyError/PreparingBody/Ready, acciones de barra y navegación fueron aprobadas en 3.3, con BodyError cubierto adicionalmente por 3/3 pruebas Compose.
+- Menú, fullscreen, descarte y error de imagen quedaron cubiertos por 4/4 pruebas Compose en 3.4; el guardado conserva la llamada exacta a `ImageUtils` y sus 12/12 contratos JVM.
+- La evidencia baseline de imagen permanece identificada por hashes: `12-image-menu.png`, `13-image-fullscreen.png` y `14-image-guardada.png`; no se generaron capturas versionadas nuevas.
+
+### 26.3 Alcance, dependencias y protección
+
+- Los bloques visuales de la etapa tienen definiciones únicas en `FloatingHeaderPanel.kt`, `EmailDetailContent.kt`, `EmailDetailTopBar.kt`, `EmailDetailStateContent.kt` e `ImageOverlays.kt`; no existe duplicación residual en `EmailDetailScreen.kt`.
+- Ningún componente nuevo referencia AppContainer, ViewModel o repositorios.
+- Firma pública `EmailDetailScreen(emailId, onBack, onReply, onForward, modifier)` intacta; no se introdujeron APIs públicas nuevas.
+- `EmailBodyWebView.kt` `83cf07eb...` ✓, `PdfAttachmentSection.kt` `e0934ce4...` ✓ e `ImageUtils.kt` `cea09ff8...` ✓ permanecen intactos.
+- `MainActivity.kt`: `a8275404afe60158d08616487124020b64d6aa1df2cb0f02f4c56c1d3b52cd55` ✓.
+- `SearchScreen.kt`: `3966a9feace5bbae418969414e7a543c26ee4909a0914ddc75eee450401d89b3` ✓.
+- Diff combinado protegido: `84adbdbeee0dd263c5b3ab94b56b996dd5adf51c08a2f60c6e2f2f7bbb9c224e` ✓.
+- Los dos archivos ajenos permanecen sin stagear y excluidos del commit.
+
+### 26.4 Cierre
+
+- [x] Subfases 3.1, 3.2, 3.3 y 3.4 aprobadas.
+- [x] Suite JVM completa, compilación, APK e instrumentación consolidadas verdes.
+- [x] Smoke funcional y comparación visual respaldados por los gates de cada subfase y la evidencia baseline congelada.
+- [x] Arquitectura conservadora: componentes visuales sin infraestructura y pantalla pública intacta.
+- [x] Alcance del commit limitado a los archivos propios de Etapa 3 y este registro.
+
+**Resultado final: Etapa 3 APROBADA el 2026-08-06.**
+**Commit previsto: `refactor(emaildetail): extract presentation components`.**
+**Siguiente paso después del commit: Etapa 4, Subfase 4.1 — Fachada pública y Route interna.**

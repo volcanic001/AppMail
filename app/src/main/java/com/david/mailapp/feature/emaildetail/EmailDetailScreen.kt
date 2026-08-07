@@ -2,61 +2,15 @@ package com.david.mailapp.feature.emaildetail
 
 import android.util.Log
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.outlined.Forward
-import androidx.compose.material.icons.automirrored.outlined.Reply
-import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.Save
-import androidx.compose.material.icons.outlined.CalendarToday
-import androidx.compose.material.icons.outlined.Mail
-import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -65,46 +19,26 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.compose.foundation.Image
 import com.david.mailapp.R
 import com.david.mailapp.core.di.AppContainer
-import com.david.mailapp.core.localization.asString
-import com.david.mailapp.core.localization.toUiText
-import com.david.mailapp.data.pdf.PdfDownloadState
-import com.david.mailapp.domain.model.Email
-import com.david.mailapp.domain.model.PdfAttachmentMetadata
-import com.david.mailapp.feature.emaildetail.components.EmailBodyWebView
-import com.david.mailapp.feature.emaildetail.components.ImageSaveLabels
-import com.david.mailapp.feature.emaildetail.components.ImageUtils
-import com.david.mailapp.feature.emaildetail.components.PdfAttachmentSection
-import com.david.mailapp.ui.theme.LocalThemeConfig
+import com.david.mailapp.feature.emaildetail.components.EmailDetailContent
+import com.david.mailapp.feature.emaildetail.components.EmailDetailTopBar
+import com.david.mailapp.feature.emaildetail.components.FloatingHeaderPanel
+import com.david.mailapp.feature.emaildetail.components.FullscreenImageDialog
+import com.david.mailapp.feature.emaildetail.components.ImageActionSheet
+import com.david.mailapp.feature.emaildetail.components.EmailDetailBodyError
+import com.david.mailapp.feature.emaildetail.components.EmailDetailLoading
+import com.david.mailapp.feature.emaildetail.components.EmailDetailResolutionError
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-import kotlin.math.roundToInt
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -271,8 +205,6 @@ fun EmailDetailScreen(
     var activeImageUrl by remember { mutableStateOf<String?>(null) }
     var showFullscreenImage by remember { mutableStateOf<String?>(null) }
     var showDetailsPanel by remember { mutableStateOf(false) }
-    val coroutineScope = rememberCoroutineScope()
-    val context = LocalContext.current
     val traceMail = remember(emailId) { EmailRenderTrace.mailKey(emailId) }
 
     DisposableEffect(traceMail) {
@@ -307,50 +239,11 @@ fun EmailDetailScreen(
     Scaffold(
         modifier = modifier.fillMaxSize(),
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.detail_title), style = MaterialTheme.typography.titleLarge) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.detail_back)
-                        )
-                    }
-                },
-                actions = {
-                    // Responder/Reenviar solo disponibles en Ready — durante
-                    // resolución, preparación o error permanecen deshabilitados.
-                    val currentEmail = (uiState as? EmailDetailUiState.Ready)?.email
-                    IconButton(
-                        onClick = {
-                            currentEmail?.let { onReply(it.id) }
-                        },
-                        enabled = currentEmail != null
-                    ) {
-                        Icon(
-                            MaterialSymbolsReply,
-                            contentDescription = stringResource(R.string.detail_reply),
-                            tint = if (currentEmail != null) MaterialTheme.colorScheme.onSurfaceVariant
-                                   else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
-                        )
-                    }
-                    IconButton(
-                        onClick = {
-                            currentEmail?.let { onForward(it.id) }
-                        },
-                        enabled = currentEmail != null
-                    ) {
-                        Icon(
-                            TablerArrowForwardUpDouble,
-                            contentDescription = stringResource(R.string.detail_forward),
-                            tint = if (currentEmail != null) MaterialTheme.colorScheme.onSurfaceVariant
-                                   else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                )
+            EmailDetailTopBar(
+                uiState = uiState,
+                onBack = onBack,
+                onReply = onReply,
+                onForward = onForward
             )
         },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
@@ -363,79 +256,23 @@ fun EmailDetailScreen(
                 }
 
                 is EmailDetailUiState.ResolutionError -> {
-                    Column(
-                        modifier = Modifier.fillMaxSize(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Icon(
-                            Icons.Filled.ErrorOutline,
-                            contentDescription = null,
-                            modifier = Modifier.size(48.dp),
-                            tint = MaterialTheme.colorScheme.error
-                        )
-                        Spacer(Modifier.height(16.dp))
-                        Text(
-                            text = state.reason.toUiText().asString(),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        if (state.retryable) {
-                            Spacer(Modifier.height(16.dp))
-                            androidx.compose.material3.TextButton(
-                                onClick = { viewModel.onRetry() }
-                            ) {
-                                Text(stringResource(R.string.action_retry))
-                            }
-                        }
-                    }
+                    EmailDetailResolutionError(
+                        state = state,
+                        onRetry = viewModel::onRetry,
+                        modifier = Modifier.fillMaxSize()
+                    )
                 }
 
                 is EmailDetailUiState.BodyError -> {
-                    val pdfEmail = state.email
-                    Column(
+                    EmailDetailBodyError(
+                        state = state,
+                        pdfDownloadStates = pdfDownloadStates,
+                        onPdfAttachmentClick = viewModel::onPdfAttachmentClick,
+                        onPdfSaveClick = viewModel::onPdfSaveClick,
+                        savingStableIds = savingState.value,
+                        onRetry = viewModel::onRetryBody,
                         modifier = Modifier.fillMaxSize()
-                    ) {
-                        Box(
-                            modifier = Modifier.weight(1f).fillMaxWidth(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center
-                            ) {
-                                Icon(
-                                    Icons.Filled.ErrorOutline,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(48.dp),
-                                    tint = MaterialTheme.colorScheme.error
-                                )
-                                Spacer(Modifier.height(16.dp))
-                                Text(
-                                    text = state.reason.toUiText().asString(),
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                if (state.retryable) {
-                                    Spacer(Modifier.height(8.dp))
-                                    androidx.compose.material3.TextButton(
-                                        onClick = { viewModel.onRetryBody() }
-                                    ) {
-                                        Text(stringResource(R.string.action_retry))
-                                    }
-                                }
-                            }
-                        }
-                        if (pdfEmail?.pdfAttachments?.isNotEmpty() == true) {
-                            PdfAttachmentSection(
-                                attachments = pdfEmail.pdfAttachments,
-                                downloadStates = pdfDownloadStates,
-                                onAttachmentClick = viewModel::onPdfAttachmentClick,
-                                onSaveClick = viewModel::onPdfSaveClick,
-                                savingStableIds = savingState.value
-                            )
-                        }
-                    }
+                    )
                 }
 
                 is EmailDetailUiState.PreparingBody, is EmailDetailUiState.Ready -> {
@@ -493,477 +330,21 @@ fun EmailDetailScreen(
             }
 
             // ── Image action sheet (overlay) ───────────────────────
-            if (activeImageUrl != null) {
-                val saveLabels = ImageSaveLabels(
-                    invalidFormatMessage = stringResource(R.string.image_invalid_format),
-                    savedToGalleryMessage = stringResource(R.string.image_saved_to_gallery),
-                    saveErrorMessage = stringResource(R.string.image_save_error),
-                    filenameTemplate = stringResource(R.string.image_filename_format)
+            activeImageUrl?.let { imageUrl ->
+                ImageActionSheet(
+                    activeImageUrl = imageUrl,
+                    onOpenFullscreen = { showFullscreenImage = it },
+                    onDismiss = { activeImageUrl = null }
                 )
-                ModalBottomSheet(
-                    onDismissRequest = { activeImageUrl = null },
-                    sheetState = rememberModalBottomSheetState(),
-                    shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 2.dp, bottom = 12.dp) // Tightens top/bottom spacing
-                    ) {
-                        ListItem(
-                            headlineContent = { Text(stringResource(R.string.image_open)) },
-                            leadingContent = {
-                                Icon(
-                                    imageVector = Icons.Filled.Image,
-                                    contentDescription = null
-                                )
-                            },
-                            colors = ListItemDefaults.colors(containerColor = Color.Transparent), // Eliminates background shadow box
-                            modifier = Modifier.clickable {
-                                showFullscreenImage = activeImageUrl
-                                activeImageUrl = null
-                            }
-                        )
-                        ListItem(
-                            headlineContent = { Text(stringResource(R.string.image_save)) },
-                            leadingContent = {
-                                Icon(
-                                    imageVector = Icons.Filled.Save,
-                                    contentDescription = null
-                                )
-                            },
-                            colors = ListItemDefaults.colors(containerColor = Color.Transparent), // Eliminates background shadow box
-                            modifier = Modifier.clickable {
-                                val urlToSave = activeImageUrl
-                                val resolvedLabels = saveLabels
-                                if (urlToSave != null) {
-                                    coroutineScope.launch {
-                                        ImageUtils.saveImageToGallery(context, urlToSave, resolvedLabels)
-                                    }
-                                }
-                                activeImageUrl = null
-                            }
-                        )
-                    }
-                }
             }
         }
 
         // ── Fullscreen image dialog (outside content Box) ──────
-        if (showFullscreenImage != null) {
-            val bitmap = remember(showFullscreenImage) {
-                showFullscreenImage?.let { ImageUtils.decodeDataUriToBitmap(it) }
-            }
-
-            Dialog(
-                onDismissRequest = { showFullscreenImage = null },
-                properties = DialogProperties(
-                    usePlatformDefaultWidth = false,
-                    dismissOnBackPress = true,
-                    dismissOnClickOutside = true
-                )
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clickable { showFullscreenImage = null },
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (bitmap != null) {
-                        Image(
-                            bitmap = bitmap.asImageBitmap(),
-                            contentDescription = stringResource(R.string.image_fullscreen),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    } else {
-                        Text(stringResource(R.string.image_load_error), color = MaterialTheme.colorScheme.error)
-                    }
-                }
-            }
-        }
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// FloatingHeaderPanel
-// An overlay panel anchored to the top of the screen.
-// Collapsed: shows only a pill handle with a rotating arrow.
-// Expanded: shows a Card with email metadata fields.
-// Never pushes the WebView — it lives in a Box overlay at zIndex(2).
-// ─────────────────────────────────────────────────────────────────────────────
-@Composable
-private fun FloatingHeaderPanel(
-    email: Email,
-    isExpanded: Boolean,
-    onToggle: () -> Unit,
-    traceMail: String,
-    modifier: Modifier = Modifier
-) {
-    val lastHeaderLayout = remember { mutableStateOf<String?>(null) }
-
-    // Arrow rotation: 0° = collapsed (points up = "tap to expand"),
-    // 180° = expanded (points down = "tap to collapse").
-    val arrowRotation by animateFloatAsState(
-        targetValue = if (isExpanded) 180f else 0f,
-        animationSpec = tween(durationMillis = 250),
-        label = "header_arrow_rotation"
-    )
-
-    // Offset the pill handle dynamically to ensure it is centered on the border when expanded
-    // and correctly aligned below the TopAppBar when collapsed (preventing cut-off).
-    val handleOffsetY by animateDpAsState(
-        targetValue = if (isExpanded) (-20).dp else (-15).dp,
-        animationSpec = tween(durationMillis = 250),
-        label = "handle_offset_y"
-    )
-
-    val dateFormat = rememberDateFormat()
-    val panelShape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp)
-
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .offset(y = (-5).dp) // Tucks the panel slightly under the TopAppBar to eliminate any gap
-            .onGloballyPositioned { coordinates ->
-                val position = coordinates.positionInRoot()
-                val snapshot =
-                    "x=${position.x.roundToInt()} y=${position.y.roundToInt()} " +
-                        "width=${coordinates.size.width} height=${coordinates.size.height} " +
-                        "expanded=$isExpanded"
-                if (lastHeaderLayout.value != snapshot) {
-                    lastHeaderLayout.value = snapshot
-                    EmailRenderTrace.d(traceMail, "UI", "HEADER_LAYOUT", snapshot)
-                }
-            },
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        // ── Expandable panel ───────────────────────────────────
-        AnimatedVisibility(
-            visible = isExpanded,
-            enter = expandVertically(
-                animationSpec = tween(durationMillis = 250),
-                expandFrom = Alignment.Top
-            ) + fadeIn(animationSpec = tween(durationMillis = 200)),
-            exit = shrinkVertically(
-                animationSpec = tween(durationMillis = 220),
-                shrinkTowards = Alignment.Top
-            ) + fadeOut(animationSpec = tween(durationMillis = 180))
-        ) {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth(),
-                shape = panelShape,
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-                ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 360.dp)
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 16.dp, vertical = 16.dp)
-                ) {
-                    // Subject — prominent
-                    Text(
-                        text = email.subject.ifBlank { stringResource(R.string.detail_subject_missing) },
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.Bold
-                        ),
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-
-                    Spacer(Modifier.height(10.dp))
-                    HorizontalDivider(
-                        thickness = 0.5.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
-                    )
-                    Spacer(Modifier.height(12.dp))
-
-                    // Metadata rows
-                    HeaderDetailRow(
-                        icon = Icons.Outlined.Mail,
-                        label = stringResource(R.string.detail_field_from_label),
-                        value = email.from
-                    )
-                    if (email.to.isNotBlank()) {
-                        Spacer(Modifier.height(8.dp))
-                        HeaderDetailRow(
-                            icon = Icons.Outlined.Person,
-                            label = stringResource(R.string.detail_field_to_label),
-                            value = email.to
-                        )
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    HeaderDetailRow(
-                        icon = Icons.Outlined.CalendarToday,
-                        label = stringResource(R.string.detail_field_date_label),
-                        value = dateFormat.format(Date(email.timestamp))
-                    )
-                }
-            }
-        }
-
-        // ── Tab handle (always visible, centered, attached to bottom) ─────────────
-        Surface(
-            onClick = onToggle,
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            shadowElevation = 4.dp,
-            modifier = Modifier
-                .zIndex(1f)
-                .width(60.dp)
-                .height(40.dp)
-                .offset(y = handleOffsetY) // Dynamic offset to align handle perfectly
-        ) {
-            Box(
-                contentAlignment = Alignment.BottomCenter,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(bottom = 2.dp) // Centers the 16.dp icon perfectly within the visible bottom 20.dp semi-circle
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.KeyboardArrowUp,
-                    contentDescription = if (isExpanded) stringResource(R.string.detail_collapse_header) else stringResource(R.string.detail_expand_header),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier
-                        .size(18.dp)
-                        .rotate(arrowRotation)
-                )
-            }
-        }
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// HeaderDetailRow
-// A label + value row used inside FloatingHeaderPanel.
-// Label has a fixed minimum width so all values align cleanly.
-// ─────────────────────────────────────────────────────────────────────────────
-@Composable
-private fun HeaderDetailRow(
-    icon: ImageVector,
-    label: String,
-    value: String,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Circle container for icon
-        Surface(
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-            modifier = Modifier.size(32.dp)
-        ) {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier.fillMaxSize()
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(16.dp)
-                )
-            }
-        }
-
-        Spacer(Modifier.width(12.dp))
-
-        Text(
-            text = "$label:",
-            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.width(44.dp)
-        )
-        Spacer(Modifier.width(8.dp))
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f)
-        )
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// EmailDetailContent
-// WebView fills the full available space — no handle bar above it.
-// ─────────────────────────────────────────────────────────────────────────────
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun EmailDetailContent(
-    email: Email,
-    body: String?,
-    traceMail: String,
-    pdfDownloadStates: Map<String, PdfDownloadState>,
-    onPdfAttachmentClick: (PdfAttachmentMetadata) -> Unit,
-    onPdfSaveClick: (PdfAttachmentMetadata) -> Unit,
-    savingStableIds: Set<String>,
-    onImageLongPress: (String) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val isDark = LocalThemeConfig.current.darkTheme
-    val showImages = true
-    val colorScheme = MaterialTheme.colorScheme
-    val bodyKey = remember(
-        body,
-        isDark,
-        showImages,
-        colorScheme.surface,
-        colorScheme.onSurface,
-        colorScheme.primary
-    ) {
-        "${body?.hashCode()}_${isDark}_${showImages}_" +
-            "${colorScheme.surface.hashCode()}_${colorScheme.onSurface.hashCode()}_" +
-            colorScheme.primary.hashCode()
-    }
-    var isBodyRendered by remember(bodyKey) { mutableStateOf(false) }
-
-    val showLoader = body == null || !isBodyRendered
-    val lastBodyLayout = remember { mutableStateOf<String?>(null) }
-
-    DisposableEffect(traceMail, email.id) {
-        EmailRenderTrace.d(traceMail, "UI", "UI_CONTENT_ENTER")
-        onDispose {
-            EmailRenderTrace.d(traceMail, "UI", "UI_CONTENT_DISPOSE")
-        }
-    }
-
-    LaunchedEffect(bodyKey) {
-        EmailRenderTrace.d(
-            traceMail,
-            "UI",
-            "UI_BODY_INPUT",
-            "present=${body != null} bodyLen=${body?.length ?: 0} bodyKey=$bodyKey"
-        )
-        EmailRenderTrace.d(traceMail, "UI", "UI_RENDER_STATE_RESET", "bodyKey=$bodyKey")
-    }
-
-    LaunchedEffect(showLoader, bodyKey) {
-        val reason = when {
-            body == null -> "body_missing"
-            !isBodyRendered -> "awaiting_visual_callback"
-            else -> "rendered"
-        }
-        EmailRenderTrace.d(
-            traceMail,
-            "UI",
-            if (showLoader) "UI_LOADER_SHOWN" else "UI_LOADER_HIDDEN",
-            "reason=$reason bodyKey=$bodyKey"
-        )
-        withFrameNanos { frameTimeNanos ->
-            EmailRenderTrace.d(
-                traceMail,
-                "UI",
-                "UI_FRAME",
-                "loaderVisible=$showLoader bodyKey=$bodyKey frameNanos=$frameTimeNanos"
+        showFullscreenImage?.let { imageUrl ->
+            FullscreenImageDialog(
+                imageUrl = imageUrl,
+                onDismiss = { showFullscreenImage = null }
             )
         }
-    }
-
-    // WebView fills the available vertical space, with PDF section below
-    Column(
-        modifier = modifier.fillMaxSize()
-    ) {
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .onGloballyPositioned { coordinates ->
-                    val position = coordinates.positionInRoot()
-                    val snapshot =
-                        "x=${position.x.roundToInt()} y=${position.y.roundToInt()} " +
-                            "width=${coordinates.size.width} height=${coordinates.size.height}"
-                    if (lastBodyLayout.value != snapshot) {
-                        lastBodyLayout.value = snapshot
-                        EmailRenderTrace.d(traceMail, "UI", "UI_BODY_LAYOUT", snapshot)
-                    }
-                }
-        ) {
-            DisposableEffect(traceMail) {
-            EmailRenderTrace.d(traceMail, "UI", "UI_WEBVIEW_SLOT_ENTER", "bodyKey=$bodyKey")
-            onDispose {
-                EmailRenderTrace.d(traceMail, "UI", "UI_WEBVIEW_SLOT_DISPOSE", "bodyKey=$bodyKey")
-            }
-        }
-        EmailBodyWebView(
-            body = body,
-            showImages = showImages,
-            isDark = isDark,
-            traceMail = traceMail,
-            onPageRendered = {
-                EmailRenderTrace.d(
-                    traceMail,
-                    "UI",
-                    "UI_RENDER_CALLBACK",
-                    "bodyKey=$bodyKey wasRendered=$isBodyRendered"
-                )
-                isBodyRendered = true
-            },
-            onImageLongPress = onImageLongPress,
-            modifier = Modifier
-                .fillMaxSize()
-                .zIndex(0f)
-        )
-        // Loader overlay on top with solid surface background —
-        // hides intermediate WebView frames until postVisualStateCallback.
-        if (showLoader) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.surface)
-                    .zIndex(1f),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(32.dp),
-                    strokeWidth = 3.dp,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-        }
-        }
-
-        // PDF attachments section below the body
-        PdfAttachmentSection(
-            attachments = email.pdfAttachments,
-            downloadStates = pdfDownloadStates,
-            onAttachmentClick = onPdfAttachmentClick,
-            onSaveClick = onPdfSaveClick,
-            savingStableIds = savingStableIds
-        )
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun EmailDetailLoading(modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(horizontal = 48.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        CircularProgressIndicator(
-            modifier = Modifier.size(36.dp),
-            strokeWidth = 3.dp,
-            color = MaterialTheme.colorScheme.primary
-        )
-    }
-}
-
-@Composable
-private fun rememberDateFormat(): SimpleDateFormat {
-    val pattern = stringResource(R.string.date_pattern_long)
-    return remember(pattern) {
-        SimpleDateFormat(pattern, Locale.getDefault())
     }
 }
