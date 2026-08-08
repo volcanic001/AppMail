@@ -593,7 +593,9 @@ class MainNavigationTest {
 
         // Close via closeEmailDetail (visual back button action)
         composeTestRule.runOnUiThread {
-            navController.closeEmailDetail("inbox_email")
+            val currentEntry = navController.currentBackStackEntry
+            checkNotNull(currentEntry)
+            navController.closeEmailDetail(currentEntry, "inbox_email")
         }
         composeTestRule.waitForIdle()
         // Returns to Inbox
@@ -644,7 +646,9 @@ class MainNavigationTest {
 
         // Close Detail
         composeTestRule.runOnUiThread {
-            navController.closeEmailDetail("search_email")
+            val currentEntry = navController.currentBackStackEntry
+            checkNotNull(currentEntry)
+            navController.closeEmailDetail(currentEntry, "search_email")
         }
         composeTestRule.waitForIdle()
         // Returns to Search
@@ -717,7 +721,9 @@ class MainNavigationTest {
 
         // Now close Detail
         composeTestRule.runOnUiThread {
-            navController.closeEmailDetail("orig_msg")
+            val currentEntry = navController.currentBackStackEntry
+            checkNotNull(currentEntry)
+            navController.closeEmailDetail(currentEntry, "orig_msg")
         }
         composeTestRule.waitForIdle()
         // Should be back in Inbox
@@ -745,7 +751,9 @@ class MainNavigationTest {
         assertEquals(null, forwardDetailEntry?.savedStateHandle?.get<String>(KEY_CLOSED_EMAIL_ID))
 
         composeTestRule.runOnUiThread {
-            navController.closeEmailDetail("forward_msg")
+            val currentEntry = navController.currentBackStackEntry
+            checkNotNull(currentEntry)
+            navController.closeEmailDetail(currentEntry, "forward_msg")
         }
         composeTestRule.waitForIdle()
         assertTrue(navController.currentBackStackEntry?.destination?.hasRoute<MainRoute.Inbox>() == true)

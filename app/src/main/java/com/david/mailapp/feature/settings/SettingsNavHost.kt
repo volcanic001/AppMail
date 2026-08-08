@@ -1,5 +1,6 @@
 package com.david.mailapp.feature.settings
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
@@ -11,11 +12,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.david.mailapp.R
 import com.david.mailapp.core.di.AppContainer
+import com.david.mailapp.ui.navigation.popBackStackFrom
 import com.david.mailapp.ui.theme.ColorPalette
 
 /**
@@ -49,6 +53,13 @@ fun SettingsNavHost(
 
     LaunchedEffect(Unit) {
         isSignedIn = AppContainer.authClient.isSignedIn()
+    }
+
+    val currentBackStackEntry by navController.currentBackStackEntryAsState()
+    val closeCurrentSheet: (() -> Unit)? = remember(currentBackStackEntry) {
+        currentBackStackEntry
+            ?.takeIf { !it.destination.hasRoute<SettingsRoute.Hub>() }
+            ?.let { sheetEntry -> { navController.popBackStackFrom(sheetEntry) } }
     }
 
     val slideSpring = spring<IntOffset>(dampingRatio = 0.85f, stiffness = 160f)
@@ -92,7 +103,7 @@ fun SettingsNavHost(
             )
         }
 
-        composable<SettingsRoute.Appearance> {
+        composable<SettingsRoute.Appearance> { backStackEntry ->
             AppearanceSettingsScreen(
                 currentPalette = currentPalette,
                 isDarkMode = isDarkMode,
@@ -104,50 +115,57 @@ fun SettingsNavHost(
                 onUseCustomFontChange = onUseCustomFontChange,
                 onAmoledChange = onAmoledChange,
                 onShowEmailDividersChange = onShowEmailDividersChange,
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStackFrom(backStackEntry) }
             )
         }
 
-        composable<SettingsRoute.Account> {
+        composable<SettingsRoute.Account> { backStackEntry ->
             AccountSettingsScreen(
                 isSigningOut = isSigningOut,
                 onSignOut = onSignOut,
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStackFrom(backStackEntry) }
             )
         }
 
-        composable<SettingsRoute.Notifications> {
+        composable<SettingsRoute.Notifications> { backStackEntry ->
             PlaceholderSettingsScreen(
                 titleResId = R.string.settings_notifications,
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStackFrom(backStackEntry) }
             )
         }
 
-        composable<SettingsRoute.Privacy> {
+        composable<SettingsRoute.Privacy> { backStackEntry ->
             PlaceholderSettingsScreen(
                 titleResId = R.string.settings_privacy,
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStackFrom(backStackEntry) }
             )
         }
 
-        composable<SettingsRoute.Security> {
+        composable<SettingsRoute.Security> { backStackEntry ->
             PlaceholderSettingsScreen(
                 titleResId = R.string.settings_security,
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStackFrom(backStackEntry) }
             )
         }
 
-        composable<SettingsRoute.About> {
+        composable<SettingsRoute.About> { backStackEntry ->
             AboutSettingsScreen(
-                onBack = { navController.popBackStack() },
+                onBack = { navController.popBackStackFrom(backStackEntry) },
                 onChangelogClick = { navController.navigate(SettingsRoute.Changelog) }
             )
         }
 
-        composable<SettingsRoute.Changelog> {
+        composable<SettingsRoute.Changelog> { backStackEntry ->
             ChangelogSettingsScreen(
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStackFrom(backStackEntry) }
             )
         }
+    }
+
+    // Registered after NavHost so sheet handlers take precedence over any
+    // generic pop callback inside NavHost. The captured entry reference
+    // stays stable; a repeated dispatch on a removed entry is a no-op.
+    BackHandler(enabled = closeCurrentSheet != null) {
+        closeCurrentSheet?.invoke()
     }
 }

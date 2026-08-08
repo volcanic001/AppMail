@@ -4,10 +4,58 @@ import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 
+import androidx.annotation.MainThread
+import androidx.lifecycle.Lifecycle
+import androidx.navigation.NavBackStackEntry
+
 /**
  * Key used in SavedStateHandle to pass the closed email ID back to the origin destination.
  */
 internal const val KEY_CLOSED_EMAIL_ID = "closed_email_id"
+
+/**
+ * Evaluates whether a pop-back request originated from [originatingEntryId] is still valid.
+ *
+ * Returns true exclusively when:
+ * - The originating entry is still the current destination (IDs match).
+ * - Its lifecycle state is exactly [Lifecycle.State.RESUMED].
+ * - There is a previous back stack entry to pop to.
+ */
+internal fun canPopBackFrom(
+    originatingEntryId: String,
+    currentEntryId: String?,
+    originatingLifecycleState: Lifecycle.State,
+    hasPreviousEntry: Boolean
+): Boolean {
+    return originatingEntryId == currentEntryId &&
+            originatingLifecycleState == Lifecycle.State.RESUMED &&
+            hasPreviousEntry
+}
+
+/**
+ * Pop the back stack only if [originatingEntry] is still the current RESUMED entry.
+ *
+ * This is the idempotent primitive: a stale or forwarded entry never consumes
+ * another destination.
+ *
+ * @return true if popBackStack() removed the authorized entry, false otherwise.
+ */
+@MainThread
+internal fun NavHostController.popBackStackFrom(
+    originatingEntry: NavBackStackEntry
+): Boolean {
+    val currentEntry = currentBackStackEntry
+    if (!canPopBackFrom(
+            originatingEntryId = originatingEntry.id,
+            currentEntryId = currentEntry?.id,
+            originatingLifecycleState = originatingEntry.lifecycle.currentState,
+            hasPreviousEntry = previousBackStackEntry != null
+        )
+    ) {
+        return false
+    }
+    return popBackStack()
+}
 
 /**
  * Extension on [NavHostController] to navigate to a top-level destination.
@@ -53,12 +101,22 @@ internal fun NavHostController.navigateToOverlay(route: MainRoute) {
 }
 
 /**
- * Closes the Email Detail screen, popping it and delivering the emailId to the origin
- * destination's SavedStateHandle if it is a valid destination (Inbox, Trash, Search).
+ * Closes the Email Detail screen idempotently.
+ *
+ * Only acts when [originatingEntry] is still the current RESUMED entry.
+ * Publishes [KEY_CLOSED_EMAIL_ID] to the previous entry's SavedStateHandle
+ * only when the pop succeeded and the previous destination is Inbox, Trash
+ * or Search.
+ *
+ * @return true if the entry was popped, false for a stale or forwarded request.
  */
-internal fun NavHostController.closeEmailDetail(emailId: String) {
+@MainThread
+internal fun NavHostController.closeEmailDetail(
+    originatingEntry: NavBackStackEntry,
+    emailId: String
+): Boolean {
     val previousEntry = previousBackStackEntry
-    val popped = popBackStack()
+    val popped = popBackStackFrom(originatingEntry)
     if (popped && previousEntry != null) {
         val dest = previousEntry.destination
         val isValidOrigin = dest.hasRoute<MainRoute.Inbox>() ||
@@ -68,4 +126,5 @@ internal fun NavHostController.closeEmailDetail(emailId: String) {
             previousEntry.savedStateHandle[KEY_CLOSED_EMAIL_ID] = emailId
         }
     }
+    return popped
 }

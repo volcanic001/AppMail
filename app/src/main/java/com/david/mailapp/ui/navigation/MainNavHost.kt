@@ -13,11 +13,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.toRoute
 import com.david.mailapp.feature.compose.ComposeMode
 import com.david.mailapp.feature.compose.ComposeScreen
@@ -47,6 +50,21 @@ fun MainNavHost(
     onSignOut: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val currentBackStackEntry by navController.currentBackStackEntryAsState()
+    val closeCurrentOverlay: (() -> Unit)? = remember(currentBackStackEntry) {
+        val entry = currentBackStackEntry ?: return@remember null
+        when {
+            entry.destination.hasRoute<MainRoute.EmailDetail>() -> {
+                val emailId = entry.toRoute<MainRoute.EmailDetail>().emailId
+                { navController.closeEmailDetail(entry, emailId) }
+            }
+            entry.destination.hasRoute<MainRoute.Compose>() -> {
+                { navController.popBackStackFrom(entry) }
+            }
+            else -> null
+        }
+    }
+
     NavHost(
         navController = navController,
         startDestination = MainRoute.Inbox,
@@ -102,7 +120,7 @@ fun MainNavHost(
         composable<MainRoute.Settings>(
             enterTransition = { fadeIn(spring(dampingRatio = 0.65f, stiffness = 350f)) },
             exitTransition = { fadeOut(spring(dampingRatio = 0.65f, stiffness = 350f)) }
-        ) {
+        ) { backStackEntry ->
             SettingsScreen(
                 currentPalette = currentPalette,
                 isDarkMode = isDarkMode,
@@ -116,7 +134,7 @@ fun MainNavHost(
                 onAmoledChange = onAmoledChange,
                 onShowEmailDividersChange = onShowEmailDividersChange,
                 onSignOut = onSignOut,
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStackFrom(backStackEntry) }
             )
         }
 
@@ -156,7 +174,7 @@ fun MainNavHost(
                 onClearHighlight = {
                     backStackEntry.savedStateHandle[KEY_CLOSED_EMAIL_ID] = null
                 },
-                onBack = { navController.popBackStack() },
+                onBack = { navController.popBackStackFrom(backStackEntry) },
                 onEmailClick = { emailId ->
                     navController.navigateToOverlay(MainRoute.EmailDetail(emailId))
                 }
@@ -170,12 +188,12 @@ fun MainNavHost(
             popExitTransition = { ExitTransition.None }
         ) { backStackEntry ->
             val detailRoute: MainRoute.EmailDetail = backStackEntry.toRoute()
-            BackHandler {
-                navController.closeEmailDetail(detailRoute.emailId)
+            val closeDetail: () -> Unit = {
+                navController.closeEmailDetail(backStackEntry, detailRoute.emailId)
             }
             EmailDetailScreen(
                 emailId = detailRoute.emailId,
-                onBack = { navController.closeEmailDetail(detailRoute.emailId) },
+                onBack = closeDetail,
                 onReply = { emailId ->
                     navController.navigateToOverlay(MainRoute.Compose(ComposeMode.REPLY, emailId))
                 },
@@ -193,8 +211,15 @@ fun MainNavHost(
             val args = composeRoute.toComposeArgs()
             ComposeScreen(
                 args = args,
-                onClose = { navController.popBackStack() }
+                onClose = { navController.popBackStackFrom(backStackEntry) }
             )
         }
+    }
+
+    // Register after NavHost so overlay back handlers take precedence over
+    // any generic pop callback inside NavHost. The captured entry reference
+    // stays stable; a repeated dispatch on a removed entry is a no-op.
+    BackHandler(enabled = closeCurrentOverlay != null) {
+        closeCurrentOverlay?.invoke()
     }
 }

@@ -171,7 +171,11 @@ class ScrollStatePresentationTest {
         navController.navigateOverlay(MainRoute.EmailDetail("e1"))
         composeTestRule.onNodeWithTag("detail_screen").assertIsDisplayed()
 
-        composeTestRule.runOnUiThread { navController.closeEmailDetail("e1") }
+        composeTestRule.runOnUiThread {
+            val currentEntry = navController.currentBackStackEntry
+            checkNotNull(currentEntry)
+            navController.closeEmailDetail(currentEntry, "e1")
+        }
         composeTestRule.waitForIdle()
 
         composeTestRule.onNodeWithTag("inbox_30").assertIsDisplayed()
@@ -192,7 +196,11 @@ class ScrollStatePresentationTest {
         navController.navigateOverlay(MainRoute.EmailDetail("e2"))
         composeTestRule.onNodeWithTag("detail_screen").assertIsDisplayed()
 
-        composeTestRule.runOnUiThread { navController.closeEmailDetail("e2") }
+        composeTestRule.runOnUiThread {
+            val currentEntry = navController.currentBackStackEntry
+            checkNotNull(currentEntry)
+            navController.closeEmailDetail(currentEntry, "e2")
+        }
         composeTestRule.waitForIdle()
 
         composeTestRule.onNodeWithTag("search_20").assertIsDisplayed()
