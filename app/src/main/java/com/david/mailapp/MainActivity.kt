@@ -10,7 +10,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -82,13 +82,13 @@ class MainActivity : ComponentActivity() {
         setContent {
             // ... (existing Compose content)
             val systemDark = isSystemInDarkTheme()
-            val savedPalette by AppContainer.appSettingsManager.paletteFlow.collectAsState(initial = null)
-            val savedDarkMode by AppContainer.appSettingsManager.isDarkModeFlow.collectAsState(initial = null)
-            val savedUseCustomFont by AppContainer.appSettingsManager.useCustomFontFlow.collectAsState(initial = null)
-            val savedIsAmoled by AppContainer.appSettingsManager.isAmoledFlow.collectAsState(initial = null)
-            val savedShowEmailDividers by AppContainer.appSettingsManager.showEmailDividersFlow.collectAsState(initial = null)
-            val isSignedIn by isSignedInFlow.collectAsState()
-            val oauthUiState by oauthUiStateFlow.collectAsState()
+            val savedPalette by AppContainer.appSettingsManager.paletteFlow.collectAsStateWithLifecycle(initialValue = null)
+            val savedDarkMode by AppContainer.appSettingsManager.isDarkModeFlow.collectAsStateWithLifecycle(initialValue = null)
+            val savedUseCustomFont by AppContainer.appSettingsManager.useCustomFontFlow.collectAsStateWithLifecycle(initialValue = null)
+            val savedIsAmoled by AppContainer.appSettingsManager.isAmoledFlow.collectAsStateWithLifecycle(initialValue = null)
+            val savedShowEmailDividers by AppContainer.appSettingsManager.showEmailDividersFlow.collectAsStateWithLifecycle(initialValue = null)
+            val isSignedIn by isSignedInFlow.collectAsStateWithLifecycle()
+            val oauthUiState by oauthUiStateFlow.collectAsStateWithLifecycle()
             var isSigningOut by remember { mutableStateOf(false) }
 
             val scope = androidx.compose.runtime.rememberCoroutineScope()

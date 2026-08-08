@@ -21,7 +21,7 @@ import com.david.mailapp.ui.components.ContainedLoadingIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -59,9 +59,9 @@ fun SearchScreen(
         )
     )
 
-    val query by viewModel.query.collectAsState()
-    val uiState by viewModel.uiState.collectAsState()
-    val history by viewModel.historyFlow.collectAsState(initial = emptyList())
+    val query by viewModel.query.collectAsStateWithLifecycle()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val history by viewModel.historyFlow.collectAsStateWithLifecycle(initialValue = emptyList())
     
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current

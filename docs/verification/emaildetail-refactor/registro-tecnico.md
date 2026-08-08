@@ -2133,13 +2133,29 @@ curso y la Subfase 5.4 queda Pendiente. Sin staging ni commit.**
 - La APK histórica instalada en el Huawei el 2026-07-30 no reproduce la doble
   navegación hacia atrás: una pulsación rápida o doble vuelve una sola vez al
   destino esperado.
+- Se ejecutó una comparación A/B aislada en el emulador `emulator-5554`, sin
+  modificar el proyecto principal: `1bb6c3a` (antes de Navigation Compose) y
+  `55b8ecf` (después de la migración). La APK de `1bb6c3a` tiene SHA-256
+  `6b458890ab44cfc01290ecea28e8038446e44114848982091f402b690a9d58f1`; la de
+  `55b8ecf`, `0901f6fceef3062975fae192a0f3497d93202d361a78509fd524c8cdfd557c24`.
+- En `1bb6c3a`, dos toques inmediatos sobre la flecha desde EmailDetail
+  regresaron a Bandeja y el segundo toque abrió el menú lateral; no apareció
+  pantalla vacía. Tras forzar el cierre y relanzar la aplicación, la misma
+  secuencia en `55b8ecf` produjo una pantalla vacía con únicamente el FAB
+  `Redactar` visible, manteniendo `MainActivity` como actividad reanudada.
 - En el estado actual, dos pulsaciones rápidas pueden consumir dos destinos del
   back stack. La reproducción no se limita a EmailDetail: también se observa
   al regresar hacia o desde Papelera y dentro de Ajustes.
-- El historial ubica la introducción probable en la migración a Navigation
-  Compose del commit `55b8ecf`, del 2026-08-01. El contrato anterior
-  `Navigator.pop()` era no-op en la raíz; las llamadas posteriores a
-  `popBackStack()` no preservaron esa protección.
+- La comparación delimita `1bb6c3a` como último estado bueno probado y
+  `55b8ecf`, del 2026-08-01, como primer estado defectuoso probado. Esto
+  confirma el límite histórico de la regresión, pero no se presenta todavía
+  como causa interna cerrada: esa conclusión corresponde a la caracterización
+  determinista del correctivo.
+- La evidencia estática muestra que el contrato anterior `Navigator.pop()`
+  comprobaba `canPop` y era no-op en la raíz; la migración introdujo llamadas
+  directas a `popBackStack()` que no vinculan la solicitud a la entrada que la
+  originó. La prueba antigua también confirma que no debe bloquearse todo
+  segundo toque: el segundo toque legítimo sobre Bandeja abrió el drawer.
 - `55b8ecf` es anterior al inicio del Plan maestro 1 y la auditoría confirma que
   sus archivos de navegación no cambiaron durante este refactor. La incidencia
   se clasifica como **preexistente y no atribuible a EmailDetail**.
@@ -2149,6 +2165,10 @@ curso y la Subfase 5.4 queda Pendiente. Sin staging ni commit.**
 - No se corrige navegación en 5.4. La solución queda reservada para el plan
   correctivo independiente de Back idempotente, con planes técnicos cerrados
   por subfase.
+- Tras conservar commits, hashes y resultados, se retiraron los worktrees
+  `/private/tmp/mailapp-nav-origin-before-compose` y
+  `/private/tmp/mailapp-nav-origin-compose` junto con sus APK temporales. No se
+  guardaron en el repositorio capturas de esta prueba con contenido personal.
 
 ### 34.4 Gates finales sobre el candidato de commit
 
