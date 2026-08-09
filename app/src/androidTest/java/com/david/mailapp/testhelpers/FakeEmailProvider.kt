@@ -75,12 +75,14 @@ class FakeEmailProvider : EmailProvider {
     var downloadAttachmentCalls = 0
     var fetchInboxCalls = 0
     var fetchTrashCalls = 0
+    var searchCalls = 0
     var fetchEmailByIdCalls = 0
     var fetchBodyCalls = 0
     var inlineImagesCalls = 0
     var eventLog: MutableList<String>? = null
     val receivedInboxTokens = mutableListOf<String?>()
     val receivedTrashTokens = mutableListOf<String?>()
+    val receivedSearchRequests = mutableListOf<Pair<String, String?>>()
     val receivedFetchEmailByIdIds = mutableListOf<String>()
 
     var moveToTrashError: Exception? = null
@@ -138,7 +140,13 @@ class FakeEmailProvider : EmailProvider {
         return plan.result
     }
 
-    override suspend fun search(query: String, pageToken: String?) = searchResult
+    override suspend fun search(query: String, pageToken: String?): PaginatedResult<Email> {
+        searchCalls++
+        receivedSearchRequests += query to pageToken
+        searchDeferred?.await()
+        searchError?.let { throw it }
+        return searchResult
+    }
 
     override suspend fun fetchEmailById(emailId: String): EmailLookupResult {
         eventLog?.add("gmail.fetchEmailById")

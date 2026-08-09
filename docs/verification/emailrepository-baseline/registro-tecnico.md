@@ -6,6 +6,7 @@
 - Etapa: 1 — Congelar estado, contratos y cobertura.
 - Subfases completadas: 1.1 — Estado inicial y registro técnico; 1.2 — Inventario de API y consumidores; 1.3 — Matriz contractual y análisis de huecos; 1.4 — Baseline técnico existente.
 - Estado de la etapa: completada y cerrada en el commit documental `docs(repository): establish verifiable baseline scope`.
+- Estado actual: etapa 2 completada; sus subfases 2.1–2.4 y la auditoría consolidada están cerradas. Etapa 3 pendiente.
 - Captura realizada: 2026-08-08 16:38:46 -0600 (CST).
 - Alcance de esta subfase: documentación del estado inicial; no se modificó código de producción, pruebas ni configuración.
 
@@ -33,6 +34,30 @@ Estas subfases fueron documentales y de análisis estático. No modificaron prod
 - [Resultados del baseline técnico existente](resultados-subfase-1.4.md): 584 pruebas JVM y 71 pruebas instrumentadas en verde, build y AndroidTest compilados, lint con 0 errores, advertencias clasificadas e integridad de hashes confirmada.
 
 La validación formal se ejecutó sin cambios en producción o pruebas. Con este resultado, la etapa 1 queda cerrada en un commit documental independiente que excluye el cambio previo del usuario.
+
+## Evidencia de la subfase 2.1
+
+- [Resultados de contratos de lectura desde Room](resultados-subfase-2.1.md): cinco pruebas directas nuevas para Inbox, Trash y lectura por id, ejecutadas en el emulador previsto con resultado final 5/5 en verde.
+
+La matriz contractual fue actualizada de 63 a 68 casos directos. Las tres APIs de lectura pasan de cobertura ausente a cobertura alta; `EmailRepository.kt` continúa congelado.
+
+## Evidencia de la subfase 2.2
+
+- [Resultados de huecos de refresh](resultados-subfase-2.2.md): siete contratos nuevos aplicados a Inbox y Trash; validación conjunta de 24/24 pruebas en verde con las suites previas de refresh seguro y página parcial.
+
+La matriz contractual aumenta de 68 a 75 casos directos. `refreshInbox` y `refreshTrash` pasan de cobertura media a alta; la independencia concurrente entre carpetas queda reservada para la subfase 2.4.
+
+## Evidencia de la subfase 2.3
+
+- [Resultados de búsqueda remota](resultados-subfase-2.3.md): cinco contratos nuevos para delegación exacta, resultado efímero, provider dinámico, ausencia, error y cancelación; suite completa de 17/17 pruebas en verde.
+
+La matriz contractual aumenta de 75 a 80 casos directos. `searchEmails` pasa de cobertura ausente a alta; no se modificó producción y la subfase 2.4 sigue siendo el único trabajo pendiente de la etapa 2.
+
+## Evidencia de la subfase 2.4 y cierre de etapa 2
+
+- [Resultados de coordinación temporal](resultados-subfase-2.4.md): tres contratos cruzados nuevos, cada uno con tres iteraciones; tres corridas JVM de `FolderCommitCoordinatorTest` y tres corridas instrumentadas consolidadas de 32/32 pruebas en verde.
+
+La matriz contractual aumenta de 80 a 83 casos directos. Inbox y Trash quedan protegidos frente a invalidación cruzada y mantienen exclusión mutua dentro de cada carpeta. La Etapa 2 se cierra en el commit `test(repository): characterize reads refresh and search`, sin incluir el cambio previo del usuario en `MainNavHost.kt`.
 
 ## Estado previo del árbol de trabajo
 

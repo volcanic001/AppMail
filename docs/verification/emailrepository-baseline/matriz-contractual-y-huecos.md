@@ -26,20 +26,21 @@ Las pruebas de ViewModel que sustituyen el repositorio por un `EmailSource` fals
 | `PartialPageContractsTest` | 1 | Integración Gmail parcial sin pérdida de caché ni avance de token. |
 | `PdfCancellationContractsTest` | 2 | Cancelación de descarga y de commit PDF. |
 | `FolderCommitCoordinatorTest` | 3 | Generación vigente, exclusión mutua y registro de nueva generación. |
+| `EmailRepositoryReadSyncSearchContractsTest` | 20 | Lecturas Room, refresh, búsqueda remota y concurrencia cruzada. |
 
-Total directo identificado: 63 casos. Las suites de integración de Email Detail añaden evidencia del consumidor, pero no cubren las APIs ausentes enumeradas abajo.
+Total directo identificado al cerrar la etapa 2: 83 casos. Las suites de integración de Email Detail añaden evidencia del consumidor, pero no cubren las APIs todavía ausentes enumeradas abajo.
 
 ## Matriz por API
 
 | API | Éxito | Sin proveedor / sesión | Error ordinario | Cancelación | Persistencia / caché | Concurrencia | Nivel actual | Hueco concreto |
 |---|---|---|---|---|---|---|---|---|
 | `resolveEmailById` | Sí | Sí | Sí | Sí | Sí | Sí | Alta | Auditar ramas exteriores y frescura del provider; no requiere una suite nueva completa. |
-| `getInbox` | Indirecto DAO | N/A | No | No | Indirecto DAO | No | Ausente | Falta probar el Flow público, mapeo, emisión inicial y actualizaciones. |
-| `getTrash` | Indirecto DAO | N/A | No | No | Indirecto DAO | No | Ausente | Mismo hueco que Inbox y aislamiento mediante la API pública. |
-| `getEmailById` | No | N/A | No | No | No | No | Ausente | Falta secuencia null → insert/update/delete y mapeo enriquecido. |
-| `refreshInbox` | Sí | No | No | No | Sí | Sí | Media | Faltan lease/provider ausente, excepción, cancelación, commit rechazado e independencia Inbox/Trash. |
-| `refreshTrash` | Sí | No | No | No | Sí | Sí | Media | Mismos huecos que Inbox. |
-| `searchEmails` | No | No | No | No | No | No | Ausente | Falta delegación de query/token, resultado vacío, no persistencia, errores y cancelación. |
+| `getInbox` | Sí | N/A | N/A | Collector cancelable | Sí | Flow vivo | Alta | Cerrado en subfase 2.1: emisión inicial, orden y actualización protegidos. |
+| `getTrash` | Sí | N/A | N/A | Collector cancelable | Sí | Flow vivo | Alta | Cerrado en subfase 2.1: emisión inicial, orden y eliminación protegidos. |
+| `getEmailById` | Sí | N/A | N/A | Collector cancelable | Sí | Flow vivo | Alta | Cerrado en subfase 2.1: null → insert/update/delete y mapeo enriquecido. |
+| `refreshInbox` | Sí | Sí | Sí | Sí | Sí | Misma y distinta carpeta | Alta | Cerrado: generaciones obsoletas, paginación, exclusión mutua e independencia de Trash protegidas. |
+| `refreshTrash` | Sí | Sí | Sí | Sí | Sí | Misma y distinta carpeta | Alta | Cerrado: generaciones obsoletas, paginación, exclusión mutua e independencia de Inbox protegidas. |
+| `searchEmails` | Sí | Sí | Sí | Sí | Sí | Provider dinámico | Alta | Cerrado en subfase 2.3: delegación exacta, resultado efímero, provider vigente, errores y cancelación protegidos. |
 | `moveToTrash` | Sí | Sí | Sí | Representativa | Sí | Reconciliación | Alta | Confirmar matriz final y que las ramas compartidas representan las cuatro acciones. |
 | `restoreFromTrash` | Sí | Parcial compartida | Sí | Compartida | Sí | Reconciliación | Alta | Completar únicamente si la auditoría encuentra una rama exclusiva sin protección. |
 | `deletePermanently` | Sí | Sí | Sí | Sí | Sí | Reconciliación | Alta | Sin hueco estructural mayor identificado. |
@@ -57,26 +58,26 @@ Total directo identificado: 63 casos. Las suites de integración de Email Detail
 
 Resumen de los 20 métodos:
 
-- Cobertura alta: 5 métodos (`resolveEmailById` y cuatro acciones).
-- Cobertura media: 2 métodos (`refreshInbox`, `refreshTrash`).
+- Cobertura alta: 11 métodos (`resolveEmailById`, cuatro acciones, tres lecturas, dos refresh y búsqueda).
+- Cobertura media: 0 métodos.
 - Cobertura mínima: 1 método (`downloadPdf`).
-- Cobertura directa ausente: 12 métodos.
+- Cobertura directa ausente: 8 métodos.
 - La constante pública PDF también carece de prueba de frontera.
 
 ## Matriz transversal
 
 | Contrato transversal | Evidencia actual | Estado | Trabajo posterior requerido |
 |---|---|---|---|
-| Provider obtenido dinámicamente | Implementación usa factory; resolución separa vuelos por generación | Parcial | Cambiar provider entre llamadas y comprobar identidad, búsqueda y envío. |
-| Lease antes de trabajo remoto | Resolución, acciones y PDF lo capturan; cuerpo también en código | Parcial | Caracterizar cuerpo, refresh y PDF durante invalidación. |
-| `CancellationException` no se transforma | Fuerte en resolución/acciones; dos casos PDF | Parcial | Añadir refresh, búsqueda, cuerpo, inline, identidad y envío. |
-| No hay escrituras después de cambiar sesión | Resolución cubierta | Parcial | Añadir refresh, cuerpo y PDF. |
+| Provider obtenido dinámicamente | Resolución y búsqueda obtienen el provider vigente por llamada | Parcial | Cambiar provider entre llamadas y comprobar identidad y envío. |
+| Lease antes de trabajo remoto | Resolución, acciones y refresh cubiertos; PDF/cuerpo observados en código | Parcial | Caracterizar cuerpo y PDF durante invalidación. |
+| `CancellationException` no se transforma | Fuerte en resolución, acciones, refresh y búsqueda; dos casos PDF | Parcial | Añadir cuerpo, inline, identidad y envío. |
+| No hay escrituras después de cambiar sesión | Resolución y rechazo de commit en refresh cubiertos | Parcial | Añadir cuerpo y PDF. |
 | Orden proveedor → Room | Acciones cubiertas | Parcial | Añadir cuerpo; preservar orden de refresh y resolución ya observado. |
 | Datos ricos sobreviven refresh/resolución | Cubierto por resolución, refresh y DAO | Alto | Reutilizar como regresión, sin duplicar casos. |
-| Inbox y Trash no se invalidan entre sí | Dos coordinadores en código | Ausente | Añadir concurrencia cruzada a nivel repositorio. |
-| Resultado remoto no se persiste en Search | Comentario/implementación | Ausente | Verificar Room antes y después. |
+| Inbox y Trash no se invalidan entre sí | Tres contratos cruzados, cada uno repetido tres veces | Alto | Mantener como regresión. |
+| Resultado remoto no se persiste en Search | Room verificado antes y después de éxito, error y cancelación | Alto | Mantener como regresión. |
 | Caché PDF atómica y sin residuos | `PdfCacheManagerTest` y cancelación parcial | Parcial | Probar el límite del repositorio y cambios de sesión. |
-| Ausencia de proveedor | Resolución y acciones cubiertas | Parcial | Añadir refresh, search, inline, PDF, identidad y envío. |
+| Ausencia de proveedor | Resolución, acciones, refresh y búsqueda cubiertos | Parcial | Añadir inline, PDF, identidad y envío. |
 
 ## Huecos priorizados para las etapas siguientes
 
@@ -85,18 +86,36 @@ Resumen de los 20 métodos:
 - Escrituras tardías de refresh, cuerpo o PDF después de invalidar sesión.
 - Cancelación absorbida o convertida en resultados ordinarios.
 - Semántica exacta de caché y validación PDF.
-- Independencia concurrente de coordinadores Inbox/Trash.
 
 ### Prioridad alta
 
-- Flows públicos de lectura y mapeo Room → Domain.
 - Contratos de cuerpo, HTML limpio, metadata PDF e imágenes inline.
-- Refresh sin provider/lease, excepciones y commits rechazados.
 - Delegación exacta y provider vigente en identidad y envío.
+
+### Hueco cerrado en la subfase 2.1
+
+- Flows públicos de lectura, aislamiento de carpetas y mapeo Room → Domain.
+
+### Huecos cerrados en la subfase 2.2
+
+- Refresh sin lease o provider.
+- Delegación de tokens y retorno de páginas completas.
+- Errores remotos, cancelación, commit rechazado y excepción local sin mutación de Room.
+
+### Huecos cerrados en la subfase 2.3
+
+- Delegación exacta de query y token, incluida la respuesta parcial completa del provider.
+- Resultado remoto efímero sin persistencia en Room.
+- Provider vigente resuelto en cada llamada, ausencia de provider, errores y cancelación.
+
+### Huecos cerrados en la subfase 2.4
+
+- Primeras páginas simultáneas de Inbox y Trash conservan ambos commits.
+- Una primera página de una carpeta no invalida la paginación activa de la otra.
+- Exclusión mutua y generaciones de la misma carpeta verificadas tres veces sin flakiness.
 
 ### Prioridad media
 
-- Búsqueda efímera sin persistencia.
 - Variantes exactas de reemplazo CID.
 - Método público `isPdfCached`, aunque no tenga consumidor actual.
 - Frontera pública `MAX_PDF_SIZE`.
@@ -115,7 +134,7 @@ Estos puntos no se clasifican como bugs en esta etapa. Las pruebas futuras deben
 
 ## Trazabilidad hacia las próximas etapas
 
-- Etapa 2 cerrará lecturas, refresh, búsqueda y concurrencia de carpetas.
+- Etapa 2 cerró lecturas, refresh, búsqueda y coordinación temporal; no quedan huecos asignados a esta etapa.
 - Etapa 3 auditará resolución/acciones y cerrará cuerpo e imágenes inline.
 - Etapa 4 cerrará PDF, identidad y envío.
 - Etapa 5 ejecutará la matriz completa y la integración real con Gmail.
