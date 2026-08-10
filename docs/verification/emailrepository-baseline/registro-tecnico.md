@@ -6,7 +6,7 @@
 - Etapa: 1 — Congelar estado, contratos y cobertura.
 - Subfases completadas: 1.1 — Estado inicial y registro técnico; 1.2 — Inventario de API y consumidores; 1.3 — Matriz contractual y análisis de huecos; 1.4 — Baseline técnico existente.
 - Estado de la etapa: completada y cerrada en el commit documental `docs(repository): establish verifiable baseline scope`.
-- Estado actual: etapa 3 completada y cerrada en el commit `test(repository): characterize resolution actions and content`; etapa 4 pendiente.
+- Estado actual: etapa 4 completada y cerrada en el commit `test(repository): characterize pdf account and send contracts`; etapa 5 pendiente.
 - Captura realizada: 2026-08-08 16:38:46 -0600 (CST).
 - Alcance de esta subfase: documentación del estado inicial; no se modificó código de producción, pruebas ni configuración.
 
@@ -82,6 +82,30 @@ La matriz contractual aumenta de 94 a 101 casos directos. `fetchAndCacheBody` pa
 - [Resultados de imágenes inline e inyección CID](resultados-subfase-3.4.md): nueve contratos nuevos; corrida de 19/19 de la suite ampliada y corrida conjunta de 73/73 de las tres suites de la Etapa 3, sin fallos, errores ni omitidas.
 
 La matriz contractual aumenta de 101 a 110 casos directos. `downloadInlineImages` e `injectInlineImages` pasan de cobertura ausente a alta, incluida la propagación de cancelación y la ausencia de provider en inline. La sensibilidad a prefijos y al orden del mapa en la inyección CID queda registrada como comportamiento heredado sospechoso para el futuro refactor lógico. `FakeEmailProvider` se amplió únicamente en AndroidTest con el registro de `emailId` y referencias ordenadas de `downloadInlineImages`. `EmailRepository.kt` y `MainNavHost.kt` conservan sus hashes originales. La Etapa 3 se cierra en el commit `test(repository): characterize resolution actions and content`, que excluye el cambio previo del usuario en `MainNavHost.kt`.
+
+## Evidencia de la subfase 4.1
+
+- [Resultados de prevalidación y consultas de caché PDF](resultados-subfase-4.1.md): diez contratos nuevos; corrida de 10/10 de la suite nueva, corrida conjunta de 12/12 con `PdfCancellationContractsTest` y 22/22 de `PdfCacheManagerTest` en JVM, sin fallos, errores ni omitidas.
+
+La matriz contractual aumenta de 110 a 120 casos directos. Las tres consultas de caché (`isPdfCached`, `checkPdfCache`, `getValidatedCachedPdf`) pasan de ausente a alta y `downloadPdf` de mínima a media, con la prevalidación, el límite declarado y el cache hit sellados. `MAX_PDF_SIZE` queda cubierto en su frontera exacta y un byte superior. No se ampliaron fakes. `EmailRepository.kt` y `MainNavHost.kt` conservan sus hashes originales. La Etapa 4 permanece en progreso y no se crea commit hasta cerrar la Subfase 4.4; 4.2 es la siguiente subfase.
+
+## Evidencia de la subfase 4.2
+
+- [Resultados de descarga, validación y resultados PDF](resultados-subfase-4.2.md): ocho contratos nuevos; corrida de 18/18 de la suite ampliada, corrida conjunta de 20/20 con `PdfCancellationContractsTest` y 22/22 de `PdfCacheManagerTest` en JVM, sin fallos, errores ni omitidas.
+
+La matriz contractual aumenta de 120 a 128 casos directos. La descarga válida, la postvalidación (vacío, tamaño real excesivo y firma inválida), la ausencia de provider, el error remoto convertido a `NETWORK`, el error de escritura en caché (`CACHE_WRITE`) y la limpieza de caché inválida quedan cubiertos. Los seis valores de `PdfDownloadFailure` están representados en contratos del repositorio. `FakeEmailProvider` se amplió únicamente en AndroidTest con el registro de `emailId`/`attachmentId` y el evento `gmail.downloadAttachment`. La Etapa 4 permanece en progreso y no se crea commit hasta cerrar la Subfase 4.4; 4.3 es la siguiente subfase.
+
+## Evidencia de la subfase 4.3
+
+- [Resultados de sesión, cancelación y atomicidad PDF](resultados-subfase-4.3.md): tres contratos nuevos de sesión y refuerzo de cancelación; corrida de 21/21 de la suite ampliada, conjunta de 23/23, tres repeticiones de C21 1/1 sin flakiness, regresión de `EmailDetailCancellationTest` 7/7 y `PdfCacheManagerTest` 22/22 en JVM, sin fallos, errores ni omitidas.
+
+La matriz contractual aumenta de 128 a 131 casos directos. `downloadPdf` pasa de media a alta con lease ausente, limpieza rechazada y cambio real de sesión sin escritura tardía protegidos. El contrato transversal «Caché PDF atómica y sin residuos» alcanza cobertura alta. `FakeEmailProvider` se amplió solo en AndroidTest con la señal `downloadAttachmentStarted` para sincronización determinista. La Etapa 4 permanece en progreso; 4.4 cierra con identidad y envío.
+
+## Evidencia de la subfase 4.4 y cierre de etapa 4
+
+- [Resultados de identidad y envío](resultados-subfase-4.4.md): nueve contratos nuevos; corrida de 9/9 de la suite nueva, corrida conjunta de 32/32 de las tres suites de la Etapa 4, regresión `EmailDetailCancellationTest` 7/7 y `PdfCacheManagerTest` 22/22 en JVM, sin fallos, errores ni omitidas.
+
+La matriz contractual aumenta de 131 a 140 casos directos. `getUserEmail` y `sendEmail` pasan de ausente a alta. Los 20 métodos públicos de `EmailRepository` quedan en cobertura alta. Provider dinámico, cancelación y ausencia de provider alcanzan cobertura transversal alta. El mensaje heredado `No hay proveedor activo` en `sendEmail` sin provider queda confirmado como comportamiento actual. `FakeEmailProvider` se amplió solo en AndroidTest con `SendRequest`, contador y eventos para identidad y envío. La Etapa 4 se cierra en el commit `test(repository): characterize pdf account and send contracts`, que excluye el cambio previo del usuario en `MainNavHost.kt`.
 
 ## Estado previo del árbol de trabajo
 

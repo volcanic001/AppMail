@@ -28,8 +28,10 @@ Las pruebas de ViewModel que sustituyen el repositorio por un `EmailSource` fals
 | `FolderCommitCoordinatorTest` | 3 | Generación vigente, exclusión mutua y registro de nueva generación. |
 | `EmailRepositoryReadSyncSearchContractsTest` | 20 | Lecturas Room, refresh, búsqueda remota y concurrencia cruzada. |
 | `EmailRepositoryContentContractsTest` | 19 | Cuerpo (éxito, ausencias, errores, cancelación, sesión, fallo de commit) e imágenes inline con delegación exacta, tres variantes CID y sensibilidad a prefijos/orden. |
+| `EmailRepositoryPdfContractsTest` | 21 | Prevalidación, cache hit, descarga, postvalidación, limpieza de caché inválida, los seis PdfDownloadFailure, tres consultas de caché, sesión, cancelación reforzada y atomicidad. |
+| `EmailRepositoryAccountSendContractsTest` | 9 | Identidad (provider dinámico, null, error, cancelación) y envío (delegación exacta, sin provider, login/logout, error, cancelación). |
 
-Total directo identificado después de la subfase 3.4: 110 casos. Las suites de integración de Email Detail añaden evidencia del consumidor, pero no cubren las APIs todavía ausentes enumeradas abajo.
+Total directo identificado después de la subfase 4.4: 140 casos. La cobertura contractual de EmailRepository es completa.
 
 ## Matriz por API
 
@@ -49,49 +51,50 @@ Total directo identificado después de la subfase 3.4: 110 casos. Las suites de 
 | `fetchAndCacheBody` | Sí | Sí | Sí | Sí | Sí | Sesión | Alta | Cerrado en subfases 3.2 y 3.3: retorno de instancia, limpieza, metadata PDF, cuerpo nulo, lista vacía, ausencias de lease/proveedor/resultado, errores y cancelación, cambio de sesión sin escritura tardía y fallo local de commit. Un commit rechazado todavía devuelve el resultado remoto (comportamiento heredado confirmado). |
 | `downloadInlineImages` | Sí | Sí | Sí | Sí | N/A | N/A | Alta | Cerrado en subfase 3.4: cortocircuito sin resolver el provider, delegación exacta de emailId/referencias/orden con retorno de la misma instancia, proveedor ausente, error y cancelación propagados. |
 | `injectInlineImages` | Sí | N/A | N/A | N/A | N/A | N/A | Alta | Cerrado en subfase 3.4: mapa vacío devuelve la misma instancia, tres variantes CID sustituidas en todas las apariciones, sin coincidencias ni mayúsculas intactas e IDs similares caracterizados por orden/prefijo. |
-| `downloadPdf` | No | No | No | Sí | Solo ausencia de residuos al cancelar | No | Mínima | Faltan pre/postvalidación, límites, cache hit/inválida, errores tipados, sesión y escritura correcta. |
-| `isPdfCached` | No | N/A | No | No | No | No | Ausente | Falta validar archivo válido, inexistente, vacío, truncado y sobredimensionado. |
-| `checkPdfCache` | No | N/A | No | No | No | No | Ausente | Falta proteger `Ready?` y tamaño reportado. |
-| `getValidatedCachedPdf` | No | N/A | No | No | No | No | Ausente | Falta proteger `File?` válido y rechazo de archivos inválidos. |
-| `getUserEmail` | No | No | No | No | N/A | Frescura no probada | Ausente | Falta proveedor dinámico, null, excepción y cancelación. |
-| `sendEmail` | Solo fuente falsa | No | Solo capa Compose | Solo capa Compose | N/A | No | Ausente | Falta delegación exacta, `ReplyContext`, proveedor ausente, error y cancelación directa. |
-| `MAX_PDF_SIZE` | N/A | N/A | N/A | N/A | No | N/A | Ausente | Falta comprobar el límite exacto y un byte por encima mediante `downloadPdf`. |
+| `downloadPdf` | Prevalidación y descarga | Provider y sesión | Sí (convertido) | Sí | Cache hit, limpieza de inválida y persistencia | Sesión | Alta | Cerrado en subfases 4.1–4.3: prevalidación, cache hit, descarga, postvalidación, los seis `PdfDownloadFailure`, `stableId`, limpieza de caché inválida, error de escritura, cancelación reforzada y sesión con cero escrituras tardías. |
+| `isPdfCached` | Sí | N/A | N/A | N/A | Sí | N/A | Alta | Cerrado en subfase 4.1: archivo válido, inexistente, vacío, truncado y sobredimensionado. |
+| `checkPdfCache` | Sí | N/A | N/A | N/A | Sí | N/A | Alta | Cerrado en subfase 4.1: `Ready(tamaño)` para válido y null para los cuatro casos inválidos. |
+| `getValidatedCachedPdf` | Sí | N/A | N/A | N/A | Sí | N/A | Alta | Cerrado en subfase 4.1: `File?` válido con la ruta cacheada correcta y rechazo de inválidos. |
+| `getUserEmail` | Sí | Sí | Sí | Sí | N/A | Provider dinámico | Alta | Cerrado en subfase 4.4: provider vigente en cada llamada, null, excepción y cancelación. |
+| `sendEmail` | Sí | Sí | Sí | Sí | N/A | Provider dinámico | Alta | Cerrado en subfase 4.4: delegación exacta de los seis argumentos y `ReplyContext`, ausencia de provider con mensaje heredado, login/logout, error y cancelación. |
+| `MAX_PDF_SIZE` | N/A | N/A | N/A | N/A | Sí | N/A | Alta | Cerrado en subfase 4.1: frontera exacta (26 214 400) aceptada y un byte superior rechazado mediante `downloadPdf`. |
 
 Resumen de los 20 métodos:
 
-- Cobertura alta: 14 métodos (`resolveEmailById`, `fetchAndCacheBody`, `downloadInlineImages`, `injectInlineImages`, cuatro acciones, tres lecturas, dos refresh y búsqueda).
+- Cobertura alta: 20 métodos (toda la API pública de EmailRepository).
 - Cobertura media: 0 métodos.
-- Cobertura mínima: 1 método (`downloadPdf`).
-- Cobertura directa ausente: 5 métodos.
-- La constante pública PDF también carece de prueba de frontera.
+- Cobertura mínima: 0 métodos.
+- Cobertura directa ausente: 0 métodos.
+- La constante pública PDF quedó cubierta en su frontera exacta y un byte superior.
+- La cobertura contractual de EmailRepository es completa.
 
 ## Matriz transversal
 
 | Contrato transversal | Evidencia actual | Estado | Trabajo posterior requerido |
 |---|---|---|---|
-| Provider obtenido dinámicamente | Resolución y búsqueda obtienen el provider vigente por llamada | Parcial | Comprobar identidad y envío en etapa 4. |
-| Lease antes de trabajo remoto | Resolución, acciones, refresh y cuerpo cubiertos; PDF observado en código | Parcial | Caracterizar PDF durante invalidación. |
-| `CancellationException` no se transforma | Fuerte en resolución, acciones, refresh, búsqueda, cuerpo e inline; dos casos PDF | Parcial | Completar PDF y añadir identidad y envío. |
-| No hay escrituras después de cambiar sesión | Resolución, rechazo de commit en refresh y cuerpo cubiertos | Parcial | Añadir PDF. |
+| Provider obtenido dinámicamente | Resolución, búsqueda, identidad y envío obtienen el provider vigente por llamada | Alto | Mantener como regresión. |
+| Lease antes de trabajo remoto | Resolución, acciones, refresh, cuerpo y PDF (C21 captura antes de invalidación) cubiertos | Alto | Mantener como regresión. |
+| `CancellationException` no se transforma | Fuerte en las 20 APIs; identidad y envío sellados en 4.4 | Alto | Mantener como regresión. |
+| No hay escrituras después de cambiar sesión | Resolución, rechazo de commit en refresh, cuerpo y PDF (C21 sesión nueva sin contaminación) cubiertos | Alto | Mantener como regresión. |
 | Orden proveedor → Room | Acciones y cuerpo cubiertos | Parcial | Preservar como regresión en refresh y resolución. |
 | Datos ricos sobreviven refresh/resolución | Cubierto por resolución, refresh y DAO | Alto | Reutilizar como regresión, sin duplicar casos. |
 | Inbox y Trash no se invalidan entre sí | Tres contratos cruzados, cada uno repetido tres veces | Alto | Mantener como regresión. |
 | Resultado remoto no se persiste en Search | Room verificado antes y después de éxito, error y cancelación | Alto | Mantener como regresión. |
-| Caché PDF atómica y sin residuos | `PdfCacheManagerTest` y cancelación parcial | Parcial | Probar el límite del repositorio y cambios de sesión. |
-| Ausencia de proveedor | Resolución, acciones, refresh, búsqueda, cuerpo e inline cubiertos | Parcial | Añadir PDF, identidad y envío. |
+| Caché PDF atómica y sin residuos | `PdfCacheManagerTest` (22 JVM), cancelación parcial, prevalidación, consultas de caché, descarga, postvalidación, limpieza de caché inválida, error de escritura, lease ausente, limpieza rechazada y rechazo de escritura tardía | Alto | Mantener como regresión. |
+| Ausencia de proveedor | Resolución, acciones, refresh, búsqueda, cuerpo, inline, PDF e identidad y envío cubiertos | Alto | Mantener como regresión. |
 
-## Huecos priorizados para las etapas siguientes
+## Estado de los huecos priorizados
 
-### Prioridad crítica
+### Prioridad crítica — cerrada contractualmente
 
-- Escrituras tardías de refresh, cuerpo o PDF después de invalidar sesión.
-- Cancelación absorbida o convertida en resultados ordinarios.
-- Semántica exacta de caché y validación PDF.
+- Escrituras tardías de refresh, cuerpo o PDF después de invalidar sesión: cubiertas en las etapas 2–4.
+- Cancelación absorbida o convertida en resultados ordinarios: cubierta en las 20 APIs públicas.
+- Semántica exacta de caché y validación PDF: cubierta en las subfases 4.1–4.3.
 
-### Prioridad alta
+### Prioridad alta — cerrada contractualmente
 
 - Contratos de cuerpo, HTML limpio, metadata PDF e imágenes inline (cerrados en la subfase 3.4).
-- Delegación exacta y provider vigente en identidad y envío.
+- Delegación exacta y provider vigente en identidad y envío (cerrados en la subfase 4.4).
 
 ### Hueco cerrado en la subfase 2.1
 
@@ -147,10 +150,38 @@ Resumen de los 20 métodos:
 - Sin coincidencias y diferencias de mayúsculas: el HTML permanece intacto.
 - IDs similares: sensibilidad al orden del mapa y reemplazo de prefijos caracterizada como comportamiento heredado.
 
-### Prioridad media
+### Huecos cerrados en la subfase 4.1
 
-- Método público `isPdfCached`, aunque no tenga consumidor actual.
-- Frontera pública `MAX_PDF_SIZE`.
+- Prevalidación de `downloadPdf`: MIME, extensión, `attachmentId` y límite declarado, sin resolver provider, sin `downloadAttachment`, sin commit y sin crear archivos.
+- Cache hit de `downloadPdf`: usa `metadata.stableId`, evita la red y conserva intacto el archivo.
+- Frontera de `MAX_PDF_SIZE`: 26 214 400 aceptado y un byte superior rechazado.
+- `isPdfCached`, `checkPdfCache` y `getValidatedCachedPdf`: archivo válido aceptado y ausente/vacío/truncado/sobredimensionado rechazado.
+
+### Huecos cerrados en la subfase 4.2
+
+- Descarga válida con `stableId` (partId recortado prevalece sobre attachmentId), persistencia exacta y orden `gmail.downloadAttachment → room.commit`.
+- Postvalidación completa: contenido vacío (`EMPTY_CONTENT`), tamaño real excesivo (`TOO_LARGE`) con `ByteArray(MAX+1)` y firma %PDF- válida, y firma inválida (`INVALID_PDF`), sin commit ni archivos.
+- Provider ausente con lease válido → `NO_PROVIDER` sin `downloadAttachment`.
+- `IOException` remota → `NETWORK` sin propagar la excepción.
+- Error de escritura con `PdfCacheManager` bloqueado (raíz es un archivo) → `CACHE_WRITE` con intento de commit y sin residuos.
+- Caché inválida: limpieza → descarga → almacenamiento, con orden `room.commit → gmail.downloadAttachment → room.commit`.
+- Los seis valores de `PdfDownloadFailure` quedan cubiertos por contratos del repositorio.
+
+### Huecos cerrados en la subfase 4.3
+
+- Sesión ausente desde el inicio: `capture()` nulo → `NO_PROVIDER` sin provider, descarga ni commit; archivo inválido preexistente intacto.
+- Limpieza de caché inválida con commit rechazado: no continúa hacia provider ni descarga; archivo intacto sin temporales.
+- Cambio real de sesión con `SessionWriteGuardImpl`: descarga antigua capturada con gen=1, invalidar y activar gen=2, sesión nueva descarga y persiste en el mismo `stableId`, al liberar la antigua su commit es rechazado → `NO_PROVIDER`; caché conserva exclusivamente los bytes de la sesión nueva sin sobrescritura.
+- Cancelación reforzada: una llamada exacta al provider, conteos de commit y orden de eventos verificados en ambos casos existentes sin aumentar el conteo.
+- Contrato transversal «Caché PDF atómica y sin residuos» alcanza cobertura alta.
+
+### Huecos cerrados en la subfase 4.4
+
+- `getUserEmail` con provider dinámico (tres proveedores sucesivos sin reutilización), resultado nulo, excepción y cancelación.
+- `sendEmail` con delegación exacta de los seis argumentos y `ReplyContext`, ausencia de provider con mensaje heredado `No hay proveedor activo`, login/logout dinámico, error y cancelación.
+- Todos los contratos de identidad y envío conservan la fila Room y el PDF cacheado previamente intactos, sin commits ni temporales.
+- Los 20 métodos públicos de `EmailRepository` alcanzan cobertura alta.
+- Contratos transversales «Provider dinámico», «Cancelación no se transforma» y «Ausencia de proveedor» alcanzan cobertura alta.
 
 ## Clasificación de comportamientos sospechosos
 
@@ -161,7 +192,7 @@ La lectura estática identificó comportamientos que deben caracterizarse antes 
 - `injectInlineImages` reemplaza en orden de iteración del mapa: un CID corto puede sustituir el prefijo de otro más largo, y el resultado depende del orden (caracterizado en la subfase 3.4 como comportamiento heredado; identificado para el futuro refactor lógico).
 - `searchEmails` no usa `SessionWriteGuard`; depende únicamente del proveedor vigente.
 - `isPdfCached` es público pero no tiene consumidor de producción.
-- `sendEmail` sin proveedor lanza una excepción con mensaje en español, mientras otras APIs devuelven resultados vacíos o tipados.
+- `sendEmail` sin proveedor lanza una excepción con mensaje en español, mientras otras APIs devuelven resultados vacíos o tipados (confirmado en la subfase 4.4 como comportamiento heredado).
 
 Estos puntos no se clasifican como bugs en esta etapa. Las pruebas futuras deben fijar primero el comportamiento real. Si alguno demuestra mezcla de sesiones, pérdida de datos o un riesgo de seguridad, el baseline se detendrá sin modificar producción.
 
@@ -169,8 +200,8 @@ Estos puntos no se clasifican como bugs en esta etapa. Las pruebas futuras deben
 
 - Etapa 2 cerró lecturas, refresh, búsqueda y coordinación temporal; no quedan huecos asignados a esta etapa.
 - Etapa 3 cerrada en la subfase 3.4: resolución, acciones, cuerpo e imágenes inline con cobertura alta.
-- Etapa 4 cerrará PDF, identidad y envío.
-- Etapa 5 ejecutará la matriz completa y la integración real con Gmail.
+- Etapa 4 cerrada en la subfase 4.4: PDF, identidad y envío con cobertura alta.
+- Etapa 5 ejecutará la validación integral de toda la matriz y la integración real con Gmail.
 
 ## Cierre de la subfase 1.3
 

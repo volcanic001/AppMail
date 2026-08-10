@@ -47,6 +47,7 @@ class FakeEmailProvider : EmailProvider {
     var markAsReadDeferred: CompletableDeferred<Unit>? = null
     var sendEmailDeferred: CompletableDeferred<Unit>? = null
     var downloadAttachmentDeferred: CompletableDeferred<Unit>? = null
+    var downloadAttachmentStarted: CompletableDeferred<Unit>? = null
     var fetchBodyDeferred: CompletableDeferred<Unit>? = null
     var fetchBodyStarted: CompletableDeferred<Unit>? = null
     var downloadInlineImagesDeferred: CompletableDeferred<Unit>? = null
@@ -66,6 +67,8 @@ class FakeEmailProvider : EmailProvider {
     var fetchBodyResult: BodyFetchResult? = null
     var inlineImagesResult: Map<String, String> = emptyMap()
     var userEmailResult: String? = "test@example.com"
+    var getUserEmailCalls = 0
+    var getUserEmailError: Exception? = null
     var downloadAttachmentResult: ByteArray = byteArrayOf(0x25, 0x50, 0x44, 0x46, 0x2D)
 
     var moveToTrashCalls = 0
@@ -87,6 +90,8 @@ class FakeEmailProvider : EmailProvider {
     val receivedFetchEmailByIdIds = mutableListOf<String>()
     val receivedFetchBodyIds = mutableListOf<String>()
     val receivedInlineImageRequests = mutableListOf<Pair<String, List<InlineImageRef>>>()
+    val receivedDownloadAttachmentRequests = mutableListOf<Pair<String, String>>()
+    val receivedSendRequests = mutableListOf<SendRequest>()
 
     var moveToTrashError: Exception? = null
     var restoreFromTrashError: Exception? = null
@@ -231,10 +236,18 @@ class FakeEmailProvider : EmailProvider {
         return inlineImagesResult
     }
 
-    override suspend fun getUserEmail() = userEmailResult
+    override suspend fun getUserEmail(): String? {
+        eventLog?.add("gmail.getUserEmail")
+        getUserEmailCalls++
+        getUserEmailError?.let { throw it }
+        return userEmailResult
+    }
 
     override suspend fun downloadAttachment(emailId: String, attachmentId: String): ByteArray {
+        eventLog?.add("gmail.downloadAttachment")
         downloadAttachmentCalls++
+        receivedDownloadAttachmentRequests += emailId to attachmentId
+        downloadAttachmentStarted?.complete(Unit)
         val deferred = downloadAttachmentDeferred
         if (deferred != null) {
             try {
@@ -253,11 +266,22 @@ class FakeEmailProvider : EmailProvider {
         to: String, cc: String?, bcc: String?, subject: String, body: String,
         replyContext: ReplyContext?
     ) {
-        sendEmailDeferred?.await()
+        eventLog?.add("gmail.sendEmail")
         sendEmailCalls++
+        receivedSendRequests += SendRequest(to, cc, bcc, subject, body, replyContext)
+        sendEmailDeferred?.await()
         sendEmailError?.let { throw it }
     }
 }
+
+data class SendRequest(
+    val to: String,
+    val cc: String?,
+    val bcc: String?,
+    val subject: String,
+    val body: String,
+    val replyContext: ReplyContext?
+)
 
 fun testEmail(
     id: String,

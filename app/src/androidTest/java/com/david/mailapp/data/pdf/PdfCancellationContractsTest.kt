@@ -10,6 +10,7 @@ import com.david.mailapp.testhelpers.FakeSessionWriteGuard
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
@@ -47,9 +48,13 @@ class PdfCancellationContractsTest {
         val fakeProvider = FakeEmailProvider()
         val sentinel = CancellationException("Download cancelled from network")
         fakeProvider.downloadAttachmentError = sentinel
+        val guard = FakeSessionWriteGuard()
+        val events = mutableListOf<String>()
+        fakeProvider.eventLog = events
+        guard.eventLog = events
         val repository = EmailRepository(
             database = db, providerFactory = { fakeProvider },
-            pdfCacheManager = PdfCacheManager(cacheDir), writeGuard = FakeSessionWriteGuard()
+            pdfCacheManager = PdfCacheManager(cacheDir), writeGuard = guard
         )
         val metadata = PdfAttachmentMetadata(
             fileName = "test.pdf", mimeType = "application/pdf",
@@ -63,6 +68,9 @@ class PdfCancellationContractsTest {
         } catch (e: Exception) {
             fail("Expected CancellationException, got ${e.javaClass.simpleName}")
         }
+        assertEquals(1, fakeProvider.downloadAttachmentCalls)
+        assertEquals(0, guard.commitCalls)
+        assertEquals(listOf("gmail.downloadAttachment"), events)
         assertCacheHasNoFiles()
     }
 
@@ -72,8 +80,11 @@ class PdfCancellationContractsTest {
             byteArrayOf(0x25, 0x50, 0x44, 0x46, 0x2D)
 
         val sentinel = CancellationException("Commit cancelled")
+        val events = mutableListOf<String>()
+        fakeProvider.eventLog = events
         val failingGuard = FakeSessionWriteGuard().apply {
             commitError = sentinel
+            eventLog = events
         }
 
         val repository = EmailRepository(
@@ -92,6 +103,9 @@ class PdfCancellationContractsTest {
         } catch (e: Exception) {
             fail("Expected CancellationException, got ${e.javaClass.simpleName}")
         }
+        assertEquals(1, fakeProvider.downloadAttachmentCalls)
+        assertEquals(listOf("gmail.downloadAttachment", "room.commit"), events)
+        assertEquals(1, failingGuard.commitCalls)
         assertCacheHasNoFiles()
     }
 }
