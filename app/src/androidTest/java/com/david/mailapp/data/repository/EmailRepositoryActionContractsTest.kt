@@ -7,6 +7,7 @@ import com.david.mailapp.data.local.MailDatabase
 import com.david.mailapp.data.local.entity.EmailEntity
 import com.david.mailapp.data.pdf.PdfCacheManager
 import com.david.mailapp.domain.model.EmailFolder
+import com.david.mailapp.domain.model.PaginatedResult
 import com.david.mailapp.testhelpers.FakeEmailProvider
 import com.david.mailapp.testhelpers.FakeSessionWriteGuard
 import com.david.mailapp.testhelpers.testEmail
@@ -331,4 +332,179 @@ class EmailRepositoryActionContractsTest {
 
         assertSame(cancellation, thrown)
     }
+
+    @Test fun remaining_actions_without_lease_return_no_active_account_without_side_effects() =
+        runTest {
+            seed("restore-no-lease", EmailFolder.Trash)
+            seed("delete-no-lease", EmailFolder.Trash)
+            seed("read-no-lease", EmailFolder.Inbox, isRead = false)
+            fakeWriteGuard.captureResult = null
+
+            val results = listOf(
+                repository.restoreFromTrash("restore-no-lease"),
+                repository.deletePermanently("delete-no-lease"),
+                repository.markAsRead("read-no-lease")
+            )
+
+            results.forEach { result ->
+                assertTrue(result is EmailActionResult.Failure)
+                result as EmailActionResult.Failure
+                assertEquals(UiErrorReason.NO_ACTIVE_ACCOUNT, result.reason)
+                assertFalse(result.remoteApplied)
+            }
+            assertEquals(0, fakeProvider.restoreFromTrashCalls)
+            assertEquals(0, fakeProvider.deletePermanentlyCalls)
+            assertEquals(0, fakeProvider.markAsReadCalls)
+            assertEquals("trash", get("restore-no-lease")?.folder)
+            assertTrue(get("delete-no-lease") != null)
+            assertFalse(get("read-no-lease")?.isRead ?: true)
+        }
+
+    @Test fun remaining_actions_without_provider_return_no_active_account_without_local_commit() =
+        runTest {
+            seed("restore-no-provider", EmailFolder.Trash)
+            seed("delete-no-provider", EmailFolder.Trash)
+            seed("read-no-provider", EmailFolder.Inbox, isRead = false)
+            val repositoryWithoutProvider = EmailRepository(
+                database = db,
+                providerFactory = { null },
+                pdfCacheManager = PdfCacheManager(cacheDir),
+                writeGuard = fakeWriteGuard
+            )
+
+            val results = listOf(
+                repositoryWithoutProvider.restoreFromTrash("restore-no-provider"),
+                repositoryWithoutProvider.deletePermanently("delete-no-provider"),
+                repositoryWithoutProvider.markAsRead("read-no-provider")
+            )
+
+            results.forEach { result ->
+                assertTrue(result is EmailActionResult.Failure)
+                result as EmailActionResult.Failure
+                assertEquals(UiErrorReason.NO_ACTIVE_ACCOUNT, result.reason)
+                assertFalse(result.remoteApplied)
+            }
+            assertTrue(events.isEmpty())
+            assertEquals("trash", get("restore-no-provider")?.folder)
+            assertTrue(get("delete-no-provider") != null)
+            assertFalse(get("read-no-provider")?.isRead ?: true)
+        }
+
+    @Test fun remaining_remote_cancellations_propagate_same_instance_without_room_changes() =
+        runTest {
+            seed("move-cancel", EmailFolder.Inbox)
+            seed("restore-cancel", EmailFolder.Trash)
+            seed("read-cancel", EmailFolder.Inbox, isRead = false)
+
+            val moveCancellation = CancellationException("cancel move")
+            fakeProvider.moveToTrashError = moveCancellation
+            val thrownMove = try {
+                repository.moveToTrash("move-cancel")
+                null
+            } catch (cancelled: CancellationException) {
+                cancelled
+            }
+            assertSame(moveCancellation, thrownMove)
+            fakeProvider.moveToTrashError = null
+
+            val restoreCancellation = CancellationException("cancel restore")
+            fakeProvider.restoreFromTrashError = restoreCancellation
+            val thrownRestore = try {
+                repository.restoreFromTrash("restore-cancel")
+                null
+            } catch (cancelled: CancellationException) {
+                cancelled
+            }
+            assertSame(restoreCancellation, thrownRestore)
+            fakeProvider.restoreFromTrashError = null
+
+            val readCancellation = CancellationException("cancel read")
+            fakeProvider.markAsReadError = readCancellation
+            val thrownRead = try {
+                repository.markAsRead("read-cancel")
+                null
+            } catch (cancelled: CancellationException) {
+                cancelled
+            }
+            assertSame(readCancellation, thrownRead)
+
+            assertEquals("inbox", get("move-cancel")?.folder)
+            assertEquals("trash", get("restore-cancel")?.folder)
+            assertFalse(get("read-cancel")?.isRead ?: true)
+            assertFalse(events.contains("room.commit"))
+        }
+
+    @Test fun rejected_action_commit_accepts_complete_reconciliation_in_folder_order() = runTest {
+        seed("stale-inbox", EmailFolder.Inbox)
+        seed("stale-trash", EmailFolder.Trash)
+        fakeWriteGuard.commitReturnsNullByCall = listOf(true, false, false)
+        fakeProvider.fetchInboxResult = PaginatedResult(
+            listOf(testEmail("server-inbox", folder = EmailFolder.Inbox)),
+            null,
+            isComplete = true
+        )
+        fakeProvider.fetchTrashResult = PaginatedResult(
+            listOf(testEmail("server-trash", folder = EmailFolder.Trash)),
+            null,
+            isComplete = true
+        )
+
+        val result = repository.moveToTrash("remote-action")
+
+        assertTrue(result is EmailActionResult.Failure)
+        result as EmailActionResult.Failure
+        assertEquals(UiErrorReason.UNKNOWN, result.reason)
+        assertTrue(result.remoteApplied)
+        assertEquals(listOf("server-inbox"), db.emailDao().getEntitiesByFolderSync("inbox").map { it.id })
+        assertEquals(listOf("server-trash"), db.emailDao().getEntitiesByFolderSync("trash").map { it.id })
+        assertEquals(
+            listOf(
+                "gmail.moveToTrash",
+                "room.commit",
+                "gmail.fetch.inbox",
+                "room.commit",
+                "gmail.fetch.trash",
+                "room.commit"
+            ),
+            events
+        )
+        assertEquals(3, fakeWriteGuard.commitCalls)
+    }
+
+    @Test fun rejected_action_commit_merges_partial_reconciliation_without_deleting_cache() =
+        runTest {
+            seed("cached-inbox", EmailFolder.Inbox)
+            seed("cached-trash", EmailFolder.Trash)
+            fakeWriteGuard.commitReturnsNullByCall = listOf(true, false, false)
+            fakeProvider.fetchInboxResult = PaginatedResult(
+                listOf(testEmail("partial-inbox", folder = EmailFolder.Inbox)),
+                "ignored-inbox-token",
+                isComplete = false
+            )
+            fakeProvider.fetchTrashResult = PaginatedResult(
+                listOf(testEmail("partial-trash", folder = EmailFolder.Trash)),
+                "ignored-trash-token",
+                isComplete = false
+            )
+
+            val result = repository.moveToTrash("remote-action")
+
+            assertTrue(result is EmailActionResult.Failure)
+            result as EmailActionResult.Failure
+            assertEquals(UiErrorReason.UNKNOWN, result.reason)
+            assertTrue(result.remoteApplied)
+            assertEquals(
+                setOf("cached-inbox", "partial-inbox"),
+                db.emailDao().getEntitiesByFolderSync("inbox").map { it.id }.toSet()
+            )
+            assertEquals(
+                setOf("cached-trash", "partial-trash"),
+                db.emailDao().getEntitiesByFolderSync("trash").map { it.id }.toSet()
+            )
+            assertEquals(
+                listOf("gmail.fetch.inbox", "gmail.fetch.trash"),
+                events.filter { it.startsWith("gmail.fetch") }
+            )
+            assertEquals(3, fakeWriteGuard.commitCalls)
+        }
 }

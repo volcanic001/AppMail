@@ -6,7 +6,7 @@
 - Etapa: 1 — Congelar estado, contratos y cobertura.
 - Subfases completadas: 1.1 — Estado inicial y registro técnico; 1.2 — Inventario de API y consumidores; 1.3 — Matriz contractual y análisis de huecos; 1.4 — Baseline técnico existente.
 - Estado de la etapa: completada y cerrada en el commit documental `docs(repository): establish verifiable baseline scope`.
-- Estado actual: etapa 2 completada; sus subfases 2.1–2.4 y la auditoría consolidada están cerradas. Etapa 3 pendiente.
+- Estado actual: etapa 3 completada y cerrada en el commit `test(repository): characterize resolution actions and content`; etapa 4 pendiente.
 - Captura realizada: 2026-08-08 16:38:46 -0600 (CST).
 - Alcance de esta subfase: documentación del estado inicial; no se modificó código de producción, pruebas ni configuración.
 
@@ -58,6 +58,30 @@ La matriz contractual aumenta de 75 a 80 casos directos. `searchEmails` pasa de 
 - [Resultados de coordinación temporal](resultados-subfase-2.4.md): tres contratos cruzados nuevos, cada uno con tres iteraciones; tres corridas JVM de `FolderCommitCoordinatorTest` y tres corridas instrumentadas consolidadas de 32/32 pruebas en verde.
 
 La matriz contractual aumenta de 80 a 83 casos directos. Inbox y Trash quedan protegidos frente a invalidación cruzada y mantienen exclusión mutua dentro de cada carpeta. La Etapa 2 se cierra en el commit `test(repository): characterize reads refresh and search`, sin incluir el cambio previo del usuario en `MainNavHost.kt`.
+
+## Evidencia de la subfase 3.1
+
+- [Resultados de resolución y acciones existentes](resultados-subfase-3.1.md): ocho contratos nuevos; corrida conjunta de 54/54 pruebas y tres ejecuciones consecutivas de resolución con 29/29 en verde.
+
+La matriz contractual aumenta de 83 a 91 casos directos. Resolución y las cuatro acciones quedan selladas para el alcance previsto, sin modificar producción. La Etapa 3 permanece abierta y no se crea commit hasta cerrar la Subfase 3.4.
+
+## Evidencia de la subfase 3.2
+
+- [Resultados de persistencia del cuerpo](resultados-subfase-3.2.md): tres contratos directos de éxito para `fetchAndCacheBody`; corrida en el emulador previsto con resultado final 3/3 en verde y XML sin fallos, errores ni omitidas.
+
+La matriz contractual aumenta de 91 a 94 casos directos. `fetchAndCacheBody` pasa de cobertura ausente a media, con éxito y persistencia protegidos; fallos, sesión y cancelación quedan pendientes para la Subfase 3.3. `FakeEmailProvider` se amplió únicamente en AndroidTest con el registro de `gmail.fetchBody` y de los `emailId` recibidos, sin alterar resultados, errores ni cancelación. La Etapa 3 permanece abierta y no se crea commit hasta cerrar la Subfase 3.4.
+
+## Evidencia de la subfase 3.3
+
+- [Resultados de fallos, sesión y cancelación del cuerpo](resultados-subfase-3.3.md): siete contratos nuevos; corrida completa de 10/10 en verde y tres ejecuciones consecutivas del contrato temporal de sesión con 1/1 en verde.
+
+La matriz contractual aumenta de 94 a 101 casos directos. `fetchAndCacheBody` pasa de cobertura media a alta, con ausencias de lease/proveedor/resultado, errores y cancelación remotos, cambio de sesión sin escritura tardía y fallo local de commit protegidos. El retorno del resultado remoto ante un commit rechazado queda confirmado como comportamiento heredado. `FakeEmailProvider` se amplió únicamente en AndroidTest con la señal de inicio `fetchBodyStarted` para la sincronización determinista del contrato de sesión. La Etapa 3 permanece abierta y no se crea commit hasta cerrar la Subfase 3.4.
+
+## Evidencia de la subfase 3.4 y cierre de etapa 3
+
+- [Resultados de imágenes inline e inyección CID](resultados-subfase-3.4.md): nueve contratos nuevos; corrida de 19/19 de la suite ampliada y corrida conjunta de 73/73 de las tres suites de la Etapa 3, sin fallos, errores ni omitidas.
+
+La matriz contractual aumenta de 101 a 110 casos directos. `downloadInlineImages` e `injectInlineImages` pasan de cobertura ausente a alta, incluida la propagación de cancelación y la ausencia de provider en inline. La sensibilidad a prefijos y al orden del mapa en la inyección CID queda registrada como comportamiento heredado sospechoso para el futuro refactor lógico. `FakeEmailProvider` se amplió únicamente en AndroidTest con el registro de `emailId` y referencias ordenadas de `downloadInlineImages`. `EmailRepository.kt` y `MainNavHost.kt` conservan sus hashes originales. La Etapa 3 se cierra en el commit `test(repository): characterize resolution actions and content`, que excluye el cambio previo del usuario en `MainNavHost.kt`.
 
 ## Estado previo del árbol de trabajo
 

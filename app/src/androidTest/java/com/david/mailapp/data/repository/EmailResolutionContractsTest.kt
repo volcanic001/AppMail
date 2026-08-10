@@ -544,4 +544,115 @@ class EmailResolutionContractsTest {
         // Both made independent remote calls (different flights)
         assertEquals("two remote calls across generations", 2, provider.fetchEmailByIdCalls)
     }
+
+    @Test fun provider_is_resolved_fresh_for_each_cache_miss() = runTest {
+        val firstProvider = FakeEmailProvider().apply {
+            fetchEmailByIdResult = EmailLookupResult.Found(
+                testEmail("fresh-a", folder = EmailFolder.Other, subject = "first-provider")
+            )
+        }
+        val secondProvider = FakeEmailProvider().apply {
+            fetchEmailByIdResult = EmailLookupResult.Found(
+                testEmail("fresh-b", folder = EmailFolder.Other, subject = "second-provider")
+            )
+        }
+        var currentProvider: FakeEmailProvider? = firstProvider
+        val dynamicRepository = EmailRepository(
+            database = db,
+            providerFactory = { currentProvider },
+            pdfCacheManager = PdfCacheManager(
+                java.io.File(context.cacheDir, "pdf_fresh_${System.nanoTime()}").apply { mkdirs() }
+            ),
+            writeGuard = writeGuard
+        )
+
+        val first = dynamicRepository.resolveEmailById("fresh-a")
+        currentProvider = secondProvider
+        val second = dynamicRepository.resolveEmailById("fresh-b")
+
+        assertEquals("first-provider", (first as EmailResolutionResult.Found).email.subject)
+        assertEquals("second-provider", (second as EmailResolutionResult.Found).email.subject)
+        assertEquals(listOf("fresh-a"), firstProvider.receivedFetchEmailByIdIds)
+        assertEquals(listOf("fresh-b"), secondProvider.receivedFetchEmailByIdIds)
+    }
+
+    @Test fun non_cacheable_terminal_flights_are_removed_and_retried() = runTest {
+        provider.fetchEmailByIdResultsByCall = listOf(
+            EmailLookupResult.NotFound,
+            EmailLookupResult.NotFound,
+            EmailLookupResult.Failure(EmailLookupFailureReason.NO_CONNECTION),
+            EmailLookupResult.Failure(EmailLookupFailureReason.NO_CONNECTION)
+        )
+
+        assertEquals(EmailResolutionResult.NotFound, repository.resolveEmailById("retry-not-found"))
+        assertEquals(EmailResolutionResult.NotFound, repository.resolveEmailById("retry-not-found"))
+        assertEquals(
+            EmailResolutionFailureReason.NO_CONNECTION,
+            repository.resolveEmailById("retry-failure").failureReason()
+        )
+        assertEquals(
+            EmailResolutionFailureReason.NO_CONNECTION,
+            repository.resolveEmailById("retry-failure").failureReason()
+        )
+
+        assertEquals(4, provider.fetchEmailByIdCalls)
+        assertEquals(
+            listOf("retry-not-found", "retry-not-found", "retry-failure", "retry-failure"),
+            provider.receivedFetchEmailByIdIds
+        )
+    }
+
+    @Test fun leader_cancellation_cancels_joined_follower_and_retry_starts_new_flight() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val roomDb = Room.inMemoryDatabaseBuilder(context, MailDatabase::class.java)
+            .setQueryExecutor(dispatcher.asExecutor())
+            .setTransactionExecutor(dispatcher.asExecutor())
+            .build()
+        val localRepository = EmailRepository(
+            database = roomDb,
+            providerFactory = { provider },
+            pdfCacheManager = PdfCacheManager(
+                java.io.File(context.cacheDir, "pdf_joined_cancel_${System.nanoTime()}").apply {
+                    mkdirs()
+                }
+            ),
+            writeGuard = writeGuard
+        )
+        val gate = CompletableDeferred<Unit>()
+        provider.fetchEmailByIdDeferred = gate
+        provider.fetchEmailByIdResult = EmailLookupResult.Found(
+            testEmail("joined-cancel", folder = EmailFolder.Other, subject = "retry")
+        )
+
+        val leader = async { localRepository.resolveEmailById("joined-cancel") }
+        advanceUntilIdle()
+        val follower = async { localRepository.resolveEmailById("joined-cancel") }
+        advanceUntilIdle()
+        assertEquals(1, provider.fetchEmailByIdCalls)
+
+        leader.cancel(CancellationException("leader sentinel"))
+        val leaderCancellation = try {
+            leader.await()
+            null
+        } catch (cancelled: CancellationException) {
+            cancelled
+        }
+        val followerCancellation = try {
+            follower.await()
+            null
+        } catch (cancelled: CancellationException) {
+            cancelled
+        }
+
+        assertTrue(leaderCancellation is CancellationException)
+        assertTrue(followerCancellation is CancellationException)
+
+        provider.fetchEmailByIdDeferred = null
+        val retry = localRepository.resolveEmailById("joined-cancel")
+
+        assertTrue(retry is EmailResolutionResult.Found)
+        assertEquals("retry", (retry as EmailResolutionResult.Found).email.subject)
+        assertEquals(2, provider.fetchEmailByIdCalls)
+        roomDb.close()
+    }
 }

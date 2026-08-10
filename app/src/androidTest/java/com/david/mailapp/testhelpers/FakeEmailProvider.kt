@@ -48,6 +48,7 @@ class FakeEmailProvider : EmailProvider {
     var sendEmailDeferred: CompletableDeferred<Unit>? = null
     var downloadAttachmentDeferred: CompletableDeferred<Unit>? = null
     var fetchBodyDeferred: CompletableDeferred<Unit>? = null
+    var fetchBodyStarted: CompletableDeferred<Unit>? = null
     var downloadInlineImagesDeferred: CompletableDeferred<Unit>? = null
 
     var wasCancelledFetchBody = false
@@ -84,6 +85,8 @@ class FakeEmailProvider : EmailProvider {
     val receivedTrashTokens = mutableListOf<String?>()
     val receivedSearchRequests = mutableListOf<Pair<String, String?>>()
     val receivedFetchEmailByIdIds = mutableListOf<String>()
+    val receivedFetchBodyIds = mutableListOf<String>()
+    val receivedInlineImageRequests = mutableListOf<Pair<String, List<InlineImageRef>>>()
 
     var moveToTrashError: Exception? = null
     var restoreFromTrashError: Exception? = null
@@ -192,7 +195,10 @@ class FakeEmailProvider : EmailProvider {
     }
 
     override suspend fun fetchBodyWithRefs(emailId: String): BodyFetchResult? {
+        eventLog?.add("gmail.fetchBody")
         fetchBodyCalls++
+        receivedFetchBodyIds += emailId
+        fetchBodyStarted?.complete(Unit)
         val deferred = fetchBodyDeferred
         if (deferred != null) {
             try {
@@ -210,6 +216,7 @@ class FakeEmailProvider : EmailProvider {
 
     override suspend fun downloadInlineImages(emailId: String, refs: List<InlineImageRef>): Map<String, String> {
         inlineImagesCalls++
+        receivedInlineImageRequests += emailId to refs
         val deferred = downloadInlineImagesDeferred
         if (deferred != null) {
             try {
