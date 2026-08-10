@@ -91,8 +91,10 @@ class TrashContentActionTest {
     fun failure_shows_error_not_success_and_row_remains() {
         var state by mutableStateOf(TrashUiState.Success(emails = listOf(email)))
         var deleteCalls = 0
+        val snackbarHostState = SnackbarHostState()
         setTrashContent(
             stateProvider = { state },
+            snackbarHostState = snackbarHostState,
             onDelete = {
                 deleteCalls++
                 state = state.copy(
@@ -109,7 +111,10 @@ class TrashContentActionTest {
         composeRule.onNodeWithText("Eliminado permanentemente").assertDoesNotExist()
         composeRule.onNodeWithText(email.subject).assertExists()
 
-        composeRule.waitUntil(timeoutMillis = 6_000) {
+        composeRule.runOnIdle {
+            snackbarHostState.currentSnackbarData?.dismiss()
+        }
+        composeRule.waitUntil(timeoutMillis = 2_000) {
             state.pendingFeedbackQueue.isEmpty()
         }
         composeRule.onNodeWithText(email.subject).performTouchInput { swipeLeft() }
@@ -173,20 +178,20 @@ class TrashContentActionTest {
     fun rapid_identical_failures_are_consumed_without_stalling_snackbar_queue() {
         var queue by mutableStateOf<List<ActionFeedback>>(emptyList())
         val consumedCount = AtomicInteger(0)
+        val snackbarHostState = SnackbarHostState()
 
         composeRule.setContent {
             MaterialTheme {
-                val host = remember { SnackbarHostState() }
                 Box {
                     ActionFeedbackEffect(
                         feedback = queue.firstOrNull(),
-                        snackbarHostState = host,
+                        snackbarHostState = snackbarHostState,
                         onConsumed = { id ->
                             queue = queue.filterNot { it.id == id }
                             consumedCount.incrementAndGet()
                         }
                     )
-                    SnackbarHost(hostState = host)
+                    SnackbarHost(hostState = snackbarHostState)
                 }
             }
         }
@@ -195,8 +200,16 @@ class TrashContentActionTest {
             queue = List(5) { ActionFeedback.Failure(UiErrorReason.NO_CONNECTION) }
         }
 
-        composeRule.waitUntil(timeoutMillis = 25_000) {
-            consumedCount.get() == 5
+        repeat(5) { index ->
+            composeRule.waitUntil(timeoutMillis = 2_000) {
+                snackbarHostState.currentSnackbarData != null
+            }
+            composeRule.runOnIdle {
+                snackbarHostState.currentSnackbarData?.dismiss()
+            }
+            composeRule.waitUntil(timeoutMillis = 2_000) {
+                consumedCount.get() == index + 1
+            }
         }
         assertEquals(5, consumedCount.get())
         assertEquals(true, queue.isEmpty())
@@ -204,7 +217,13 @@ class TrashContentActionTest {
         composeRule.runOnIdle {
             queue = listOf(ActionFeedback.Failure(UiErrorReason.NO_CONNECTION))
         }
-        composeRule.waitUntil(timeoutMillis = 6_000) {
+        composeRule.waitUntil(timeoutMillis = 2_000) {
+            snackbarHostState.currentSnackbarData != null
+        }
+        composeRule.runOnIdle {
+            snackbarHostState.currentSnackbarData?.dismiss()
+        }
+        composeRule.waitUntil(timeoutMillis = 2_000) {
             consumedCount.get() == 6
         }
         assertEquals(6, consumedCount.get())
@@ -214,17 +233,17 @@ class TrashContentActionTest {
     private fun setTrashContent(
         initialState: TrashUiState.Success = TrashUiState.Success(emails = listOf(email)),
         stateProvider: (() -> TrashUiState.Success)? = null,
+        snackbarHostState: SnackbarHostState = SnackbarHostState(),
         onDelete: (String) -> Unit = {},
         onFeedbackConsumed: (com.david.mailapp.feature.inbox.ActionFeedbackId) -> Unit = {}
     ) {
         composeRule.setContent {
             MaterialTheme {
-                val host = remember { SnackbarHostState() }
                 val state = stateProvider?.invoke() ?: initialState
                 TrashContent(
                     state = state,
                     listState = androidx.compose.foundation.lazy.rememberLazyListState(),
-                    snackbarHostState = host,
+                    snackbarHostState = snackbarHostState,
                     highlightedEmailId = null,
                     onEmailClick = {},
                     onDeletePermanently = onDelete,

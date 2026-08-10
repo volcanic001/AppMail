@@ -6,7 +6,7 @@
 - Etapa: 1 — Congelar estado, contratos y cobertura.
 - Subfases completadas: 1.1 — Estado inicial y registro técnico; 1.2 — Inventario de API y consumidores; 1.3 — Matriz contractual y análisis de huecos; 1.4 — Baseline técnico existente.
 - Estado de la etapa: completada y cerrada en el commit documental `docs(repository): establish verifiable baseline scope`.
-- Estado actual: etapa 4 completada y cerrada en el commit `test(repository): characterize pdf account and send contracts`; etapa 5 pendiente.
+- Estado actual: baseline verificable completado; etapas 1–5 y subfases 1.1–5.4 cerradas. Puerta de entrada al refactor estructural: GO.
 - Captura realizada: 2026-08-08 16:38:46 -0600 (CST).
 - Alcance de esta subfase: documentación del estado inicial; no se modificó código de producción, pruebas ni configuración.
 
@@ -106,6 +106,22 @@ La matriz contractual aumenta de 128 a 131 casos directos. `downloadPdf` pasa de
 - [Resultados de identidad y envío](resultados-subfase-4.4.md): nueve contratos nuevos; corrida de 9/9 de la suite nueva, corrida conjunta de 32/32 de las tres suites de la Etapa 4, regresión `EmailDetailCancellationTest` 7/7 y `PdfCacheManagerTest` 22/22 en JVM, sin fallos, errores ni omitidas.
 
 La matriz contractual aumenta de 131 a 140 casos directos. `getUserEmail` y `sendEmail` pasan de ausente a alta. Los 20 métodos públicos de `EmailRepository` quedan en cobertura alta. Provider dinámico, cancelación y ausencia de provider alcanzan cobertura transversal alta. El mensaje heredado `No hay proveedor activo` en `sendEmail` sin provider queda confirmado como comportamiento actual. `FakeEmailProvider` se amplió solo en AndroidTest con `SendRequest`, contador y eventos para identidad y envío. La Etapa 4 se cierra en el commit `test(repository): characterize pdf account and send contracts`, que excluye el cambio previo del usuario en `MainNavHost.kt`.
+
+## Evidencia de la subfase 5.1
+
+- [Resultados de validación JVM, build y análisis estático](resultados-subfase-5.1.md): suite JVM completa verde con 584 pruebas (idéntico al baseline de 1.4), ambos APK generados correctamente y lint con 0 errores y 64 advertencias (idéntico a 1.4, sin regresiones). La integridad de producción y Gradle se mantiene inalterada post-Gradle. La Subfase 5.1 queda cerrada sin commit; 5.2 es la siguiente subfase.
+
+## Evidencia de la subfase 5.2
+
+- [Resultados de instrumentación completa en emulador](resultados-subfase-5.2.md): los fallos iniciales quedaron atribuidos a esperas de reloj real en `TrashContentActionTest` y a una condición exacta de contador que podía perderse en `EmailDetailCancellationTest`. Se corrigieron solo esas pruebas AndroidTest mediante sincronización observable. Validación final: foco repositorio 137/137, regresión de las dos clases 42/42, suite completa 284/284 y selección temporal 330/330 en tres corridas consecutivas, sin fallos, errores, omisiones ni flakiness pendiente. Producción y Gradle permanecen congelados. La Subfase 5.2 queda cerrada sin commit; 5.3 es la siguiente subfase.
+
+## Evidencia de la subfase 5.3
+
+- [Resultados del baseline real en Pixel 9](resultados-subfase-5.3.md): matriz manual completa sobre Gmail dedicado con login e identidad, Inbox/Trash/búsqueda/paginación, cuerpo e inline, leído/mover/restaurar, envío/respuesta/reenvío, PDF online/offline/caché/reintento/cancelación, cambio de sesión y una única eliminación definitiva sacrificial. El gate de sesión terminó sin datos tardíos, archivo final ni `.tmp`; PAGE_19 quedó ausente tras refresh y en Room (`0` filas). Las anomalías observadas quedaron clasificadas como heredadas o externas y no contradicen los contratos automatizados. `EmailRepository.kt`, producción, Gradle y `MainNavHost.kt` permanecen intactos. La Subfase 5.3 queda cerrada sin commit; 5.4 es la siguiente subfase.
+
+## Evidencia de la subfase 5.4 y cierre del baseline
+
+- [Resultados de la auditoría final y puerta de entrada](resultados-subfase-5.4.md): los 20 métodos públicos conservan cobertura alta mediante 140 contratos directos; JVM, instrumentación, serie anti-flakiness, lint y matriz real del Pixel permanecen cerrados sin fallos pendientes. Producción y Gradle siguen intactos, `EmailRepository.kt` conserva su hash inicial y el cambio ajeno de `MainNavHost.kt` conserva su hash y queda fuera del commit. Las evidencias fueron verificadas y saneadas; no existe contrato pendiente ni anomalía crítica. La decisión final es GO para un plan independiente de refactor estructural conservador, sin mezclar cambios lógicos.
 
 ## Estado previo del árbol de trabajo
 

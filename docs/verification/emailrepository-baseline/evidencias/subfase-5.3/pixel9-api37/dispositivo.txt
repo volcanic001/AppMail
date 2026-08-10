@@ -1,0 +1,18 @@
+Fecha: 2026-08-10
+Zona horaria: America/El_Salvador (-0600)
+Serial ADB: 55080DLAQ002CK
+Transporte: USB 20-7
+Modelo: Pixel 9
+Dispositivo: tokay
+Android: 17
+API: 37
+Pantalla física: 1080x2424
+Densidad física: 420 dpi
+App: com.david.mailapp
+versionCode: 1
+versionName: 1.0
+minSdk: 26
+targetSdk: 36
+APK debug local e instalado, SHA-256: f27ff938f0cd7c1903998b67de43cfd3310b62f3b36d96cb4296ae77f146f003
+Wi-Fi al cierre: activado (1)
+Datos móviles al cierre: activados (1)

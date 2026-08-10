@@ -1,0 +1,41 @@
+# Extracto de EmailResolve/MailPerfTrace — Subfase 5.3
+# Se sustituyeron emailId y attachmentId por marcadores. No contiene credenciales,
+# tokens, cuerpos de correo, direcciones completas ni URLs de Gmail.
+
+## Resolución, cuerpo e inline — primera apertura
+12:11:46.237 EmailResolve [RESOLVE] RESULT id=<email-id> source=cache durationMs=54 category=FOUND
+12:11:46.750 MailPerfTrace [BODY_FETCH] HTTP_DONE emailId=<email-id> durationMs=510
+12:11:46.752 MailPerfTrace [BODY_FETCH] EXTRACT_DONE emailId=<email-id> extractMs=2 bodyLen=911 totalMs=512
+12:11:46.753 MailPerfTrace [BODY_FETCH] INLINE_REFS_FOUND count=3 emailId=<email-id>
+12:11:46.753 MailPerfTrace [BODY_FETCH] PDF_ATTACHMENTS_FOUND count=2 emailId=<email-id>
+12:11:46.811 MailPerfTrace [REPO_BODY] CACHED emailId=<email-id> roomMs=58 totalMs=571
+12:12:02.046 MailPerfTrace [INLINE_DOWNLOAD] ALL_DONE emailId=<email-id> successCount=2 parallelMs=15219
+12:12:02.046 MailPerfTrace [REPO_INLINE] DONE emailId=<email-id> count=2 totalMs=15219
+12:12:02.072 MailPerfTrace [REPO_INJECT] DONE outputLen=9438 durationMs=23
+
+## Reapertura
+12:13:26.002 EmailResolve [RESOLVE] RESULT id=<email-id> source=cache durationMs=72 category=FOUND
+12:13:26.837 MailPerfTrace [BODY_FETCH] HTTP_DONE emailId=<email-id> durationMs=831
+12:13:26.871 MailPerfTrace [REPO_BODY] CACHED emailId=<email-id> roomMs=30 totalMs=865
+12:13:42.413 MailPerfTrace [REPO_INLINE] DONE emailId=<email-id> count=2 totalMs=15540
+12:13:42.433 MailPerfTrace [REPO_INJECT] DONE outputLen=9438 durationMs=19
+
+## PDF sin conexión y reintento correcto
+12:14:26.880 MailPerfTrace [PDF_DOWNLOAD] DOWNLOADING emailId=<email-id> attachmentId=<attachment-id>
+12:14:26.950 MailPerfTrace [PDF_DOWNLOAD] NETWORK_ERROR emailId=<email-id> attachmentId=<attachment-id> exception=UnresolvedAddressException
+12:15:16.374 MailPerfTrace [PDF_DOWNLOAD] DOWNLOADING emailId=<email-id> attachmentId=<attachment-id>
+12:15:16.879 MailPerfTrace [ATTACHMENT] HTTP_DONE attachmentId=<attachment-id> httpMs=505
+12:15:16.882 MailPerfTrace [PDF_DOWNLOAD] SUCCESS emailId=<email-id> attachmentId=<attachment-id> size=678
+
+## Salida durante descarga
+12:17:31.425 MailPerfTrace [PDF_DOWNLOAD] DOWNLOADING emailId=<email-id> attachmentId=<attachment-id>
+# Veinte segundos después: sin SUCCESS, sin archivo final grande y sin .tmp.
+
+## Cierre de sesión durante descarga
+12:41:26.654 MailRenderTrace event=VM_PDF_DOWNLOAD_START attachmentId=<attachment-id> fileName=baseline-cancel.pdf
+12:41:26.658 MailPerfTrace [PDF_DOWNLOAD] DOWNLOADING emailId=<email-id> attachmentId=<attachment-id>
+12:41:31.848 acción de prueba: confirmación de cierre de sesión (delta 5432 ms)
+12:41:50.186 MailPerfTrace [ATTACHMENT] HTTP_DONE attachmentId=<attachment-id> httpMs=23528
+12:41:50.897 MailPerfTrace [ATTACHMENT] DECODED attachmentId=<attachment-id> bytesLen=15000693 decodeMs=711
+12:41:50.898 MailRenderTrace event=VM_PDF_DOWNLOAD_END attachmentId=<attachment-id> state=Error
+# Verificación inmediata y 55 s después: sin PDF grande final, sin .tmp y Room con 0 filas de correo de la sesión antigua.

@@ -116,11 +116,16 @@ class EmailDetailCancellationTest {
 
         val viewModel = createViewModel(email.id)
 
-        awaitCondition("inline provider was not invoked") { provider.inlineImagesCalls == 1 }
+        awaitCondition("inline provider was not invoked") { provider.inlineImagesCalls >= 1 }
+        awaitCondition("pending inline Ready state was not published") {
+            val state = viewModel.uiState.value
+            state is EmailDetailUiState.Ready &&
+                state.inlineImagesLoading &&
+                state.email.body.contains("cid:image-1")
+        }
         val storedAfterBodyFetch = database.emailDao()
             .getEntitiesByIdsSync(listOf(email.id))
             .single()
-        delay(50)
 
         val state = viewModel.uiState.value
         assertTrue("Expected Ready, got $state", state is EmailDetailUiState.Ready)
