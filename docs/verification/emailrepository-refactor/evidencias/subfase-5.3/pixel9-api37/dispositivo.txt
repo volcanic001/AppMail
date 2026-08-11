@@ -1,0 +1,11 @@
+Device: Google Pixel 9
+Model: tokay
+Android: 17
+API level: 37
+Serial (adb transport): 55080DLAQ002CK (wireless ADB over TLS)
+Package under test: com.david.mailapp
+APK: app-debug.apk — 25,642,958 bytes — SHA-256 e1531ab9e4cd940951451242e7c60e8ecfd5aa9bc99b2acf6f70e9412d176e01
+Installed APK hash: e1531ab9e4cd940951451242e7c60e8ecfd5aa9bc99b2acf6f70e9412d176e01 (coincide con el local)
+Cuenta dedicada: CUENTA_DEDICADA
+Red inicial/final: Wi-Fi ON, datos móviles ON, modo avión OFF (restaurada al cierre)
+Capturas: Screenshot_20260811-* (nativas del dispositivo, preservadas en /sdcard/Pictures/Screenshots/)

@@ -1,9 +1,9 @@
 # Registro técnico — Refactor estructural conservador de EmailRepository
 
 Registro acumulativo del plan maestro «Refactor estructural conservador de
-EmailRepository», en su Etapa 1 — Activación y protección, Subfase 1.1 —
-Estado inicial y trazabilidad. Este archivo es el único artefacto permitido
-en la Subfase 1.1.
+EmailRepository», iniciado en la Etapa 1 — Activación y protección, Subfase
+1.1 — Estado inicial y trazabilidad, y actualizado hasta su cierre integral
+en la Subfase 5.4.
 
 ---
 
@@ -279,10 +279,10 @@ aprobada.
 | 4.1 | [resultados-subfase-4.1.md](resultados-subfase-4.1.md) |
 | 4.2 | [resultados-subfase-4.2.md](resultados-subfase-4.2.md) |
 | 4.3 | [resultados-subfase-4.3.md](resultados-subfase-4.3.md) |
-| 5.1 | _pendiente_ |
-| 5.2 | _pendiente_ |
-| 5.3 | _pendiente_ |
-| 5.4 | _pendiente_ |
+| 5.1 | [resultados-subfase-5.1.md](resultados-subfase-5.1.md) |
+| 5.2 | [resultados-subfase-5.2.md](resultados-subfase-5.2.md) |
+| 5.3 | [resultados-subfase-5.3.md](resultados-subfase-5.3.md) |
+| 5.4 | [resultados-subfase-5.4.md](resultados-subfase-5.4.md) |
 
 ---
 
@@ -305,11 +305,11 @@ aprobada.
 | Subfase 4.1 | Consultas y validación PDF | Aprobada |
 | Subfase 4.2 | Descarga PDF | Aprobada |
 | Subfase 4.3 | Resolución y single-flight | Aprobada |
-| Etapa 5 | Cierre integral | Pendiente |
-| Subfase 5.1 | JVM, build y lint | Pendiente |
-| Subfase 5.2 | Instrumentación y concurrencia | Pendiente |
-| Subfase 5.3 | Verificación real en Pixel 9 | Pendiente |
-| Subfase 5.4 | Auditoría y cierre | Pendiente |
+| Etapa 5 | Cierre integral | Aprobada |
+| Subfase 5.1 | JVM, build y lint | Aprobada |
+| Subfase 5.2 | Instrumentación y concurrencia | Aprobada |
+| Subfase 5.3 | Verificación real en Pixel 9 | Aprobada |
+| Subfase 5.4 | Auditoría y cierre | Aprobada |
 
 ---
 
@@ -333,3 +333,40 @@ lint 0/64 e instrumentación focal 137/137; la evidencia está enlazada en el
 
 Las Subfases 2.1, 2.2 y 2.3 quedaron aprobadas con sus respectivos planes
 técnicos cerrados y evidencias de verificación. La Etapa 2 queda aprobada.
+
+Las Subfases 3.1, 3.2 y 3.3 extrajeron acciones, contenido e imágenes inline
+sin alterar contratos. La Etapa 3 queda aprobada. Las Subfases 4.1, 4.2 y 4.3
+extrajeron consultas, descarga PDF y resolución single-flight; la Etapa 4
+queda aprobada.
+
+---
+
+## 15. Auditoría final y cierre del plan
+
+La Subfase 5.4 comparó el código final con la baseline contractual `aef2d02`:
+
+| Medida | Inicial | Final |
+| --- | ---: | ---: |
+| Líneas de `EmailRepository.kt` | 745 | 177 |
+| Métodos públicos | 20 | 20 |
+| Constantes públicas | 1 | 1 |
+| Componentes internos extraídos | 0 | 8 |
+
+- El constructor, los parámetros, valores predeterminados y tipos de retorno
+  de la API pública permanecen intactos.
+- `AppContainer` y todos los consumidores quedaron sin cambios atribuibles al
+  refactor.
+- Las pruebas cerraron con JVM 584/584, contratos 140/140, instrumentación
+  284/284 y serie temporal 330/330; lint terminó con 0 errores y 65
+  advertencias conocidas.
+- La matriz real en Pixel 9/API 37 quedó aprobada, incluida la limpieza de
+  Room y caché PDF durante logout.
+- El comportamiento heredado de `untrash` sin reañadir `INBOX` queda
+  documentado fuera del alcance del refactor.
+- Los fingerprints protegidos de `ComposeScreen.kt` y `MainNavHost.kt`
+  permanecen intactos y ambos archivos quedan fuera del cierre documental.
+
+**Decisión final: GO.** Las cinco etapas y las 15 subfases quedan aprobadas.
+El refactor estructural termina con una fachada de 177 líneas y ocho
+componentes internos especializados, sin cambios contractuales ni regresiones
+atribuibles al refactor.

@@ -1,0 +1,34 @@
+# Logs saneados — Subfase 5.3 (Pixel 9, sesión de verificación)
+# Reglas: emailId->EMAIL_ID, mail=hash->mail=HASH, dirección de cuenta dedicada->CUENTA_DEDICADA, nombre de remitente neutral->REMITENTE_NEUTRAL
+# Sin tokens, credenciales, URLs, cuerpos ni IDs largos de Gmail.
+
+## Trazas de resolución/cuerpo (cache + re-fetch heredado)
+08-11 13:33:19.424 12678  2433 D MailPerfTrace: [BODY_FETCH] START emailId=EMAIL_ID
+08-11 13:33:19.926 12678  2428 D MailPerfTrace: [BODY_FETCH] HTTP_DONE emailId=EMAIL_ID durationMs=502
+08-11 13:33:19.927 12678  2428 D MailPerfTrace: [EXTRACT_BODY] START
+08-11 13:33:19.927 12678  2428 D MailPerfTrace: [EXTRACT_BODY] NO_HTML_PART fallback=text/plain
+08-11 13:33:19.927 12678  2428 D MailPerfTrace: [EXTRACT_BODY] PLAIN_PART_FOUND rawDataLen=272
+08-11 13:33:19.928 12678  2428 D MailPerfTrace: [DECODE_B64URL] inputLen=272 cleanLen=272 outputLen=202 durationMs=1
+08-11 13:33:19.928 12678  2428 D MailPerfTrace: [EXTRACT_BODY] PLAIN_DECODED decodedLen=202 decodeMs=1
+08-11 13:33:19.928 12678  2428 D MailPerfTrace: [BODY_FETCH] EXTRACT_DONE emailId=EMAIL_ID extractMs=2 bodyLen=289 totalMs=504
+08-11 13:33:19.928 12678  2428 D MailPerfTrace: [BODY_FETCH] INLINE_REFS_FOUND count=0 emailId=EMAIL_ID
+08-11 13:33:19.928 12678  2428 D MailPerfTrace: [BODY_FETCH] PDF_ATTACHMENTS_FOUND count=0 emailId=EMAIL_ID
+08-11 13:33:19.929 12678  2428 D MailPerfTrace: [REPO_BODY] FETCHED emailId=EMAIL_ID bodyLen=289 refs=0 pdfs=0 fetchMs=505
+08-11 13:33:19.929 12678  2428 D MailPerfTrace: [JSOUP_CLEAN] START htmlLen=289
+08-11 13:33:19.931 12678  2428 D MailPerfTrace: [JSOUP_CLEAN] PARSE_DONE parseMs=2
+08-11 13:33:19.937 12678  2428 D MailPerfTrace: [JSOUP_CLEAN] DONE outputLen=288 totalMs=8
+08-11 13:33:19.947 12678  2428 D MailPerfTrace: [REPO_BODY] CACHED emailId=EMAIL_ID roomMs=18 totalMs=523
+
+## Verificación final de ausencia remota (DELETE_ONLY)
+08-11 13:32:38.160 12678 12678 D SearchDebug: [GmailProvider] Search returned 1 emails, complete=true
+08-11 13:44:48.851 12678 12678 D SearchDebug: [SearchTopBar] BasicTextField onValueChange: 'MAILAPP_REFACTOR_53_20260811_DELETE_ONLY'
+08-11 13:44:49.155 12678 12678 D SearchDebug: [GmailProvider] Search with q='MAILAPP_REFACTOR_53_20260811_DELETE_ONLY', pageToken=null
+08-11 13:44:49.929 12678 12678 D SearchDebug: [GmailProvider] Search returned 0 emails, complete=true
+
+## Repetición de protección de sesión para cierre documental
+# Corrida confirmada: inicio de descarga 14:03:19; logout confirmado 14:03:25; verificación 14:04:24 (59 s después).
+# La reautenticación fue autorizada y completada por el usuario; después se verificó la recuperación normal de Inbox.
+SESSION_ROOM_COUNT=0
+PDF_CACHE_LARGE_COUNT=0
+PDF_TMP_COUNT=0
+DELETE_ONLY_ROOM_COUNT=0
