@@ -265,35 +265,11 @@ class EmailRepository(
     suspend fun fetchAndCacheBody(emailId: String): BodyFetchResult? =
         contentCoordinator.fetchAndCacheBody(emailId)
 
-    suspend fun downloadInlineImages(emailId: String, refs: List<InlineImageRef>): Map<String, String> {
-        if (refs.isEmpty()) return emptyMap()
-        // DEBUG_PERF
-        val t0 = repoNow()
-        Log.d(REPO_TAG, "[REPO_INLINE] START emailId=$emailId count=${refs.size}")
-        val result = provider?.downloadInlineImages(emailId, refs) ?: emptyMap()
-        Log.d(REPO_TAG, "[REPO_INLINE] DONE emailId=$emailId count=${result.size} totalMs=${repoNow() - t0}")
-        return result
-    }
+    suspend fun downloadInlineImages(emailId: String, refs: List<InlineImageRef>): Map<String, String> =
+        contentCoordinator.downloadInlineImages(emailId, refs)
 
-    fun injectInlineImages(html: String, inlineImages: Map<String, String>): String {
-        if (inlineImages.isEmpty()) {
-            // DEBUG_PERF
-            Log.d(REPO_TAG, "[REPO_INJECT] SKIP reason=no_inline_images htmlLen=${html.length}")
-            return html
-        }
-        // DEBUG_PERF
-        val t0 = repoNow()
-        Log.d(REPO_TAG, "[REPO_INJECT] START htmlLen=${html.length} imageCount=${inlineImages.size}")
-        var result = html
-        for ((cid, dataUri) in inlineImages) {
-            result = result
-                .replace("cid:$cid", dataUri)
-                .replace("cid:&lt;$cid&gt;", dataUri)
-                .replace("cid:<$cid>", dataUri)
-        }
-        Log.d(REPO_TAG, "[REPO_INJECT] DONE outputLen=${result.length} durationMs=${repoNow() - t0}")
-        return result
-    }
+    fun injectInlineImages(html: String, inlineImages: Map<String, String>): String =
+        contentCoordinator.injectInlineImages(html, inlineImages)
 
     // ── PDF download ───────────────────────────────────────────
 

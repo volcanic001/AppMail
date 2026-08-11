@@ -7,6 +7,7 @@ import com.david.mailapp.data.local.converter.PdfAttachmentMetadataCodec
 import com.david.mailapp.data.local.dao.EmailDao
 import com.david.mailapp.data.remote.provider.BodyFetchResult
 import com.david.mailapp.data.remote.provider.EmailProvider
+import com.david.mailapp.data.remote.provider.InlineImageRef
 import com.david.mailapp.feature.emaildetail.components.EmailHtmlCleaner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -57,6 +58,36 @@ internal class EmailContentCoordinator(
             )
         }
         Log.d(REPO_TAG, "[REPO_BODY] CACHED emailId=$emailId roomMs=${repoNow() - tFetch} totalMs=${repoNow() - t0}")
+        return result
+    }
+
+    suspend fun downloadInlineImages(emailId: String, refs: List<InlineImageRef>): Map<String, String> {
+        if (refs.isEmpty()) return emptyMap()
+        // DEBUG_PERF
+        val t0 = repoNow()
+        Log.d(REPO_TAG, "[REPO_INLINE] START emailId=$emailId count=${refs.size}")
+        val result = providerFactory()?.downloadInlineImages(emailId, refs) ?: emptyMap()
+        Log.d(REPO_TAG, "[REPO_INLINE] DONE emailId=$emailId count=${result.size} totalMs=${repoNow() - t0}")
+        return result
+    }
+
+    fun injectInlineImages(html: String, inlineImages: Map<String, String>): String {
+        if (inlineImages.isEmpty()) {
+            // DEBUG_PERF
+            Log.d(REPO_TAG, "[REPO_INJECT] SKIP reason=no_inline_images htmlLen=${html.length}")
+            return html
+        }
+        // DEBUG_PERF
+        val t0 = repoNow()
+        Log.d(REPO_TAG, "[REPO_INJECT] START htmlLen=${html.length} imageCount=${inlineImages.size}")
+        var result = html
+        for ((cid, dataUri) in inlineImages) {
+            result = result
+                .replace("cid:$cid", dataUri)
+                .replace("cid:&lt;$cid&gt;", dataUri)
+                .replace("cid:<$cid>", dataUri)
+        }
+        Log.d(REPO_TAG, "[REPO_INJECT] DONE outputLen=${result.length} durationMs=${repoNow() - t0}")
         return result
     }
 }
