@@ -274,7 +274,7 @@ aprobada.
 | 2.2 | [resultados-subfase-2.2.md](resultados-subfase-2.2.md) |
 | 2.3 | [resultados-subfase-2.3.md](resultados-subfase-2.3.md) |
 | 3.1 | [resultados-subfase-3.1.md](resultados-subfase-3.1.md) |
-| 3.2 | _pendiente_ |
+| 3.2 | [resultados-subfase-3.2.md](resultados-subfase-3.2.md) |
 | 3.3 | _pendiente_ |
 | 4.1 | _pendiente_ |
 | 4.2 | _pendiente_ |
@@ -299,7 +299,7 @@ aprobada.
 | Subfase 2.3 | Refresh y coordinación por carpeta | Aprobada |
 | Etapa 3 | Mutaciones y contenido | En curso |
 | Subfase 3.1 | Acciones remotas y reconciliación | Aprobada |
-| Subfase 3.2 | Cuerpo y metadata | Pendiente |
+| Subfase 3.2 | Cuerpo y metadata | Aprobada |
 | Subfase 3.3 | Imágenes inline | Pendiente |
 | Etapa 4 | Caché y concurrencia crítica | Pendiente |
 | Subfase 4.1 | Consultas y validación PDF | Pendiente |
