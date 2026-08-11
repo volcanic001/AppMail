@@ -32,7 +32,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -65,6 +64,9 @@ class EmailRepository(
 
     /** Simple provider delegation for search, account and send operations. */
     private val providerGateway = EmailProviderGateway(providerFactory)
+
+    /** Live Room-backed reads for the mailbox folders. */
+    private val mailboxCoordinator = EmailMailboxCoordinator(dao)
 
     /** Current provider — read via factory every time so it stays fresh after sign-in/sign-out. */
     private val provider: EmailProvider? get() = providerFactory()
@@ -229,21 +231,11 @@ class EmailRepository(
 
     // ── Read (always from cache) ─────────────────────────────────
 
-    fun getInbox(): Flow<List<Email>> {
-        return dao.getByFolder("inbox").map { entities ->
-            entities.map { it.toDomain() }
-        }
-    }
+    fun getInbox(): Flow<List<Email>> = mailboxCoordinator.getInbox()
 
-    fun getTrash(): Flow<List<Email>> {
-        return dao.getByFolder("trash").map { entities ->
-            entities.map { it.toDomain() }
-        }
-    }
+    fun getTrash(): Flow<List<Email>> = mailboxCoordinator.getTrash()
 
-    fun getEmailById(emailId: String): Flow<Email?> {
-        return dao.getById(emailId).map { entity -> entity?.toDomain() }
-    }
+    fun getEmailById(emailId: String): Flow<Email?> = mailboxCoordinator.getEmailById(emailId)
 
     // ── Write (remote → cache) ──────────────────────────────────
 
