@@ -1,6 +1,5 @@
 package com.david.mailapp.data.repository
 
-import android.os.SystemClock
 import android.util.Log
 import com.david.mailapp.core.session.SessionWriteGuard
 import com.david.mailapp.data.local.converter.PdfAttachmentMetadataCodec
@@ -12,9 +11,6 @@ import com.david.mailapp.feature.emaildetail.components.EmailHtmlCleaner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-private const val REPO_TAG = "MailPerfTrace"
-private fun repoNow() = SystemClock.elapsedRealtime()
-
 internal class EmailContentCoordinator(
     private val dao: EmailDao,
     private val providerFactory: () -> EmailProvider?,
@@ -24,19 +20,19 @@ internal class EmailContentCoordinator(
      * then persist everything atomically to Room. Metadata is persisted even when the body is empty. */
     suspend fun fetchAndCacheBody(emailId: String): BodyFetchResult? {
         // DEBUG_PERF
-        val t0 = repoNow()
-        Log.d(REPO_TAG, "[REPO_BODY] START emailId=$emailId")
+        val t0 = RepositoryTrace.now()
+        Log.d(RepositoryTrace.MAIL_PERF_TAG, "[REPO_BODY] START emailId=$emailId")
         val lease = writeGuard.capture() ?: run {
-            Log.d(REPO_TAG, "[REPO_BODY] GUARD_INVALIDATED emailId=$emailId")
+            Log.d(RepositoryTrace.MAIL_PERF_TAG, "[REPO_BODY] GUARD_INVALIDATED emailId=$emailId")
             return null
         }
         val result = providerFactory()?.fetchBodyWithRefs(emailId) ?: run {
-            Log.d(REPO_TAG, "[REPO_BODY] NO_PROVIDER_OR_FAILED emailId=$emailId")
+            Log.d(RepositoryTrace.MAIL_PERF_TAG, "[REPO_BODY] NO_PROVIDER_OR_FAILED emailId=$emailId")
             return null
         }
         val rawBody = result.rawBody.orEmpty()
-        val tFetch = repoNow()
-        Log.d(REPO_TAG, "[REPO_BODY] FETCHED emailId=$emailId bodyLen=${rawBody.length} refs=${result.inlineRefs.size} pdfs=${result.pdfAttachments.size} fetchMs=${tFetch - t0}")
+        val tFetch = RepositoryTrace.now()
+        Log.d(RepositoryTrace.MAIL_PERF_TAG, "[REPO_BODY] FETCHED emailId=$emailId bodyLen=${rawBody.length} refs=${result.inlineRefs.size} pdfs=${result.pdfAttachments.size} fetchMs=${tFetch - t0}")
 
         // Clean HTML only when there's a body
         val cleanBody = if (rawBody.isNotBlank()) {
@@ -57,29 +53,29 @@ internal class EmailContentCoordinator(
                 hasAttachments = hasAtt
             )
         }
-        Log.d(REPO_TAG, "[REPO_BODY] CACHED emailId=$emailId roomMs=${repoNow() - tFetch} totalMs=${repoNow() - t0}")
+        Log.d(RepositoryTrace.MAIL_PERF_TAG, "[REPO_BODY] CACHED emailId=$emailId roomMs=${RepositoryTrace.now() - tFetch} totalMs=${RepositoryTrace.now() - t0}")
         return result
     }
 
     suspend fun downloadInlineImages(emailId: String, refs: List<InlineImageRef>): Map<String, String> {
         if (refs.isEmpty()) return emptyMap()
         // DEBUG_PERF
-        val t0 = repoNow()
-        Log.d(REPO_TAG, "[REPO_INLINE] START emailId=$emailId count=${refs.size}")
+        val t0 = RepositoryTrace.now()
+        Log.d(RepositoryTrace.MAIL_PERF_TAG, "[REPO_INLINE] START emailId=$emailId count=${refs.size}")
         val result = providerFactory()?.downloadInlineImages(emailId, refs) ?: emptyMap()
-        Log.d(REPO_TAG, "[REPO_INLINE] DONE emailId=$emailId count=${result.size} totalMs=${repoNow() - t0}")
+        Log.d(RepositoryTrace.MAIL_PERF_TAG, "[REPO_INLINE] DONE emailId=$emailId count=${result.size} totalMs=${RepositoryTrace.now() - t0}")
         return result
     }
 
     fun injectInlineImages(html: String, inlineImages: Map<String, String>): String {
         if (inlineImages.isEmpty()) {
             // DEBUG_PERF
-            Log.d(REPO_TAG, "[REPO_INJECT] SKIP reason=no_inline_images htmlLen=${html.length}")
+            Log.d(RepositoryTrace.MAIL_PERF_TAG, "[REPO_INJECT] SKIP reason=no_inline_images htmlLen=${html.length}")
             return html
         }
         // DEBUG_PERF
-        val t0 = repoNow()
-        Log.d(REPO_TAG, "[REPO_INJECT] START htmlLen=${html.length} imageCount=${inlineImages.size}")
+        val t0 = RepositoryTrace.now()
+        Log.d(RepositoryTrace.MAIL_PERF_TAG, "[REPO_INJECT] START htmlLen=${html.length} imageCount=${inlineImages.size}")
         var result = html
         for ((cid, dataUri) in inlineImages) {
             result = result
@@ -87,7 +83,7 @@ internal class EmailContentCoordinator(
                 .replace("cid:&lt;$cid&gt;", dataUri)
                 .replace("cid:<$cid>", dataUri)
         }
-        Log.d(REPO_TAG, "[REPO_INJECT] DONE outputLen=${result.length} durationMs=${repoNow() - t0}")
+        Log.d(RepositoryTrace.MAIL_PERF_TAG, "[REPO_INJECT] DONE outputLen=${result.length} durationMs=${RepositoryTrace.now() - t0}")
         return result
     }
 }

@@ -11,8 +11,6 @@ import com.david.mailapp.data.remote.provider.EmailProvider
 import com.david.mailapp.domain.model.EmailFolder
 import kotlinx.coroutines.CancellationException
 
-private const val REPO_TAG = "MailPerfTrace"
-
 internal class EmailActionCoordinator(
     private val dao: EmailDao,
     private val providerFactory: () -> EmailProvider?,
@@ -117,7 +115,7 @@ internal class EmailActionCoordinator(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Log.e(REPO_TAG, "Local commit failed after remote success", e)
+            Log.e(RepositoryTrace.MAIL_PERF_TAG, "Local commit failed after remote success", e)
             null
         }
 
@@ -130,7 +128,7 @@ internal class EmailActionCoordinator(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                Log.e(REPO_TAG, "Reconcile $folder failed after remote success", e)
+                Log.e(RepositoryTrace.MAIL_PERF_TAG, "Reconcile $folder failed after remote success", e)
             }
         }
 
