@@ -272,7 +272,7 @@ aprobada.
 | 1.2 | [resultados-subfase-1.2.md](resultados-subfase-1.2.md) |
 | 2.1 | [resultados-subfase-2.1.md](resultados-subfase-2.1.md) |
 | 2.2 | [resultados-subfase-2.2.md](resultados-subfase-2.2.md) |
-| 2.3 | _pendiente_ |
+| 2.3 | [resultados-subfase-2.3.md](resultados-subfase-2.3.md) |
 | 3.1 | _pendiente_ |
 | 3.2 | _pendiente_ |
 | 3.3 | _pendiente_ |
@@ -293,10 +293,10 @@ aprobada.
 | Etapa 1 | Activación y protección | Aprobada |
 | Subfase 1.1 | Estado inicial y trazabilidad | Aprobada |
 | Subfase 1.2 | Gate técnico de entrada | Aprobada |
-| Etapa 2 | Accesos simples y sincronización | En curso |
+| Etapa 2 | Accesos simples y sincronización | Aprobada |
 | Subfase 2.1 | Provider gateway | Aprobada |
 | Subfase 2.2 | Lecturas de Mailbox | Aprobada |
-| Subfase 2.3 | Refresh y coordinación por carpeta | Pendiente |
+| Subfase 2.3 | Refresh y coordinación por carpeta | Aprobada |
 | Etapa 3 | Mutaciones y contenido | Pendiente |
 | Subfase 3.1 | Acciones remotas y reconciliación | Pendiente |
 | Subfase 3.2 | Cuerpo y metadata | Pendiente |
@@ -331,6 +331,5 @@ propio plan técnico cerrado y quedó aprobada con JVM 584/584, build correcto,
 lint 0/64 e instrumentación focal 137/137; la evidencia está enlazada en el
 índice anterior. La Etapa 1 queda aprobada.
 
-La Subfase 2.1 quedó aprobada con su plan técnico cerrado y evidencia de
-verificación. La Etapa 2 sigue en curso. La Subfase 2.2 permanece pendiente y
-no está autorizada sin su propio plan técnico cerrado y aprobación explícita.
+Las Subfases 2.1, 2.2 y 2.3 quedaron aprobadas con sus respectivos planes
+técnicos cerrados y evidencias de verificación. La Etapa 2 queda aprobada.

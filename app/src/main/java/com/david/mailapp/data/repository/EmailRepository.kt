@@ -32,8 +32,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 // DEBUG_PERF
@@ -59,14 +57,11 @@ class EmailRepository(
 ) {
     private val dao = database.emailDao()
 
-    private val inboxCommitCoordinator = FolderCommitCoordinator()
-    private val trashCommitCoordinator = FolderCommitCoordinator()
-
     /** Simple provider delegation for search, account and send operations. */
     private val providerGateway = EmailProviderGateway(providerFactory)
 
-    /** Live Room-backed reads for the mailbox folders. */
-    private val mailboxCoordinator = EmailMailboxCoordinator(dao)
+    /** Live Room-backed reads and refresh coordination for the mailbox folders. */
+    private val mailboxCoordinator = EmailMailboxCoordinator(dao, providerFactory, writeGuard)
 
     /** Current provider — read via factory every time so it stays fresh after sign-in/sign-out. */
     private val provider: EmailProvider? get() = providerFactory()
@@ -240,61 +235,11 @@ class EmailRepository(
     // ── Write (remote → cache) ──────────────────────────────────
 
     /** Fetch from provider and persist to Room. Returns the paginated result for UI pagination. */
-    suspend fun refreshInbox(pageToken: String? = null): PaginatedResult<Email> {
-        val gen = if (pageToken == null) {
-            inboxCommitCoordinator.nextGeneration()
-        } else {
-            inboxCommitCoordinator.currentGeneration()
-        }
+    suspend fun refreshInbox(pageToken: String? = null): PaginatedResult<Email> =
+        mailboxCoordinator.refreshInbox(pageToken)
 
-        val lease = writeGuard.capture() ?: return PaginatedResult(emptyList(), null)
-        val p = provider ?: return PaginatedResult(emptyList(), null)
-        val fetched = p.fetchInbox(pageToken)
-        val result = if (fetched.isComplete) fetched else fetched.copy(nextPageToken = null)
-
-        val entities = result.items.map { EmailEntity.fromDomain(it, EmailFolder.Inbox) }
-        inboxCommitCoordinator.commitIfValid(gen) {
-            writeGuard.commit(lease) {
-                // Replace folder only on a complete first page;
-                // partial pages or pagination append/merge.
-                if (pageToken == null && result.isComplete) {
-                    dao.replaceFolder("inbox", entities)
-                } else {
-                    dao.upsertPreservingBodies(entities)
-                }
-            }
-        }
-
-        return result
-    }
-
-    suspend fun refreshTrash(pageToken: String? = null): PaginatedResult<Email> {
-        val gen = if (pageToken == null) {
-            trashCommitCoordinator.nextGeneration()
-        } else {
-            trashCommitCoordinator.currentGeneration()
-        }
-
-        val lease = writeGuard.capture() ?: return PaginatedResult(emptyList(), null)
-        val p = provider ?: return PaginatedResult(emptyList(), null)
-        val fetched = p.fetchTrash(pageToken)
-        val result = if (fetched.isComplete) fetched else fetched.copy(nextPageToken = null)
-
-        val entities = result.items.map { EmailEntity.fromDomain(it, EmailFolder.Trash) }
-        trashCommitCoordinator.commitIfValid(gen) {
-            writeGuard.commit(lease) {
-                // Refresh replaces the paginated window only for a complete first page.
-                // Partial pages and subsequent pages can only merge into the cache.
-                if (pageToken == null && result.isComplete) {
-                    dao.replaceFolder("trash", entities)
-                } else {
-                    dao.upsertPreservingBodies(entities)
-                }
-            }
-        }
-
-        return result
-    }
+    suspend fun refreshTrash(pageToken: String? = null): PaginatedResult<Email> =
+        mailboxCoordinator.refreshTrash(pageToken)
 
     /**
      * Remote search — NOT cached in Room. Results are ephemeral
@@ -708,30 +653,5 @@ class EmailRepository(
         replyContext: ReplyContext? = null
     ) {
         providerGateway.sendEmail(to, cc, bcc, subject, body, replyContext)
-    }
-}
-
-internal class FolderCommitCoordinator {
-    private val mutex = Mutex()
-    private var currentGeneration = 0L
-
-    suspend fun nextGeneration(): Long = mutex.withLock {
-        ++currentGeneration
-    }
-
-    suspend fun currentGeneration(): Long = mutex.withLock {
-        currentGeneration
-    }
-
-    suspend fun commitIfValid(
-        generation: Long,
-        block: suspend () -> Unit
-    ): Boolean = mutex.withLock {
-        if (generation != currentGeneration) {
-            false
-        } else {
-            block()
-            true
-        }
     }
 }
