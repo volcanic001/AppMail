@@ -63,6 +63,9 @@ class EmailRepository(
     private val inboxCommitCoordinator = FolderCommitCoordinator()
     private val trashCommitCoordinator = FolderCommitCoordinator()
 
+    /** Simple provider delegation for search, account and send operations. */
+    private val providerGateway = EmailProviderGateway(providerFactory)
+
     /** Current provider — read via factory every time so it stays fresh after sign-in/sign-out. */
     private val provider: EmailProvider? get() = providerFactory()
 
@@ -305,10 +308,8 @@ class EmailRepository(
      * Remote search — NOT cached in Room. Results are ephemeral
      * and live only in the ViewModel's state.
      */
-    suspend fun searchEmails(query: String, pageToken: String? = null): PaginatedResult<Email> {
-        val p = provider ?: return PaginatedResult(emptyList(), null)
-        return p.search(query, pageToken)
-    }
+    suspend fun searchEmails(query: String, pageToken: String? = null): PaginatedResult<Email> =
+        providerGateway.searchEmails(query, pageToken)
 
     suspend fun moveToTrash(emailId: String): EmailActionResult {
         val lease = writeGuard.capture() ?: return EmailActionResult.Failure(
@@ -707,15 +708,14 @@ class EmailRepository(
     }
 
     /** Obtiene la dirección de email del usuario autenticado desde el provider. */
-    suspend fun getUserEmail(): String? = provider?.getUserEmail()
+    suspend fun getUserEmail(): String? = providerGateway.getUserEmail()
 
     suspend fun sendEmail(
         to: String, cc: String?, bcc: String?,
         subject: String, body: String,
         replyContext: ReplyContext? = null
     ) {
-        provider?.sendEmail(to, cc, bcc, subject, body, replyContext)
-            ?: error("No hay proveedor activo")
+        providerGateway.sendEmail(to, cc, bcc, subject, body, replyContext)
     }
 }
 

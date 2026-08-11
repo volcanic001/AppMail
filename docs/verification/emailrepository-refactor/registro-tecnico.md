@@ -270,7 +270,7 @@ aprobada.
 | ------- | ---------- |
 | 1.1 | (este registro) |
 | 1.2 | [resultados-subfase-1.2.md](resultados-subfase-1.2.md) |
-| 2.1 | _pendiente_ |
+| 2.1 | [resultados-subfase-2.1.md](resultados-subfase-2.1.md) |
 | 2.2 | _pendiente_ |
 | 2.3 | _pendiente_ |
 | 3.1 | _pendiente_ |
@@ -293,8 +293,8 @@ aprobada.
 | Etapa 1 | Activación y protección | Aprobada |
 | Subfase 1.1 | Estado inicial y trazabilidad | Aprobada |
 | Subfase 1.2 | Gate técnico de entrada | Aprobada |
-| Etapa 2 | Accesos simples y sincronización | Pendiente |
-| Subfase 2.1 | Provider gateway | Pendiente |
+| Etapa 2 | Accesos simples y sincronización | En curso |
+| Subfase 2.1 | Provider gateway | Aprobada |
 | Subfase 2.2 | Lecturas de Mailbox | Pendiente |
 | Subfase 2.3 | Refresh y coordinación por carpeta | Pendiente |
 | Etapa 3 | Mutaciones y contenido | Pendiente |
