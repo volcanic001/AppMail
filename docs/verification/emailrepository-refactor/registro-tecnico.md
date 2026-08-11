@@ -277,7 +277,7 @@ aprobada.
 | 3.2 | [resultados-subfase-3.2.md](resultados-subfase-3.2.md) |
 | 3.3 | [resultados-subfase-3.3.md](resultados-subfase-3.3.md) |
 | 4.1 | [resultados-subfase-4.1.md](resultados-subfase-4.1.md) |
-| 4.2 | _pendiente_ |
+| 4.2 | [resultados-subfase-4.2.md](resultados-subfase-4.2.md) |
 | 4.3 | _pendiente_ |
 | 5.1 | _pendiente_ |
 | 5.2 | _pendiente_ |
@@ -303,7 +303,7 @@ aprobada.
 | Subfase 3.3 | Imágenes inline | Aprobada |
 | Etapa 4 | Caché y concurrencia crítica | En curso |
 | Subfase 4.1 | Consultas y validación PDF | Aprobada |
-| Subfase 4.2 | Descarga PDF | Pendiente |
+| Subfase 4.2 | Descarga PDF | Aprobada |
 | Subfase 4.3 | Resolución y single-flight | Pendiente |
 | Etapa 5 | Cierre integral | Pendiente |
 | Subfase 5.1 | JVM, build y lint | Pendiente |

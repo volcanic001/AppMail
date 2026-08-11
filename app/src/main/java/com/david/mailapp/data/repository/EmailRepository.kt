@@ -5,7 +5,6 @@ import android.util.Log
 import com.david.mailapp.data.local.MailDatabase
 import com.david.mailapp.data.local.entity.EmailEntity
 import com.david.mailapp.data.pdf.PdfCacheManager
-import com.david.mailapp.data.pdf.PdfDownloadFailure
 import com.david.mailapp.data.pdf.PdfDownloadState
 import com.david.mailapp.data.remote.provider.BodyFetchResult
 import com.david.mailapp.data.remote.provider.EmailLookupFailureReason
@@ -27,8 +26,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 
-// DEBUG_PERF
-private const val REPO_TAG = "MailPerfTrace"
 private const val RESOLVE_TAG = "EmailResolve"
 private fun repoNow() = SystemClock.elapsedRealtime()
 
@@ -63,10 +60,8 @@ class EmailRepository(
     private val contentCoordinator = EmailContentCoordinator(dao, providerFactory, writeGuard)
 
     /** PDF cache queries and binary validation. */
-    private val pdfCoordinator = EmailPdfCoordinator(pdfCacheManager, MAX_PDF_SIZE)
-
-    /** Current provider — read via factory every time so it stays fresh after sign-in/sign-out. */
-    private val provider: EmailProvider? get() = providerFactory()
+    private val pdfCoordinator =
+        EmailPdfCoordinator(pdfCacheManager, MAX_PDF_SIZE, providerFactory, writeGuard)
 
     /** Single-flight pending resolutions keyed by (sessionGeneration, emailId). Cleaned up on completion, cancellation, or session change. */
     private val pendingResolutions = ConcurrentHashMap<Pair<Long, String>, CompletableDeferred<EmailResolutionResult>>()
@@ -294,104 +289,7 @@ class EmailRepository(
     suspend fun downloadPdf(
         emailId: String,
         metadata: PdfAttachmentMetadata
-    ): PdfDownloadState {
-        // ── Pre-validación ──────────────────────────────────────
-        if (metadata.mimeType != "application/pdf") {
-            return PdfDownloadState.Error(PdfDownloadFailure.INVALID_PDF)
-        }
-        if (!metadata.fileName.endsWith(".pdf", ignoreCase = true)) {
-            return PdfDownloadState.Error(PdfDownloadFailure.INVALID_PDF)
-        }
-        if (metadata.attachmentId.isBlank()) {
-            return PdfDownloadState.Error(PdfDownloadFailure.INVALID_PDF)
-        }
-        val declaredSize = metadata.sizeBytes
-        if (declaredSize != null && declaredSize > MAX_PDF_SIZE) {
-            Log.w(REPO_TAG, "[PDF_DOWNLOAD] DECLARED_TOO_LARGE emailId=$emailId " +
-                "attachmentId=${metadata.attachmentId} declaredSize=$declaredSize")
-            return PdfDownloadState.Error(PdfDownloadFailure.TOO_LARGE)
-        }
-
-        // Capture before any cache mutation or network request. A lease obtained
-        // after the download could belong to a different, newly signed-in account.
-        val lease = writeGuard.capture()
-            ?: return PdfDownloadState.Error(PdfDownloadFailure.NO_PROVIDER)
-
-        // ── Cache check ─────────────────────────────────────────
-        val stableId = metadata.stableId
-        val cachedFile = pdfCacheManager.getCachedFile(emailId, stableId)
-        if (cachedFile != null && pdfCoordinator.isValidPdfFile(cachedFile)) {
-            Log.d(REPO_TAG, "[PDF_DOWNLOAD] CACHE_HIT emailId=$emailId " +
-                "attachmentId=${metadata.attachmentId} size=${cachedFile.length()}")
-            return PdfDownloadState.Ready(cachedFile.length())
-        }
-        // Cache inválido — limpiar
-        if (cachedFile != null) {
-            Log.d(REPO_TAG, "[PDF_DOWNLOAD] CACHE_INVALID removing emailId=$emailId " +
-                "attachmentId=${metadata.attachmentId}")
-            val removed = writeGuard.commit(lease) {
-                cachedFile.delete()
-                pdfCacheManager.delete(emailId, stableId)
-                true
-            } ?: false
-            if (!removed) {
-                return PdfDownloadState.Error(PdfDownloadFailure.NO_PROVIDER)
-            }
-        }
-
-        // ── Download ────────────────────────────────────────────
-        val p = provider
-        if (p == null) {
-            return PdfDownloadState.Error(PdfDownloadFailure.NO_PROVIDER)
-        }
-
-        val bytes: ByteArray
-        try {
-            Log.d(REPO_TAG, "[PDF_DOWNLOAD] DOWNLOADING emailId=$emailId " +
-                "attachmentId=${metadata.attachmentId}")
-            bytes = p.downloadAttachment(emailId, metadata.attachmentId)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            Log.e(REPO_TAG, "[PDF_DOWNLOAD] NETWORK_ERROR emailId=$emailId " +
-                "attachmentId=${metadata.attachmentId} error=${e.message}", e)
-            return PdfDownloadState.Error(PdfDownloadFailure.NETWORK)
-        }
-
-        // ── Post-validación ─────────────────────────────────────
-        if (bytes.isEmpty()) {
-            Log.w(REPO_TAG, "[PDF_DOWNLOAD] EMPTY_CONTENT emailId=$emailId " +
-                "attachmentId=${metadata.attachmentId}")
-            return PdfDownloadState.Error(PdfDownloadFailure.EMPTY_CONTENT)
-        }
-
-        if (bytes.size.toLong() > MAX_PDF_SIZE) {
-            Log.w(REPO_TAG, "[PDF_DOWNLOAD] ACTUAL_TOO_LARGE emailId=$emailId " +
-                "attachmentId=${metadata.attachmentId} actualSize=${bytes.size}")
-            return PdfDownloadState.Error(PdfDownloadFailure.TOO_LARGE)
-        }
-
-        if (!pdfCoordinator.hasPdfMagic(bytes)) {
-            Log.w(REPO_TAG, "[PDF_DOWNLOAD] INVALID_PDF emailId=$emailId " +
-                "attachmentId=${metadata.attachmentId} firstBytes=${bytes.take(5).joinToString("") { "%02x".format(it) }}")
-            return PdfDownloadState.Error(PdfDownloadFailure.INVALID_PDF)
-        }
-
-        // ── Store ───────────────────────────────────────────────
-        return try {
-            val file = writeGuard.commit(lease) { pdfCacheManager.store(emailId, stableId, bytes) }
-                ?: return PdfDownloadState.Error(PdfDownloadFailure.NO_PROVIDER)
-            Log.d(REPO_TAG, "[PDF_DOWNLOAD] SUCCESS emailId=$emailId " +
-                "attachmentId=${metadata.attachmentId} size=${file.length()}")
-            PdfDownloadState.Ready(file.length())
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            Log.e(REPO_TAG, "[PDF_DOWNLOAD] CACHE_WRITE_ERROR emailId=$emailId " +
-                "attachmentId=${metadata.attachmentId} error=${e.message}", e)
-            PdfDownloadState.Error(PdfDownloadFailure.CACHE_WRITE)
-        }
-    }
+    ): PdfDownloadState = pdfCoordinator.downloadPdf(emailId, metadata)
 
     /**
      * Consulta si un PDF ya está descargado y válido en caché,
