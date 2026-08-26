@@ -380,6 +380,15 @@ class EmailDetailPresentationTest {
             .perform(WaitForWebViewProgress(100))
             .perform(ViewActions.longClick())
 
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            runCatching {
+                composeRule.onNodeWithText(context.getString(R.string.image_open))
+                    .fetchSemanticsNode()
+                true
+            }.getOrDefault(false)
+        }
+        composeRule.waitForIdle()
+
         composeRule.onNodeWithText(context.getString(R.string.image_open))
             .assertIsDisplayed()
         composeRule.onNodeWithText(context.getString(R.string.image_save))

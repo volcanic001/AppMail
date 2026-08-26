@@ -1,0 +1,30 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<testsuite name="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" tests="22" failures="0" errors="0" skipped="0" time="66.589" timestamp="2026-08-26T04:32:59" hostname="localhost">
+  <properties>
+    <property name="device" value="Pixel 9 - 17" />
+    <property name="flavor" value="" />
+    <property name="project" value=":app" />
+  </properties>
+  <testcase name="s03_simpleDark_initial" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="3.649" />
+  <testcase name="s08_dataImageRemoteBlocked_light" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="2.224" />
+  <testcase name="s16_release_andReopen_createsNewInstance" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="3.511" />
+  <testcase name="s04_newsletterLight_initial" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="2.271" />
+  <testcase name="s13_imagePolicyChange_enabledToBlocked" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="3.047" />
+  <testcase name="s09_externalLink_opensCustomTab_andDetailSurvives" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="5.576" />
+  <testcase name="s07_remoteImageBlocked_light" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="2.263" />
+  <testcase name="bodyPending_keepsWebViewMounted_andLoadsWhenBodyArrives" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="1.63" />
+  <testcase name="s12_themeChange_lightToDark" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="3.052" />
+  <testcase name="algorithmicDarkening_followsIsDark" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="2.905" />
+  <testcase name="s15_longPress_onDataImage_deliversExactDataUrl" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="3.692" />
+  <testcase name="s11_bodyChange_simpleToNewsletter_light" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="3.093" />
+  <testcase name="canonicalFixtures_loadSequentially_inSameWebView" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="4.077" />
+  <testcase name="s06_remoteImageEnabled_light" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="2.326" />
+  <testcase name="s01_bodyNullToSimple_light_loadsAndTraces" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="2.511" />
+  <testcase name="s14_longNewsletter_scrollAndLifecycle_restoresScrollWithoutReload" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="4.985" />
+  <testcase name="hardeningViewportAndZoomSettings_matchBaseline" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="1.772" />
+  <testcase name="networkBlocking_followsShowImagesAcrossRecomposition" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="2.797" />
+  <testcase name="s02_simpleLight_initial" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="2.213" />
+  <testcase name="s10_equivalentRecomposition_noReload" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="1.866" />
+  <testcase name="s05_newsletterDark_initial" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="2.18" />
+  <testcase name="replacedDocument_doesNotDispatchStaleCallback" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="2.195" />
+</testsuite>

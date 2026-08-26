@@ -1,0 +1,42 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<testsuite name="com.david.mailapp.feature.emaildetail.EmailDetailPresentationTest" tests="34" failures="0" errors="0" skipped="0" time="74.401" timestamp="2026-08-24T23:36:19" hostname="localhost">
+  <properties>
+    <property name="device" value="Medium_Phone_API_36.1(AVD) - 16" />
+    <property name="flavor" value="" />
+    <property name="project" value=":app" />
+  </properties>
+  <testcase name="imageLongPress_opensActionMenuAndFullscreen" classname="com.david.mailapp.feature.emaildetail.EmailDetailPresentationTest" time="11.627" />
+  <testcase name="bodyErrorWithoutAttachments_showsErrorWithoutPdfActions" classname="com.david.mailapp.feature.emaildetail.EmailDetailPresentationTest" time="3.828" />
+  <testcase name="retryableResolutionError_showsMessageAndForwardsRetry" classname="com.david.mailapp.feature.emaildetail.EmailDetailPresentationTest" time="3.616" />
+  <testcase name="nonRetryableResolutionError_hidesRetry" classname="com.david.mailapp.feature.emaildetail.EmailDetailPresentationTest" time="3.949" />
+  <testcase name="bodyErrorWithAttachment_forwardsPdfCallbacksAndSavingState" classname="com.david.mailapp.feature.emaildetail.EmailDetailPresentationTest" time="3.371" />
+  <testcase name="replyForwardAndBack_areForwardedOnlyInReady" classname="com.david.mailapp.feature.emaildetail.EmailDetailPresentationTest" time="7.325" />
+  <testcase name="expandedHeader_consumesBackBeforeOuterHandler" classname="com.david.mailapp.feature.emaildetail.EmailDetailPresentationTest" time="4.981" />
+  <testcase name="loading_showsProgressAndDisablesReplyForward" classname="com.david.mailapp.feature.emaildetail.EmailDetailPresentationTest" time="3.754" />
+  <testcase name="matrix_trash_absent_email_resolves_and_persists" classname="com.david.mailapp.feature.emaildetail.EmailDetailIntegrationTest" time="1.548" />
+  <testcase name="absentEmail_recovered_and_persisted" classname="com.david.mailapp.feature.emaildetail.EmailDetailIntegrationTest" time="0.049" />
+  <testcase name="accountChange_duringResolution_showsAccountChanged_withoutObservingOldRoom" classname="com.david.mailapp.feature.emaildetail.EmailDetailIntegrationTest" time="0.073" />
+  <testcase name="matrix_sent_absent_email_resolves_and_persists" classname="com.david.mailapp.feature.emaildetail.EmailDetailIntegrationTest" time="0.032" />
+  <testcase name="matrix_email_absent_from_room_doesNotContaminate_inbox_or_trash" classname="com.david.mailapp.feature.emaildetail.EmailDetailIntegrationTest" time="0.002" />
+  <testcase name="matrix_inbox_absent_email_resolves_and_persists" classname="com.david.mailapp.feature.emaildetail.EmailDetailIntegrationTest" time="0.028" />
+  <testcase name="matrix_trash_sent_absent_email_resolves_and_persists" classname="com.david.mailapp.feature.emaildetail.EmailDetailIntegrationTest" time="0.056" />
+  <testcase name="retry_afterRecoverableFailure_succeeds" classname="com.david.mailapp.feature.emaildetail.EmailDetailIntegrationTest" time="0.036" />
+  <testcase name="cachedEmail_opens_withoutRemoteCall" classname="com.david.mailapp.feature.emaildetail.EmailDetailIntegrationTest" time="0.003" />
+  <testcase name="matrix_archived_absent_email_resolves_and_persists" classname="com.david.mailapp.feature.emaildetail.EmailDetailIntegrationTest" time="0.031" />
+  <testcase name="remote_404_returns_notFound" classname="com.david.mailapp.feature.emaildetail.EmailDetailIntegrationTest" time="0.033" />
+  <testcase name="providerIgnoresCancellationAndReturnsLateDoesNotModifyState" classname="com.david.mailapp.feature.emaildetail.EmailDetailCancellationTest" time="0.167" />
+  <testcase name="abandonDetailDuringPdfDownloadCancelsNetworkAndDoesNotCreateFileOrEmitOpenSave" classname="com.david.mailapp.feature.emaildetail.EmailDetailCancellationTest" time="0.195" />
+  <testcase name="pdfCommittedBeforeDismissalRemainsValidInCache" classname="com.david.mailapp.feature.emaildetail.EmailDetailCancellationTest" time="0.165" />
+  <testcase name="bodyCancellationKeepsPreparingStateAndDoesNotWriteRoom" classname="com.david.mailapp.feature.emaildetail.EmailDetailCancellationTest" time="0.175" />
+  <testcase name="abandonDetailDuringBodyFetchCancelsCallAndDoesNotModifyRoomOrState" classname="com.david.mailapp.feature.emaildetail.EmailDetailCancellationTest" time="0.168" />
+  <testcase name="inlineCancellationKeepsPendingReadyStateAndDoesNotWriteFallback" classname="com.david.mailapp.feature.emaildetail.EmailDetailCancellationTest" time="0.163" />
+  <testcase name="abandonDetailDuringInlineImagesDoesNotWriteFallbackOrDataImage" classname="com.david.mailapp.feature.emaildetail.EmailDetailCancellationTest" time="0.201" />
+  <testcase name="read_failure_is_presented_as_localized_snackbar" classname="com.david.mailapp.feature.emaildetail.EmailDetailReadFailureEffectTest" time="2.425" />
+  <testcase name="nonRetryableBodyError_hidesRetry" classname="com.david.mailapp.feature.emaildetail.components.EmailDetailStateContentTest" time="2.634" />
+  <testcase name="bodyErrorWithPdf_forwardsOpenAndSaveCallbacks" classname="com.david.mailapp.feature.emaildetail.components.EmailDetailStateContentTest" time="3.825" />
+  <testcase name="retryableBodyError_showsMessageAndInvokesRetryOnce" classname="com.david.mailapp.feature.emaildetail.components.EmailDetailStateContentTest" time="3.326" />
+  <testcase name="fullscreenImage_decodesAndClosesOnTap" classname="com.david.mailapp.feature.emaildetail.components.ImageOverlaysTest" time="2.623" />
+  <testcase name="actionSheet_openForwardsUrlAndDismissesMenu" classname="com.david.mailapp.feature.emaildetail.components.ImageOverlaysTest" time="4.058" />
+  <testcase name="fullscreenImage_invalidDataShowsErrorAndClosesOnTap" classname="com.david.mailapp.feature.emaildetail.components.ImageOverlaysTest" time="3.033" />
+  <testcase name="actionSheet_backDismissesMenu" classname="com.david.mailapp.feature.emaildetail.components.ImageOverlaysTest" time="3.697" />
+</testsuite>

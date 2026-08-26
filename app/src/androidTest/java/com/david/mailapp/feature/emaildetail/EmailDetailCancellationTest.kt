@@ -257,11 +257,14 @@ class EmailDetailCancellationTest {
         // Clear viewModelStore
         viewModelStore.clear()
 
-        // Complete the gate
-        pdfGate.complete(Unit)
-        delay(50)
+        // Observe cancellation before releasing the provider gate. Completing
+        // the gate first races normal completion against viewModelScope teardown.
+        awaitCondition("pdf download cancellation") {
+            provider.wasCancelledDownloadAttachment
+        }
 
-        assertTrue(provider.wasCancelledDownloadAttachment)
+        // Release any residual waiter after cancellation has been observed.
+        pdfGate.complete(Unit)
 
         // Verify file does not exist
         val targetFile = pdfCache.getCachedFile(emailWithPdf.id, "stable-1")

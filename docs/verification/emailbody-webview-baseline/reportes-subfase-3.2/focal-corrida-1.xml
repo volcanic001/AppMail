@@ -1,0 +1,30 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<testsuite name="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" tests="22" failures="0" errors="0" skipped="0" time="100.677" timestamp="2026-08-26T01:17:59" hostname="localhost">
+  <properties>
+    <property name="device" value="Medium_Phone_API_36.1(AVD) - 16" />
+    <property name="flavor" value="" />
+    <property name="project" value=":app" />
+  </properties>
+  <testcase name="s03_simpleDark_initial" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="4.875" />
+  <testcase name="s08_dataImageRemoteBlocked_light" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="3.57" />
+  <testcase name="s16_release_andReopen_createsNewInstance" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="5.753" />
+  <testcase name="s04_newsletterLight_initial" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="3.315" />
+  <testcase name="s13_imagePolicyChange_enabledToBlocked" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="3.953" />
+  <testcase name="s09_externalLink_opensCustomTab_andDetailSurvives" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="14.589" />
+  <testcase name="s07_remoteImageBlocked_light" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="3.861" />
+  <testcase name="bodyPending_keepsWebViewMounted_andLoadsWhenBodyArrives" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="2.482" />
+  <testcase name="s12_themeChange_lightToDark" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="3.828" />
+  <testcase name="algorithmicDarkening_followsIsDark" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="4.02" />
+  <testcase name="s15_longPress_onDataImage_deliversExactDataUrl" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="4.647" />
+  <testcase name="s11_bodyChange_simpleToNewsletter_light" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="4.082" />
+  <testcase name="canonicalFixtures_loadSequentially_inSameWebView" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="5.121" />
+  <testcase name="s06_remoteImageEnabled_light" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="3.75" />
+  <testcase name="s01_bodyNullToSimple_light_loadsAndTraces" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="2.942" />
+  <testcase name="s14_longNewsletter_scrollAndLifecycle_restoresScrollWithoutReload" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="6.09" />
+  <testcase name="hardeningViewportAndZoomSettings_matchBaseline" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="2.972" />
+  <testcase name="networkBlocking_followsShowImagesAcrossRecomposition" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="4.337" />
+  <testcase name="s02_simpleLight_initial" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="3.282" />
+  <testcase name="s10_equivalentRecomposition_noReload" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="3.158" />
+  <testcase name="s05_newsletterDark_initial" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="3.379" />
+  <testcase name="replacedDocument_doesNotDispatchStaleCallback" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="3.274" />
+</testsuite>

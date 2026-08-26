@@ -1,0 +1,14 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<testsuite name="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" tests="6" failures="0" errors="0" skipped="0" time="40.239" timestamp="2026-08-25T15:21:48" hostname="localhost">
+  <properties>
+    <property name="device" value="Medium_Phone_API_36.1(AVD) - 16" />
+    <property name="flavor" value="" />
+    <property name="project" value=":app" />
+  </properties>
+  <testcase name="bodyPending_keepsWebViewMounted_andLoadsWhenBodyArrives" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="8.22" />
+  <testcase name="algorithmicDarkening_followsIsDark" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="6.335" />
+  <testcase name="canonicalFixtures_loadSequentially_inSameWebView" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="7.644" />
+  <testcase name="hardeningViewportAndZoomSettings_matchBaseline" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="5.24" />
+  <testcase name="networkBlocking_followsShowImagesAcrossRecomposition" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="5.658" />
+  <testcase name="replacedDocument_doesNotDispatchStaleCallback" classname="com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest" time="4.945" />
+</testsuite>
