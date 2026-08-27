@@ -367,3 +367,67 @@ en commits.
 construya la matriz de equivalencia sin tomar decisiones nuevas. Commit aislado
 creado únicamente con los dos documentos permitidos
 (`arquitectura-propiedad-estado.md` y `registro-tecnico.md`).
+
+---
+
+## 12. Subfase 1.3 — Matriz de equivalencia
+
+Fecha de ejecución: 2026-08-27T10:59:00-0600 (CST)
+Ejecutor: DeepSeek V4 Pro
+Revisión: DeepSeek V4 Pro (modo auditoría)
+Naturaleza: solo documental (no mueve código ni cambia lógica).
+
+### 12.1 Estado inicial verificado
+
+| Campo | Valor |
+|---|---|
+| Rama | `main` |
+| HEAD | `1251f06e43e62a349979e0e9233c85ffbc29332a` (coincide con el plan cerrado) |
+| origin/main | `8ab343440c2a36a81bbd053439aedfe8790f33e5` |
+| Divergencia | `main` adelante 3 commits (`bb1a415`, `a21b11c`, `1251f06`), todos documentales |
+| Staging | vacío |
+| Untracked | vacío |
+
+### 12.2 Hashes de los tres archivos ajenos protegidos (SHA-256)
+
+| Archivo | SHA-256 | ¿Coincide? |
+|---|---|---|
+| `ComposeScreen.kt` | `2505050cf45aab8fc691a2b439d442a9b1a73c62c1d0a32c53bc3703469f5e69` | Sí |
+| `MainNavHost.kt` | `a6840cfc931e19185fbc29db02e11cc31152b9d719cd1b31fff564060feea088` | Sí |
+| `gradle.properties` | `3339808f9445e215b61f0e7a61ccaacc00f97ffc6e7ff0c6581ec0b79c55d476` | Sí |
+
+### 12.3 Artefactos de la subfase
+
+- Creado: `docs/verification/emailbody-webview-refactor/matriz-equivalencia.md`.
+- Actualizado: `docs/verification/emailbody-webview-refactor/registro-tecnico.md`
+  (esta entrada, sin alterar el baseline histórico).
+- El plan técnico externo `Subfase 1.3.md` ya existía en las notas privadas.
+
+### 12.4 Matriz congelada
+
+- **40 contratos** trazados a zonas (Z1–Z8) y subfases futuras:
+  34 automatizados + 6 manuales, todos con equivalencia demostrable.
+- **22 tests** mapeados a sus contratos (tabla de cobertura de la sección 4).
+- 8 zonas con subfase responsable (sección 2): Z1→5.1, Z2→2.1/2.2/2.3,
+  Z3→3.1, Z4→4.1/4.4, Z5→3.2/3.3, Z6→4.2/4.4, Z7→4.3, Z8→3.3+4.3.
+- Reglas de equivalencia no negociables reafirmadas (sección 5).
+- Defectos conocidos preservados: F02 overflow y S06 imagen remota sintética
+  (sección 6); no se corrigen.
+
+### 12.5 Verificación
+
+- `git diff --check`: sin salida.
+- `git diff --cached --check`: sin salida.
+- `git diff --cached --name-only`: solo los dos documentos de la subfase.
+- `git status --short --branch`: `## main...origin/main [ahead 3]` con los tres
+  archivos ajenos modificados (M), sin tocar.
+- SHA-256 de los tres archivos ajenos: idénticos a los registrados en 1.1.
+- Revisión manual: la matriz no autoriza cambios de lógica ni de tests para
+  aceptar regresiones.
+
+### 12.6 Resultado
+
+**GO** — la matriz queda completa y apta para iniciar la Etapa 2 (primera
+extracción real en 2.1). Ningún contrato queda sin equivalencia demostrable.
+Commit aislado creado únicamente con los dos documentos permitidos
+(`matriz-equivalencia.md` y `registro-tecnico.md`).
