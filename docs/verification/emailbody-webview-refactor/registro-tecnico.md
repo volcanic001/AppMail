@@ -2,12 +2,15 @@
 
 Subfase 1.1 — Estado inicial y protección
 Fecha de ejecución: 2026-08-27T08:40:12-0600 (CST)
+Fecha de cierre documental: 2026-08-27T08:50:00-0600 (CST)
+Commit de cierre: `bb1a415ec4572a884dc60b63c0492d3bb91e9c94`
 
 ## 1. Identidad del repositorio y entorno
 
 - Repositorio: `/Users/david/Desktop/MailApp 0.3.0 2`
 - Rama: `main`
-- HEAD: `8ab343440c2a36a81bbd053439aedfe8790f33e5`
+- HEAD inicial verificado: `8ab343440c2a36a81bbd053439aedfe8790f33e5`
+- HEAD posterior al cierre: `bb1a415ec4572a884dc60b63c0492d3bb91e9c94`
 - origin/main: `8ab343440c2a36a81bbd053439aedfe8790f33e5` (en sincronía)
 - Usuario operativo: `david`
 - Sistema: macOS 26.6.2 (Build 25G83); Darwin 25.6.0 x86_64 (iMac-de-David.local)
@@ -18,9 +21,11 @@ Fecha de ejecución: 2026-08-27T08:40:12-0600 (CST)
 
 ## 2. Estado Git y divergencia respecto de origin/main
 
-- `status --short --branch`: `## main...origin/main` con tres archivos modificados (M).
+- `status --short --branch` inicial: `## main...origin/main` con tres archivos modificados (M).
+- `status --short --branch` posterior al cierre: `## main...origin/main [ahead 1]` con los mismos tres archivos modificados (M).
 - `branch --show-current`: `main`.
-- `rev-parse HEAD`: `8ab343440c2a36a81bbd053439aedfe8790f33e5`.
+- `rev-parse HEAD` inicial: `8ab343440c2a36a81bbd053439aedfe8790f33e5`.
+- `rev-parse HEAD` posterior al cierre: `bb1a415ec4572a884dc60b63c0492d3bb91e9c94`.
 - `rev-parse origin/main`: `8ab343440c2a36a81bbd053439aedfe8790f33e5` → **sin divergencia**.
 - `log -5 --oneline --decorate`:
 
@@ -36,11 +41,24 @@ Fecha de ejecución: 2026-08-27T08:40:12-0600 (CST)
 - `diff --name-only`: únicamente los tres archivos ajenos protegidos.
 - `ls-files --others --exclude-standard`: vacío (sin archivos sin seguimiento).
 
-### Incidencia remota
+### Incidencia remota inicial
 
 El plan técnico cerrado fijó «main está un commit delante de origin/main»; en el
 momento de ejecución ambos apuntan a `8ab3434` porque el commit del baseline ya
 fue empujado. No cambia HEAD ni rama; se registra y no bloquea la subfase.
+
+### Estado remoto posterior al cierre
+
+Después del commit `docs(emailbody): record structural refactor preflight`,
+`main` queda un commit delante de `origin/main`:
+
+```
+bb1a415 (HEAD -> main) docs(emailbody): record structural refactor preflight
+8ab3434 (origin/main, origin/HEAD) docs(emailbody): establish webview baseline
+```
+
+Esta divergencia es esperada y corresponde únicamente al commit documental de
+la Subfase 1.1.
 
 ## 3. Cambios ajenos protegidos
 
@@ -251,13 +269,27 @@ repositorio y del staging. El único archivo admitido en el commit de 1.1 es
 
 **GO** — todas las comprobaciones de solo lectura pasan:
 
-- HEAD en `8ab343440c2a36a81bbd053439aedfe8790f33e5`, rama `main`.
+- HEAD inicial en `8ab343440c2a36a81bbd053439aedfe8790f33e5`, rama `main`.
+- HEAD cerrado en `bb1a415ec4572a884dc60b63c0492d3bb91e9c94`.
 - Los siete hashes iniciales permanecen idénticos (4 de referencia + 3 ajenos).
 - Baseline íntegro y con decisión GO (`resultados-subfase-4.2.md`).
-- Sin modificación de producción, pruebas ni configuración (diff limitado a los
-  tres archivos ajenos preexistentes).
+- Sin modificación de producción, pruebas ni configuración.
 - Sin archivos inesperados en el working tree ni en staging.
 
-Pendiente de cierre: aprobación explícita del usuario para crear el commit
-aislado `docs(emailbody): record structural refactor preflight`, recálculo de
-los tres hashes ajenos y registro del SHA del commit en el plan técnico externo.
+La Subfase 1.1 queda cerrada en el commit aislado
+`bb1a415ec4572a884dc60b63c0492d3bb91e9c94`
+(`docs(emailbody): record structural refactor preflight`). El plan técnico
+externo contiene el acta de cierre correspondiente.
+
+## 10. Corrección documental menor posterior
+
+Esta sección fue añadida después del cierre para eliminar ambigüedades
+detectadas durante la verificación:
+
+- Se registró explícitamente el SHA del commit de cierre.
+- Se separó el HEAD inicial del HEAD posterior al cierre.
+- Se documentó que `main` queda un commit delante de `origin/main` por el commit
+  documental de la Subfase 1.1.
+- Se confirmó la ruta externa real de los documentos privados:
+  `/Users/david/Documents/Private/Proyecto MailApp/Refactor estructural de EmailBodyWebView/`.
+- No se tocó código de producción, pruebas, configuración ni baseline histórico.
