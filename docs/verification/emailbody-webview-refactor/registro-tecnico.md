@@ -293,3 +293,77 @@ detectadas durante la verificación:
 - Se confirmó la ruta externa real de los documentos privados:
   `/Users/david/Documents/Private/Proyecto MailApp/Refactor estructural de EmailBodyWebView/`.
 - No se tocó código de producción, pruebas, configuración ni baseline histórico.
+
+---
+
+## 11. Subfase 1.2 — Arquitectura y propiedad del estado
+
+Fecha de ejecución: 2026-08-27T10:58:00-0600 (CST)
+Ejecutor: DeepSeek V4 Pro
+Revisión: DeepSeek V4 Pro (modo auditoría)
+Naturaleza: solo documental (no modifica producción, pruebas, Gradle,
+navegación, DI ni baseline histórico).
+
+### 11.1 Estado inicial verificado
+
+| Campo | Valor |
+|---|---|
+| Rama | `main` |
+| HEAD | `a21b11c964b8101a126b46786658c21307b3d49c` (coincide con el plan cerrado) |
+| origin/main | `8ab343440c2a36a81bbd053439aedfe8790f33e5` |
+| Divergencia | `main` adelante 2 commits (`bb1a415`, `a21b11c`), ambos documentales |
+| Staging | vacío (`git diff --cached --name-only` sin salida) |
+| Untracked | vacío (`git ls-files --others --exclude-standard` sin salida) |
+
+### 11.2 Hashes de los tres archivos ajenos protegidos (SHA-256)
+
+| Archivo | SHA-256 | ¿Coincide con 1.1? |
+|---|---|---|
+| `ComposeScreen.kt` | `2505050cf45aab8fc691a2b439d442a9b1a73c62c1d0a32c53bc3703469f5e69` | Sí |
+| `MainNavHost.kt` | `a6840cfc931e19185fbc29db02e11cc31152b9d719cd1b31fff564060feea088` | Sí |
+| `gradle.properties` | `3339808f9445e215b61f0e7a61ccaacc00f97ffc6e7ff0c6581ec0b79c55d476` | Sí |
+
+Los tres permanecen idénticos; no se editan, formatean, restauran ni incluyen
+en commits.
+
+### 11.3 Artefactos de la subfase
+
+- Creado: `docs/verification/emailbody-webview-refactor/arquitectura-propiedad-estado.md`.
+- Actualizado: `docs/verification/emailbody-webview-refactor/registro-tecnico.md`
+  (esta entrada, sin alterar el baseline histórico de 1.1).
+- El plan técnico externo `Subfase 1.2.md` ya existía en las notas privadas
+  (`/Users/david/Documents/Private/Proyecto MailApp/Refactor estructural de
+  EmailBodyWebView/`); no se duplica ni se versiona.
+
+### 11.4 Arquitectura congelada
+
+- Siete archivos objetivo: `EmailBodyWebView.kt` (fachada pública, 80–140
+  líneas), `EmailBodyDocument.kt`, `EmailBodyDocumentPreparation.kt`,
+  `EmailBodyWebViewRuntime.kt`, `EmailBodyWebViewHost.kt`,
+  `EmailBodyWebViewSettings.kt`, `EmailBodyWebViewClients.kt`.
+- Símbolos extraídos `internal`; sin API pública nueva.
+- `preparedDocument` ligado a `currentKey`; runtime recordado sin claves.
+- Claves Compose congeladas: `remember(currentKey)`, `LaunchedEffect(currentKey)`,
+  `DisposableEffect(traceMail)`, `DisposableEffect(lifecycleOwner)`.
+- Fórmula de `buildLoadKey` congelada (seis componentes, `body.hashCode()`).
+- Órdenes de carga y release congelados (secciones 7 del documento de
+  arquitectura).
+- Prohibidas las mejoras incidentales (`rememberUpdatedState`, cambios de URL,
+  CSS, dark mode, callbacks o pruebas).
+
+### 11.5 Verificación
+
+- `git diff --check`: sin salida (sin errores de whitespace).
+- `git diff --cached --check`: sin salida.
+- `git diff --cached --name-only`: solo los dos documentos de la subfase.
+- `git status --short --branch`: `## main...origin/main [ahead 2]` con los tres
+  archivos ajenos modificados (M), sin tocar.
+- SHA-256 de los tres archivos ajenos: idénticos a los registrados en 1.1.
+- Revisión manual: ningún documento autoriza cambios de lógica.
+
+### 11.6 Resultado
+
+**GO** — la arquitectura queda congelada y apta para que la Subfase 1.3
+construya la matriz de equivalencia sin tomar decisiones nuevas. Commit aislado
+creado únicamente con los dos documentos permitidos
+(`arquitectura-propiedad-estado.md` y `registro-tecnico.md`).
