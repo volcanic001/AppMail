@@ -580,3 +580,88 @@ Naturaleza: extracción de `buildHtml`.
 staging limpio tras el commit y ninguna diferencia funcional en la construcción
 HTML. Commit aislado creado con pathspecs explícitos. Siguiente subfase: 2.3
 (preparación asíncrona).
+
+---
+
+## 15. Subfase 2.3 — Preparación asíncrona
+
+Fecha de ejecución: 2026-08-27T22:36:00-0600 (CST)
+Ejecutor: DeepSeek V4 Pro
+Revisión: DeepSeek V4 Pro (modo auditoría)
+Naturaleza: extracción de la preparación asíncrona (corrutinas, cancelación
+Compose, estado ligado a clave y orden de trazas).
+
+### 15.1 Estado inicial verificado
+
+| Campo | Valor |
+|---|---|
+| Rama | `main` |
+| HEAD | `8e95c03d2166565e8f19fa8e5354a59925963056` (coincide con el plan cerrado) |
+| origin/main | `de48b270521144d7927bbda92c01aeac86c3904d` |
+| Divergencia | `main` adelante 1 por el commit de 2.2 |
+| Staging | vacío |
+
+### 15.2 Hashes de los tres archivos ajenos protegidos (SHA-256)
+
+| Archivo | SHA-256 | ¿Coincide? |
+|---|---|---|
+| `ComposeScreen.kt` | `2505050cf45aab8fc691a2b439d442a9b1a73c62c1d0a32c53bc3703469f5e69` | Sí |
+| `MainNavHost.kt` | `a6840cfc931e19185fbc29db02e11cc31152b9d719cd1b31fff564060feea088` | Sí |
+| `gradle.properties` | `3339808f9445e215b61f0e7a61ccaacc00f97ffc6e7ff0c6581ec0b79c55d476` | Sí |
+
+### 15.3 Cambios de implementación
+
+- Creado `EmailBodyDocumentPreparation.kt` en
+  `com.david.mailapp.feature.emaildetail.components` con:
+  `@Composable internal fun rememberPreparedEmailBodyDocument(body, currentKey,
+  showImages, isDark, surfaceArgb, onSurfaceArgb, primaryArgb, traceMail):
+  PreparedDocument?`.
+- La función conserva `remember(currentKey)`, `mutableStateOf<PreparedDocument?>(null)`,
+  `LaunchedEffect(currentKey)`, `val sourceBody = body`, `val loadKey = currentKey`,
+  `withContext(Dispatchers.Default)`, `PreparedDocument(loadKey, html)` y las
+  cuatro trazas `HTML_BUILD_*` exactas.
+- En `EmailBodyWebView.kt` el bloque fue reemplazado por la llamada con
+  argumentos nombrados; `currentKey` sigue calculándose en la fachada.
+- Movidos al nuevo archivo los imports `LaunchedEffect`, `Dispatchers` y
+  `withContext`, que ya no se usan en `EmailBodyWebView.kt`.
+
+### 15.4 Invariantes preservados
+
+- `HTML_BUILD_WAITING reason=body_pending`, `HTML_BUILD_START`,
+  `HTML_BUILD_END`, `HTML_BUILD_READY` sin cambios de nombre ni payload.
+- Orden WAITING o START → END → asignación `preparedDocument` → READY.
+- `buildHtml(...)` llamado con los mismos parámetros y orden.
+- `preparedDocument` se reinicia a `null` al cambiar `currentKey`.
+- `body == null || currentKey == null` retorna sin construir HTML.
+- La cancelación natural de `LaunchedEffect(currentKey)` sigue siendo la única
+  defensa contra resultados obsoletos (sin `rememberUpdatedState` ni guards nuevos).
+
+### 15.5 Pruebas
+
+- `./gradlew compileDebugKotlin` → **BUILD SUCCESSFUL**.
+- `./gradlew testDebugUnitTest --tests 'com.david.mailapp.feature.emaildetail.components.EmailBodyDocumentTest'`
+  → **BUILD SUCCESSFUL** (unit test existente intacto).
+- Instrumentación focal (emulador `Medium_Phone_API_36.1`, API 36, serial
+  `emulator-5554`):
+  ```
+  ANDROID_SERIAL=emulator-5554 ./gradlew connectedDebugAndroidTest --rerun-tasks \
+    -Pandroid.testInstrumentationRunnerArguments.class=...EmailBodyWebViewBaselineTest#bodyPending_keepsWebViewMounted_andLoadsWhenBodyArrives,...EmailBodyWebViewBaselineTest#replacedDocument_doesNotDispatchStaleCallback
+  ```
+  → **BUILD SUCCESSFUL, 2/2** (0 fallos, 0 errores, 0 omitidas;
+  XML `tests="2"`).
+
+### 15.6 Verificación
+
+- `git diff --check`: sin salida.
+- Diff de producción: solo extrae la preparación asíncrona y mueve los tres
+  imports; `EmailBodyWebView.kt` conserva `currentKey` en la fachada.
+- El nuevo archivo contiene las trazas `HTML_BUILD_*` sin cambios.
+- SHA-256 de los tres archivos ajenos: idénticos a los registrados.
+
+### 15.7 Resultado
+
+**GO** — compilación verde, unit test existente verde, pruebas focales
+instrumentadas de body pending y stale callback verdes (2/2), staging limpio
+tras commit, hashes protegidos intactos y sin cambios de comportamiento
+observable. Commit aislado creado con pathspecs explícitos. Siguiente subfase:
+3.1 (configuración WebSettings).

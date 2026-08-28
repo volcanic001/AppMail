@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -33,8 +32,6 @@ import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewFeature
 import com.david.mailapp.feature.emaildetail.EmailRenderTrace
 import java.lang.ref.WeakReference
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 /**
  * Renders email HTML body in a hardened WebView.
@@ -94,54 +91,16 @@ fun EmailBodyWebView(
         }
     }
 
-    // HTML parsing and Jsoup cleanup are CPU-heavy for large inline images.
-    // Prepare the document off-main while the already-mounted WebView remains
-    // hidden behind the Compose loader.
-    var preparedDocument by remember(currentKey) {
-        mutableStateOf<PreparedDocument?>(null)
-    }
-    LaunchedEffect(currentKey) {
-        val sourceBody = body
-        val loadKey = currentKey
-        if (sourceBody == null || loadKey == null) {
-            EmailRenderTrace.d(traceMail, "WV", "HTML_BUILD_WAITING", "reason=body_pending")
-            return@LaunchedEffect
-        }
-
-        val html = withContext(Dispatchers.Default) {
-            val startedAt = EmailRenderTrace.now()
-            EmailRenderTrace.d(
-                traceMail,
-                "WV",
-                "HTML_BUILD_START",
-                "loadKey=$loadKey bodyLen=${sourceBody.length}"
-            )
-            buildHtml(
-                sourceBody,
-                showImages,
-                isDark,
-                surfaceArgb,
-                onSurfaceArgb,
-                primaryArgb
-            ).also { result ->
-                EmailRenderTrace.d(
-                    traceMail,
-                    "WV",
-                    "HTML_BUILD_END",
-                    "loadKey=$loadKey htmlLen=${result.length} " +
-                        "durationMs=${EmailRenderTrace.now() - startedAt}"
-                )
-            }
-        }
-
-        preparedDocument = PreparedDocument(loadKey, html)
-        EmailRenderTrace.d(
-            traceMail,
-            "WV",
-            "HTML_BUILD_READY",
-            "loadKey=$loadKey htmlLen=${html.length}"
-        )
-    }
+    val preparedDocument = rememberPreparedEmailBodyDocument(
+        body = body,
+        currentKey = currentKey,
+        showImages = showImages,
+        isDark = isDark,
+        surfaceArgb = surfaceArgb,
+        onSurfaceArgb = onSurfaceArgb,
+        primaryArgb = primaryArgb,
+        traceMail = traceMail
+    )
 
     // Track the document actually loaded into this WebView. This is separate
     // from the body being prepared so stale visual callbacks can be rejected.
