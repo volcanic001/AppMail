@@ -505,3 +505,78 @@ Naturaleza: primera extracción real del refactor.
 intactos, staging limpio tras el commit y ningún cambio de comportamiento
 observable. Commit aislado creado con pathspecs explícitos de los archivos
 permitidos. Siguiente subfase: 2.2 (construcción HTML).
+
+---
+
+## 14. Subfase 2.2 — Construcción HTML
+
+Fecha de ejecución: 2026-08-27T22:15:00-0600 (CST)
+Ejecutor: DeepSeek V4 Flash
+Revisión: DeepSeek V4 Pro (obligatoria)
+Naturaleza: extracción de `buildHtml`.
+
+### 14.1 Estado inicial verificado
+
+| Campo | Valor |
+|---|---|
+| Rama | `main` |
+| HEAD | `de48b270521144d7927bbda92c01aeac86c3904d` (coincide con el plan cerrado) |
+| origin/main | `de48b270521144d7927bbda92c01aeac86c3904d` |
+| Divergencia | ninguna (a la par) |
+| Staging | vacío |
+
+### 14.2 Hashes de los tres archivos ajenos protegidos (SHA-256)
+
+| Archivo | SHA-256 | ¿Coincide? |
+|---|---|---|
+| `ComposeScreen.kt` | `2505050cf45aab8fc691a2b439d442a9b1a73c62c1d0a32c53bc3703469f5e69` | Sí |
+| `MainNavHost.kt` | `a6840cfc931e19185fbc29db02e11cc31152b9d719cd1b31fff564060feea088` | Sí |
+| `gradle.properties` | `3339808f9445e215b61f0e7a61ccaacc00f97ffc6e7ff0c6581ec0b79c55d476` | Sí |
+
+### 14.3 Cambios de implementación
+
+- Movido `buildHtml(...)` completo de `EmailBodyWebView.kt` a
+  `EmailBodyDocument.kt`; visibilidad `private` → `internal`, nombre, firma,
+  orden de parámetros y cuerpo intactos.
+- Movido `import org.jsoup.Jsoup` a `EmailBodyDocument.kt`; `EmailBodyWebView.kt`
+  ya no lo importa.
+- `EmailBodyDocument.kt` ahora contiene `PreparedDocument`, `buildLoadKey`,
+  `toCssRgb` y `buildHtml`.
+- `EmailHtmlCleaner.isSimpleHtml(doc)` y `EmailHtmlCleaner.clean(doc)`
+  permanecen exactamente en su posición del pipeline (mismo paquete).
+- `EmailBodyWebView.kt` sigue llamando `buildHtml(...)` sin wrapper ni alias.
+- Ningún literal HTML/CSS cambió: viewport, wrapper simple
+  (`margin:0 16px; padding-top: 20px;`), `font-size: 15px`,
+  `line-height: 1.5`, `padding: 8px 0`, `img, table { max-width: 100%; height: auto; }`,
+  regla `img:not([src^="data:"]){display:none!important}` y colores fijos
+  `rgb(224, 224, 224)` / `rgb(33, 33, 33)`.
+
+### 14.4 Pruebas
+
+- Ampliado `EmailBodyDocumentTest.kt` con 5 casos de `buildHtml`:
+  - `buildHtml_simpleHtml_wrapsCleanBodyWithSimpleMargins`.
+  - `buildHtml_newsletterDoesNotAddSimpleWrapper`.
+  - `buildHtml_darkAndLightThemesPreserveTextAndColorScheme`.
+  - `buildHtml_whenImagesBlocked_hidesRemoteButNotDataImages`.
+  - `buildHtml_whenImagesEnabled_doesNotInjectRemoteHideRule`.
+- Comando: `./gradlew testDebugUnitTest --tests 'com.david.mailapp.feature.emaildetail.components.EmailBodyDocumentTest'`
+  → **BUILD SUCCESSFUL, 9/9** (4 previos + 5 nuevos; 0 fallos, 0 errores,
+  0 omitidas; XML `tests="9"`).
+- Comando: `./gradlew compileDebugKotlin` → **BUILD SUCCESSFUL**.
+- No se ejecutó instrumentation; S04, S05, S07, S08, S12 y S13 quedan como red
+  de seguridad visual/trace para etapas posteriores.
+
+### 14.5 Verificación
+
+- `git diff --check`: sin salida.
+- Diff de producción: solo mueve `buildHtml` y el import `org.jsoup.Jsoup`.
+- `EmailBodyWebView.kt` ya no importa `org.jsoup.Jsoup`.
+- `EmailBodyDocument.kt` contiene los cuatro símbolos.
+- SHA-256 de los tres archivos ajenos: idénticos a los registrados.
+
+### 14.6 Resultado
+
+**GO** — tests JVM 9/9, compilación debug verde, hashes protegidos intactos,
+staging limpio tras el commit y ninguna diferencia funcional en la construcción
+HTML. Commit aislado creado con pathspecs explícitos. Siguiente subfase: 2.3
+(preparación asíncrona).
