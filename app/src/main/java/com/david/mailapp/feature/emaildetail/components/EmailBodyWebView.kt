@@ -7,7 +7,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
-import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.browser.customtabs.CustomTabsIntent
@@ -28,8 +27,6 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import androidx.webkit.WebSettingsCompat
-import androidx.webkit.WebViewFeature
 import com.david.mailapp.feature.emaildetail.EmailRenderTrace
 import java.lang.ref.WeakReference
 
@@ -38,10 +35,10 @@ import java.lang.ref.WeakReference
  *
  * Design decisions per the unified body-rendering spec:
  * - D2: [loadDataWithBaseURL] with null baseUrl — no relative resource resolution.
- * - D3: [WebSettings.blockNetworkLoads] = !showImages (kills all remote trackers).
- * - D4: [WebSettings.javaScriptEnabled] = false — always.
+ * - D3: `WebSettings.blockNetworkLoads` = !showImages (kills all remote trackers).
+ * - D4: `WebSettings.javaScriptEnabled` = false — always.
  * - D6: CSS-injected dark mode from [MaterialTheme.colorScheme] colors
- *   + [WebSettingsCompat.setAlgorithmicDarkeningAllowed] for content without
+ *   + `WebSettingsCompat.setAlgorithmicDarkeningAllowed` for content without
  *   its own background.
  * - D7: [WebViewClient.shouldOverrideUrlLoading] → Chrome Custom Tabs.
  * - D10: Lifecycle managed via [DisposableEffect] + [LifecycleEventObserver];
@@ -389,37 +386,6 @@ fun EmailBodyWebView(
             },
             modifier = Modifier.fillMaxSize()
         )
-    }
-}
-
-// ── WebSettings Hardening (D3, D4, D6) ──────────────────────────────
-
-private fun WebSettings.applyHardening(showImages: Boolean, isDark: Boolean) {
-    javaScriptEnabled = false
-    domStorageEnabled = false
-    allowFileAccess = false
-    allowContentAccess = false
-    allowFileAccessFromFileURLs = false
-    allowUniversalAccessFromFileURLs = false
-    mediaPlaybackRequiresUserGesture = true
-    cacheMode = WebSettings.LOAD_NO_CACHE
-    blockNetworkImage = !showImages
-    blockNetworkLoads = !showImages
-    
-    // Configuración de zoom y viewport para que los correos (especialmente newsletters con tablas)
-    // se adapten al ancho de la pantalla móvil en lugar de verse gigantes o hacer zoom por defecto.
-    useWideViewPort = true
-    loadWithOverviewMode = true
-    textZoom = 100
-    builtInZoomControls = true
-    displayZoomControls = false
-    setSupportZoom(true)
-
-    if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
-        WebSettingsCompat.setAlgorithmicDarkeningAllowed(this, isDark)
-    }
-    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-        isAlgorithmicDarkeningAllowed = isDark
     }
 }
 

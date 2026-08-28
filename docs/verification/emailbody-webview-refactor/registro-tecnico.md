@@ -665,3 +665,74 @@ instrumentadas de body pending y stale callback verdes (2/2), staging limpio
 tras commit, hashes protegidos intactos y sin cambios de comportamiento
 observable. Commit aislado creado con pathspecs explícitos. Siguiente subfase:
 3.1 (configuración WebSettings).
+
+---
+
+## 16. Subfase 3.1 — Configuración WebView
+
+Fecha de ejecución: 2026-08-27T23:30:00-0600 (CST)
+Ejecutor: DeepSeek V4 Flash
+Revisión: DeepSeek V4 Pro (obligatoria)
+Naturaleza: extracción de `WebSettings.applyHardening`.
+
+### 16.1 Estado inicial verificado
+
+| Campo | Valor |
+|---|---|
+| Rama | `main` |
+| HEAD | `58bda1d6cbf7fca5dc7c2b411bd33a6756d9153f` (coincide con el plan cerrado) |
+| origin/main | `de48b270521144d7927bbda92c01aeac86c3904d` |
+| Divergencia | `main` adelante 2 (commits de 2.2 y 2.3) |
+| Staging | vacío |
+
+### 16.2 Hashes de los tres archivos ajenos protegidos (SHA-256)
+
+| Archivo | SHA-256 | ¿Coincide? |
+|---|---|---|
+| `ComposeScreen.kt` | `2505050cf45aab8fc691a2b439d442a9b1a73c62c1d0a32c53bc3703469f5e69` | Sí |
+| `MainNavHost.kt` | `a6840cfc931e19185fbc29db02e11cc31152b9d719cd1b31fff564060feea088` | Sí |
+| `gradle.properties` | `3339808f9445e215b61f0e7a61ccaacc00f97ffc6e7ff0c6581ec0b79c55d476` | Sí |
+
+### 16.3 Cambios de implementación
+
+- Creado `EmailBodyWebViewSettings.kt` en
+  `com.david.mailapp.feature.emaildetail.components` con
+  `internal fun WebSettings.applyHardening(showImages, isDark)`.
+- Conservados nombre, firma, orden de parámetros, comentario interno y cuerpo;
+  únicamente se normalizó el whitespace final de una línea en blanco (no
+  funcional) para mantener `git diff --check` limpio.
+- Movidos al nuevo archivo los imports `android.webkit.WebSettings`,
+  `androidx.webkit.WebSettingsCompat` y `androidx.webkit.WebViewFeature`.
+- En `EmailBodyWebView.kt` se retiraron esos tres imports y se convirtieron a
+  texto literal con backticks las tres referencias KDoc que ya solo quedaban en
+  la documentación (`WebSettings.blockNetworkLoads`,
+  `WebSettings.javaScriptEnabled`, `WebSettingsCompat.setAlgorithmicDarkeningAllowed`).
+- Las dos llamadas `applyHardening(...)` (factory y update) permanecen sin cambios.
+- Ningún valor de settings cambió (C15–C31 de la matriz).
+
+### 16.4 Pruebas
+
+- `./gradlew compileDebugKotlin` → **BUILD SUCCESSFUL**.
+- Instrumentación focal (emulador `Medium_Phone_API_36.1`, API 36):
+  ```
+  ANDROID_SERIAL=emulator-5554 ./gradlew connectedDebugAndroidTest --rerun-tasks \
+    -Pandroid.testInstrumentationRunnerArguments.class=...hardeningViewportAndZoomSettings_matchBaseline,...networkBlocking_followsShowImagesAcrossRecomposition,...algorithmicDarkening_followsIsDark
+  ```
+  → **BUILD SUCCESSFUL, 3/3** (0 fallos, 0 errores, 0 omitidas;
+  XML `tests="3"`).
+
+### 16.5 Verificación
+
+- `git diff --check`: sin salida.
+- Diff de producción: solo mueve `applyHardening`, sus imports y las referencias
+  KDoc asociadas; ningún valor de settings cambió.
+- `EmailBodyWebViewSettings.kt` contiene la extensión `internal`.
+- `EmailBodyWebView.kt` sigue llamando `applyHardening` en factory y update.
+- SHA-256 de los tres archivos ajenos: idénticos a los registrados.
+
+### 16.6 Resultado
+
+**GO** — compilación verde, pruebas focales instrumentadas 3/3 verdes, hashes
+protegidos intactos, staging limpio tras commit y ningún cambio observable en
+hardening/settings. Commit aislado creado con pathspecs explícitos. Siguiente
+subfase: 3.2 (cliente de progreso).
