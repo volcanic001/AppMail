@@ -431,3 +431,77 @@ Naturaleza: solo documental (no mueve código ni cambia lógica).
 extracción real en 2.1). Ningún contrato queda sin equivalencia demostrable.
 Commit aislado creado únicamente con los dos documentos permitidos
 (`matriz-equivalencia.md` y `registro-tecnico.md`).
+
+---
+
+## 13. Subfase 2.1 — Modelo, clave y colores
+
+Fecha de ejecución: 2026-08-27T19:04:00-0600 (CST)
+Ejecutor: DeepSeek V4 Flash
+Revisión: DeepSeek V4 Pro (obligatoria)
+Naturaleza: primera extracción real del refactor.
+
+### 13.1 Estado inicial verificado
+
+| Campo | Valor |
+|---|---|
+| Rama | `main` |
+| HEAD | `2ea6b36c05a3904820225690b9d81dc2fcaf3a7b` (coincide con el plan cerrado) |
+| origin/main | `8ab343440c2a36a81bbd053439aedfe8790f33e5` |
+| Divergencia | `main` adelante 4 commits, todos documentales |
+| Staging | vacío |
+
+### 13.2 Hashes de los tres archivos ajenos protegidos (SHA-256)
+
+| Archivo | SHA-256 | ¿Coincide? |
+|---|---|---|
+| `ComposeScreen.kt` | `2505050cf45aab8fc691a2b439d442a9b1a73c62c1d0a32c53bc3703469f5e69` | Sí |
+| `MainNavHost.kt` | `a6840cfc931e19185fbc29db02e11cc31152b9d719cd1b31fff564060feea088` | Sí |
+| `gradle.properties` | `3339808f9445e215b61f0e7a61ccaacc00f97ffc6e7ff0c6581ec0b79c55d476` | Sí |
+
+### 13.3 Cambios de implementación
+
+- Creado `EmailBodyDocument.kt` en
+  `com.david.mailapp.feature.emaildetail.components` con:
+  - `internal data class PreparedDocument(val key, val html)`.
+  - `internal fun buildLoadKey(body, showImages, isDark, surfaceArgb, onSurfaceArgb, primaryArgb)`.
+  - `internal fun toCssRgb(argb): String`.
+- Eliminados de `EmailBodyWebView.kt` los tres símbolos (`private` → `internal`)
+  y los dos comentarios separadores que quedaron huérfanos (`Keys & Cache` y
+  `Helpers`).
+- `buildHtml` permanece en `EmailBodyWebView.kt` y sigue llamando a
+  `toCssRgb(...)` extraído (mismo paquete).
+- Fórmula de `buildLoadKey` intacta, incluyendo `onSurfaceArgb`.
+- `currentKey` sin cambios: sigue calculándose en la fachada con
+  `remember(body, showImages, isDark, surfaceArgb, onSurfaceArgb, primaryArgb)`.
+- No se tocaron `buildHtml`, `EmailHtmlCleaner`, `EmailDetailContent`, la
+  instrumentation baseline, Gradle, navegación ni DI.
+
+### 13.4 Pruebas
+
+- Creado `EmailBodyDocumentTest.kt` (JUnit 4 puro, 4 casos):
+  - `buildLoadKey_preservesExactComponentOrder`.
+  - `buildLoadKey_changesWhenEachComponentChanges`.
+  - `toCssRgb_ignoresAlphaAndFormatsRgb`.
+  - `preparedDocument_storesKeyAndHtml`.
+- Comando: `./gradlew testDebugUnitTest --tests 'com.david.mailapp.feature.emaildetail.components.EmailBodyDocumentTest'`
+  → **BUILD SUCCESSFUL, 4/4** (0 fallos, 0 errores, 0 omitidas; XML `tests="4"`).
+- Comando: `./gradlew compileDebugKotlin` → **BUILD SUCCESSFUL**.
+- No se ejecutó instrumentation; S10–S13 quedan como red de seguridad para
+  etapas posteriores o auditoría (según plan).
+
+### 13.5 Verificación
+
+- `git diff --check`: sin salida.
+- Diff de producción: solo elimina los tres símbolos movidos + dos comentarios
+  huérfanos; ningún literal de `buildLoadKey`, `toCssRgb` ni `buildHtml` cambió.
+- SHA-256 de los tres archivos ajenos: idénticos a los registrados.
+- Revisión manual: sin cambios de comportamiento observable; sin wrappers,
+  aliases, data classes adicionales ni nombres nuevos.
+
+### 13.6 Resultado
+
+**GO** — unit test nuevo 4/4, compilación debug verde, hashes protegidos
+intactos, staging limpio tras el commit y ningún cambio de comportamiento
+observable. Commit aislado creado con pathspecs explícitos de los archivos
+permitidos. Siguiente subfase: 2.2 (construcción HTML).

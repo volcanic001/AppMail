@@ -434,20 +434,6 @@ fun EmailBodyWebView(
     }
 }
 
-// ── Keys & Cache ────────────────────────────────────────────────────
-
-private data class PreparedDocument(val key: String, val html: String)
-
-private fun buildLoadKey(
-    body: String,
-    showImages: Boolean,
-    isDark: Boolean,
-    surfaceArgb: Int,
-    onSurfaceArgb: Int,
-    primaryArgb: Int
-): String =
-    "${body.hashCode()}_${showImages}_${isDark}_${surfaceArgb}_${onSurfaceArgb}_${primaryArgb}"
-
 // ── HTML Template (D2, D6) ──────────────────────────────────────────
 
 private fun buildHtml(
@@ -657,13 +643,4 @@ private class TraceWebChromeClient(
             )
         }
     }
-}
-
-// ── Helpers ─────────────────────────────────────────────────────────
-
-private fun toCssRgb(argb: Int): String {
-    val r = (argb shr 16) and 0xFF
-    val g = (argb shr 8) and 0xFF
-    val b = argb and 0xFF
-    return "rgb($r,$g,$b)"
 }
