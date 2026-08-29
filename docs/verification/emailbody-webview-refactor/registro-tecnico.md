@@ -736,3 +736,89 @@ Naturaleza: extracción de `WebSettings.applyHardening`.
 protegidos intactos, staging limpio tras commit y ningún cambio observable en
 hardening/settings. Commit aislado creado con pathspecs explícitos. Siguiente
 subfase: 3.2 (cliente de progreso).
+
+---
+
+## 17. Subfase 3.2 — Cliente de progreso
+
+Fecha de ejecución: 2026-08-29T17:21:00-0600 (CST)
+Ejecutor: DeepSeek V4 Flash
+Revisión: DeepSeek V4 Pro (obligatoria)
+Naturaleza: extracción de `TraceWebChromeClient`.
+
+### 17.1 Estado inicial verificado
+
+| Campo | Valor |
+|---|---|
+| Rama | `main` |
+| HEAD | `9eb65c2193eb97998e5b46c93a38d6554340c29f` |
+| origin/main | `de48b270521144d7927bbda92c01aeac86c3904d` |
+| Divergencia | `main` adelante 3 |
+| Staging | vacío |
+
+> **Nota de HEAD:** el plan fijó `9eb65c2cc068d80f196e6a7d969a7d6b7e6c2ee3`; el
+> HEAD real es `9eb65c2193eb97998e5b46c93a38d6554340c29f`. Coinciden en el
+> prefijo corto `9eb65c2`; la diferencia corresponde a la predicción del hash en
+> el plan cerrado, no a un commit distinto. Se documenta y no bloquea.
+
+### 17.2 Hashes de los tres archivos ajenos protegidos (SHA-256)
+
+| Archivo | SHA-256 | ¿Coincide? |
+|---|---|---|
+| `ComposeScreen.kt` | `2505050cf45aab8fc691a2b439d442a9b1a73c62c1d0a32c53bc3703469f5e69` | Sí |
+| `MainNavHost.kt` | `a6840cfc931e19185fbc29db02e11cc31152b9d719cd1b31fff564060feea088` | Sí |
+| `gradle.properties` | `3339808f9445e215b61f0e7a61ccaacc00f97ffc6e7ff0c6581ec0b79c55d476` | Sí |
+
+### 17.3 Cambios de implementación
+
+- Creado `EmailBodyWebViewClients.kt` en
+  `com.david.mailapp.feature.emaildetail.components` con
+  `internal class TraceWebChromeClient(traceMail, loadKey)`.
+- Conservados nombre, constructor, `lastMilestone = -1`, override
+  `onProgressChanged`, llamada `super`, cálculo de milestone y traza
+  `WV_PROGRESS` exacta.
+- Movidos al nuevo archivo los imports `android.webkit.WebChromeClient`,
+  `android.webkit.WebView` y `com.david.mailapp.feature.emaildetail.EmailRenderTrace`.
+- Retirado `import android.webkit.WebChromeClient` de `EmailBodyWebView.kt`
+  (ya no se usa).
+- `CustomTabsWebViewClient` permanece en `EmailBodyWebView.kt` (se moverá en 3.3).
+- La llamada `webView.webChromeClient = TraceWebChromeClient(traceMail, document.key)`
+  permanece intacta.
+- Sin throttling, deduplicación adicional ni eventos nuevos.
+
+### 17.4 Pruebas
+
+- `./gradlew compileDebugKotlin` → **BUILD SUCCESSFUL**.
+- Instrumentación focal (emulador `Medium_Phone_API_36.1`, API 36):
+  ```
+  ANDROID_SERIAL=emulator-5554 ./gradlew connectedDebugAndroidTest --rerun-tasks \
+    -Pandroid.testInstrumentationRunnerArguments.class=...s02_simpleLight_initial,...s16_release_andReopen_createsNewInstance
+  ```
+  → **BUILD SUCCESSFUL, 2/2** (0 fallos, 0 errores, 0 omitidas; XML `tests="2"`).
+
+### 17.5 Validación manual de trazas WV_PROGRESS
+
+Confirmado en logcat y en la evidencia publicada (`/data/local/tmp/emailbody-3.2/`):
+
+- `WV_PROGRESS` aparece con payload `loadKey=`, `progress=` y `milestone=`.
+- Aparecen al menos `milestone=0` (progress 10) y `milestone=100` (progress 100).
+- S02: hitos observados 0 y 100.
+- S16: primera carga emite hitos 0/50/75/100; tras `WV_RELEASE` y reapertura con
+  instancia nueva (`WV_FACTORY instance=23b4609`), el progreso vuelve a emitir
+  para la nueva carga (0 y 100).
+
+### 17.6 Verificación
+
+- `git diff --check`: sin salida.
+- Diff de producción: solo mueve `TraceWebChromeClient` y sus imports.
+- `CustomTabsWebViewClient` sigue en `EmailBodyWebView.kt`.
+- Ningún milestone ni payload de `WV_PROGRESS` cambió.
+- SHA-256 de los tres archivos ajenos: idénticos a los registrados.
+
+### 17.7 Resultado
+
+**GO** — compilación verde, pruebas focales instrumentadas 2/2 verdes, trazas
+`WV_PROGRESS` preservadas (milestones y payloads), hashes protegidos intactos,
+staging limpio tras commit y sin cambios observables en navegación, visual
+callbacks o lifecycle. Commit aislado creado con pathspecs explícitos. Siguiente
+subfase: 3.3 (cliente de navegación y página lista).
