@@ -976,3 +976,87 @@ Naturaleza: extracción estructural del estado runtime recordado.
 2/2 verdes, extracción estructural sin cambios funcionales, hashes protegidos
 intactos y staging limpio tras el commit. Commit aislado creado con pathspecs
 explícitos. Siguiente subfase: 4.2 (lifecycle y restauración de scroll).
+
+---
+
+## 20. Subfase 4.2 — Lifecycle y restauración de scroll
+
+Fecha de ejecución: 2026-08-30T18:38:00-0600 (CST)
+Ejecutor: DeepSeek V4 Pro
+Revisión: DeepSeek V4 Pro
+Naturaleza: extracción estructural del binding de lifecycle.
+
+### 20.1 Estado inicial verificado
+
+| Campo | Valor |
+|---|---|
+| Rama | `main` |
+| HEAD | `c6acc6f5f9d5deb482f489edda135ced1fb3e483` (commit de 4.1) |
+| origin/main | `de48b270521144d7927bbda92c01aeac86c3904d` |
+| Divergencia | `main` adelante 6 |
+| Staging | vacío |
+
+### 20.2 Hashes de los tres archivos ajenos protegidos (SHA-256)
+
+| Archivo | SHA-256 | ¿Coincide? |
+|---|---|---|
+| `ComposeScreen.kt` | `2505050cf45aab8fc691a2b439d442a9b1a73c62c1d0a32c53bc3703469f5e69` | Sí |
+| `MainNavHost.kt` | `a6840cfc931e19185fbc29db02e11cc31152b9d719cd1b31fff564060feea088` | Sí |
+| `gradle.properties` | `3339808f9445e215b61f0e7a61cca00f97ffc6e7ff0c6581ec0b79c55d476` | Sí |
+
+### 20.3 Cambios de implementación
+
+- Creado `EmailBodyWebViewLifecycle.kt` en
+  `com.david.mailapp.feature.emaildetail.components` con
+  `@Composable internal fun BindEmailBodyWebViewLifecycle(lifecycleOwner, runtimeState, traceMail)`.
+- Movido íntegro el `DisposableEffect(lifecycleOwner)` a la función, con la
+  clave `DisposableEffect(lifecycleOwner)` intacta.
+- Conservados: `ON_PAUSE` (leer WebView débil → guardar scrollY → `WV_ON_PAUSE` →
+  `onPause()`), `ON_RESUME` (`WV_ON_RESUME` → `onResume()` →
+  `WV_RESUME_VISUAL_SKIPPED` si no hay clave activa → `postVisualStateCallback`),
+  las dos protecciones `released || activeLoadKey != resumeLoadKey` (en
+  `onComplete` y en `webView.post`), `scrollTo` + `invalidate`, registro/retiro
+  del `LifecycleEventObserver` y `WV_LIFECYCLE_OBSERVER_DISPOSE`.
+- `EmailBodyWebView.kt` ahora invoca `BindEmailBodyWebViewLifecycle(...)` tras
+  crear `runtimeState`.
+- Retirados de `EmailBodyWebView.kt` los imports `Lifecycle` y
+  `LifecycleEventObserver`; la referencia KDoc `[LifecycleEventObserver]` se
+  convirtió a texto literal con backticks.
+- No se movieron factory, attach/detach, long-press, update, carga ni release
+  (pertenecen a 4.3/4.4).
+
+### 20.4 Pruebas
+
+- `./gradlew compileDebugKotlin` → **BUILD SUCCESSFUL**.
+- Instrumentación focal (emulador `Medium_Phone_API_36.1`, API 36):
+  ```
+  ANDROID_SERIAL=emulator-5554 ./gradlew connectedDebugAndroidTest --rerun-tasks \
+    -Pandroid.testInstrumentationRunnerArguments.class=...s14_longNewsletter_scrollAndLifecycle_restoresScrollWithoutReload,...s09_externalLink_opensCustomTab_andDetailSurvives
+  ```
+  - Corrida 1: **1/2** — `s14` pasó; `s09` falló con
+    `NoMatchingViewException: No views in hierarchy found matching WebView`
+    (actividad con contenido vacío `child-count=0` tras el round-trip de Custom
+    Tab). Diagnóstico: **flakiness de infraestructura** de la Custom Tab, no
+    regresión del refactor (el binding de lifecycle es byte a byte idéntico al
+    original, solo relocalizado).
+  - Re-ejecución `s09` en solitario: **1/1** verde.
+  - Corrida combinada final: **2/2** verdes (0 fallos, 0 errores, 0 omitidas;
+    XML `tests="2"`).
+- El único `LifecycleEventObserver` del código queda en
+  `EmailBodyWebViewLifecycle.kt` (la mención en `EmailBodyWebView.kt` es solo
+  KDoc).
+
+### 20.5 Verificación
+
+- `git diff --check`: sin salida.
+- Sin cambios en nombres/orden/payload de `WV_ON_PAUSE`, `WV_ON_RESUME`,
+  `WV_RESUME_VISUAL_*` y `WV_LIFECYCLE_OBSERVER_DISPOSE`.
+- SHA-256 de los tres archivos ajenos: idénticos a los registrados.
+
+### 20.6 Resultado
+
+**Subfase 4.2 CERRADA — GO.** Compilación verde, pruebas focales instrumentadas
+2/2 verdes (s14 + s09 en corrida combinada final), sin cambios funcionales,
+hashes protegidos intactos y staging limpio tras el commit. Commit aislado
+creado con pathspecs explícitos. Siguiente subfase: 4.3 (factory, attach y
+long-press).
