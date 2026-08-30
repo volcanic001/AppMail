@@ -9,11 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
@@ -93,17 +89,7 @@ fun EmailBodyWebView(
         traceMail = traceMail
     )
 
-    // Track the document actually loaded into this WebView. This is separate
-    // from the body being prepared so stale visual callbacks can be rejected.
-    var lastLoaded by remember { mutableStateOf<String?>(null) }
-    var activeLoadKey by remember { mutableStateOf<String?>(null) }
-    var loggedSkippedKey by remember { mutableStateOf<String?>(null) }
-    var loggedWaitingState by remember { mutableStateOf<String?>(null) }
-
-    // ── Lifecycle-aware scroll preservation ────────────────────
-    val savedScrollY = remember { mutableIntStateOf(0) }
-    val webViewRef = remember { mutableStateOf<WeakReference<WebView>?>(null) }
-    val released = remember { mutableStateOf(false) }
+    val runtimeState = rememberEmailBodyWebViewRuntimeState()
 
     DisposableEffect(traceMail) {
         EmailRenderTrace.d(
@@ -124,14 +110,14 @@ fun EmailBodyWebView(
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            val webView = webViewRef.value?.get()
+            val webView = runtimeState.webViewRef.value?.get()
             when (event) {
                 Lifecycle.Event.ON_PAUSE -> {
                     if (webView == null) {
                         EmailRenderTrace.d(traceMail, "WV", "WV_ON_PAUSE", "hasWebView=false")
                         return@LifecycleEventObserver
                     }
-                    savedScrollY.intValue = webView.scrollY
+                    runtimeState.savedScrollY.intValue = webView.scrollY
                     EmailRenderTrace.d(
                         traceMail,
                         "WV",
@@ -149,10 +135,10 @@ fun EmailBodyWebView(
                         traceMail,
                         "WV",
                         "WV_ON_RESUME",
-                        "hasWebView=true savedScrollY=${savedScrollY.intValue}"
+                        "hasWebView=true savedScrollY=${runtimeState.savedScrollY.intValue}"
                     )
                     webView.onResume()
-                    val resumeLoadKey = activeLoadKey
+                    val resumeLoadKey = runtimeState.activeLoadKey.value
                     if (resumeLoadKey == null) {
                         EmailRenderTrace.d(
                             traceMail,
@@ -171,21 +157,21 @@ fun EmailBodyWebView(
                                     traceMail,
                                     "WV",
                                     "WV_RESUME_VISUAL_CALLBACK",
-                                    "loadKey=$resumeLoadKey activeLoadKey=$activeLoadKey " +
-                                        "released=${released.value} requestId=$requestId"
+                                    "loadKey=$resumeLoadKey activeLoadKey=${runtimeState.activeLoadKey.value} " +
+                                        "released=${runtimeState.released.value} requestId=$requestId"
                                 )
-                                if (released.value || activeLoadKey != resumeLoadKey) return
+                                if (runtimeState.released.value || runtimeState.activeLoadKey.value != resumeLoadKey) return
                                 webView.post {
-                                    if (released.value || activeLoadKey != resumeLoadKey) {
+                                    if (runtimeState.released.value || runtimeState.activeLoadKey.value != resumeLoadKey) {
                                         return@post
                                     }
-                                    webView.scrollTo(0, savedScrollY.intValue)
+                                    webView.scrollTo(0, runtimeState.savedScrollY.intValue)
                                     webView.invalidate()
                                     EmailRenderTrace.d(
                                         traceMail,
                                         "WV",
                                         "WV_RESUME_SCROLL_APPLIED",
-                                        "scrollY=${savedScrollY.intValue}"
+                                        "scrollY=${runtimeState.savedScrollY.intValue}"
                                     )
                                 }
                             }
@@ -257,7 +243,7 @@ fun EmailBodyWebView(
                         }
                         false
                     }
-                }.also { webViewRef.value = WeakReference(it) }
+                }.also { runtimeState.webViewRef.value = WeakReference(it) }
             },
             update = { webView ->
                 val document = preparedDocument
@@ -267,8 +253,8 @@ fun EmailBodyWebView(
                     } else {
                         "html_pending:$currentKey"
                     }
-                    if (loggedWaitingState != waitingState) {
-                        loggedWaitingState = waitingState
+                    if (runtimeState.loggedWaitingState.value != waitingState) {
+                        runtimeState.loggedWaitingState.value = waitingState
                         EmailRenderTrace.d(
                             traceMail,
                             "WV",
@@ -276,20 +262,20 @@ fun EmailBodyWebView(
                             "action=wait reason=$waitingState"
                         )
                     }
-                } else if (lastLoaded != document.key) {
+                } else if (runtimeState.lastLoaded.value != document.key) {
                     EmailRenderTrace.d(
                         traceMail,
                         "WV",
                         "WV_UPDATE",
-                        "action=load previousKey=${lastLoaded ?: "none"} loadKey=${document.key} " +
+                        "action=load previousKey=${runtimeState.lastLoaded.value ?: "none"} loadKey=${document.key} " +
                             "htmlLen=${document.html.length}"
                     )
-                    lastLoaded = document.key
-                    activeLoadKey = document.key
-                    loggedSkippedKey = null
-                    loggedWaitingState = null
-                    released.value = false
-                    webViewRef.value = WeakReference(webView)
+                    runtimeState.lastLoaded.value = document.key
+                    runtimeState.activeLoadKey.value = document.key
+                    runtimeState.loggedSkippedKey.value = null
+                    runtimeState.loggedWaitingState.value = null
+                    runtimeState.released.value = false
+                    runtimeState.webViewRef.value = WeakReference(webView)
                     webView.setBackgroundColor(surfaceArgb)
                     webView.settings.applyHardening(showImages, isDark)
                     webView.webChromeClient = TraceWebChromeClient(traceMail, document.key)
@@ -298,15 +284,15 @@ fun EmailBodyWebView(
                         traceMail,
                         document.key
                     ) {
-                        if (!released.value && activeLoadKey == document.key) {
+                        if (!runtimeState.released.value && runtimeState.activeLoadKey.value == document.key) {
                             EmailRenderTrace.d(
                                 traceMail,
                                 "WV",
                                 "WV_SCROLL_RESTORE_POSTED",
-                                "loadKey=${document.key} scrollY=${savedScrollY.intValue}"
+                                "loadKey=${document.key} scrollY=${runtimeState.savedScrollY.intValue}"
                             )
                             webView.post {
-                                if (released.value || activeLoadKey != document.key) {
+                                if (runtimeState.released.value || runtimeState.activeLoadKey.value != document.key) {
                                     EmailRenderTrace.d(
                                         traceMail,
                                         "WV",
@@ -315,13 +301,13 @@ fun EmailBodyWebView(
                                     )
                                     return@post
                                 }
-                                webView.scrollTo(0, savedScrollY.intValue)
+                                webView.scrollTo(0, runtimeState.savedScrollY.intValue)
                                 webView.invalidate()
                                 EmailRenderTrace.d(
                                     traceMail,
                                     "WV",
                                     "WV_SCROLL_RESTORE_APPLIED",
-                                    "loadKey=${document.key} scrollY=${savedScrollY.intValue}"
+                                    "loadKey=${document.key} scrollY=${runtimeState.savedScrollY.intValue}"
                                 )
                                 EmailRenderTrace.d(
                                     traceMail,
@@ -336,8 +322,8 @@ fun EmailBodyWebView(
                                 traceMail,
                                 "WV",
                                 "WV_PAGE_RENDERED_IGNORED",
-                                "loadKey=${document.key} activeLoadKey=$activeLoadKey " +
-                                    "released=${released.value} reason=stale_or_released"
+                                "loadKey=${document.key} activeLoadKey=${runtimeState.activeLoadKey.value} " +
+                                    "released=${runtimeState.released.value} reason=stale_or_released"
                             )
                         }
                     }
@@ -354,8 +340,8 @@ fun EmailBodyWebView(
                         "UTF-8",
                         null
                     )
-                } else if (loggedSkippedKey != document.key) {
-                    loggedSkippedKey = document.key
+                } else if (runtimeState.loggedSkippedKey.value != document.key) {
+                    runtimeState.loggedSkippedKey.value = document.key
                     EmailRenderTrace.d(
                         traceMail,
                         "WV",
@@ -369,12 +355,12 @@ fun EmailBodyWebView(
                     traceMail,
                     "WV",
                     "WV_RELEASE",
-                    "loadKey=${activeLoadKey ?: "none"} scrollY=${webView.scrollY}"
+                    "loadKey=${runtimeState.activeLoadKey.value ?: "none"} scrollY=${webView.scrollY}"
                 )
-                savedScrollY.intValue = webView.scrollY
-                released.value = true
-                activeLoadKey = null
-                webViewRef.value = null
+                runtimeState.savedScrollY.intValue = webView.scrollY
+                runtimeState.released.value = true
+                runtimeState.activeLoadKey.value = null
+                runtimeState.webViewRef.value = null
                 webView.stopLoading()
                 webView.destroy()
             },

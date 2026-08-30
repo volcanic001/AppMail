@@ -899,3 +899,80 @@ Naturaleza: extracción de `CustomTabsWebViewClient`.
 cambios funcionales, hashes protegidos intactos y staging limpio tras el commit.
 Commit aislado creado con pathspecs explícitos. Siguiente subfase: 4.1 (estado
 runtime).
+
+---
+
+## 19. Subfase 4.1 — Estado runtime
+
+Fecha de ejecución: 2026-08-30T16:39:00-0600 (CST)
+Ejecutor: DeepSeek V4 Pro
+Revisión: DeepSeek V4 Pro
+Naturaleza: extracción estructural del estado runtime recordado.
+
+### 19.1 Estado inicial verificado
+
+| Campo | Valor |
+|---|---|
+| Rama | `main` |
+| HEAD | `1ea56ec...` (commit de 3.3) |
+| origin/main | `de48b270521144d7927bbda92c01aeac86c3904d` |
+| Divergencia | `main` adelante 5 |
+| Staging | vacío |
+
+### 19.2 Hashes de los tres archivos ajenos protegidos (SHA-256)
+
+| Archivo | SHA-256 | ¿Coincide? |
+|---|---|---|
+| `ComposeScreen.kt` | `2505050cf45aab8fc691a2b439d442a9b1a73c62c1d0a32c53bc3703469f5e69` | Sí |
+| `MainNavHost.kt` | `a6840cfc931e19185fbc29db02e11cc31152b9d719cd1b31fff564060feea088` | Sí |
+| `gradle.properties` | `3339808f9445e215b61f0e7a61ccaacc00f97ffc6e7ff0c6581ec0b79c55d476` | Sí |
+
+### 19.3 Cambios de implementación
+
+- Creado `EmailBodyWebViewRuntime.kt` en
+  `com.david.mailapp.feature.emaildetail.components` con:
+  - `internal class EmailBodyWebViewRuntimeState` con exactamente los siete
+    estados (mismos tipos Compose): `lastLoaded`, `activeLoadKey`,
+    `loggedSkippedKey`, `loggedWaitingState`, `savedScrollY` (`MutableIntState`),
+    `webViewRef` (`MutableState<WeakReference<WebView>?>`), `released`.
+  - `@Composable internal fun rememberEmailBodyWebViewRuntimeState()` que
+    recuerda el contenedor con `remember { }` (sin claves).
+- En `EmailBodyWebView.kt` las siete variables sueltas fueron reemplazadas por
+  `val runtimeState = rememberEmailBodyWebViewRuntimeState()` y todas las
+  lecturas/escrituras pasan por `runtimeState.<campo>.value/.intValue`,
+  preservando el orden lógico (load: lastLoaded → activeLoadKey → reset logs →
+  released=false → webViewRef → configuración → carga; release: scroll →
+  released=true → activeLoadKey=null → webViewRef=null → stop → destroy).
+- Retirados los imports `getValue`, `setValue`, `mutableStateOf` y
+  `mutableIntStateOf` de `EmailBodyWebView.kt` (quedaron sin uso).
+- No se extrajo lifecycle, AndroidView factory/update/release, long-press,
+  clientes ni restauración de scroll (corresponden a 4.2–4.4).
+- Payloads de trazas `WV_*` conservados textualmente (claves `activeLoadKey=`,
+  `previousKey=`, `loadKey=`, `scrollY=`, `released=` intactas).
+
+### 19.4 Pruebas
+
+- `./gradlew compileDebugKotlin` → **BUILD SUCCESSFUL**.
+- Instrumentación focal (emulador `Medium_Phone_API_36.1`, API 36):
+  ```
+  ANDROID_SERIAL=emulator-5554 ./gradlew connectedDebugAndroidTest --rerun-tasks \
+    -Pandroid.testInstrumentationRunnerArguments.class=...s02_simpleLight_initial,...s16_release_andReopen_createsNewInstance
+  ```
+  → **BUILD SUCCESSFUL, 2/2** (0 fallos, 0 errores, 0 omitidas; XML `tests="2"`).
+
+### 19.5 Verificación estática
+
+- `EmailBodyWebView.kt` ya no declara los siete estados runtime como variables
+  sueltas.
+- El contenedor mantiene los mismos tipos Compose (`MutableState`/`MutableIntState`).
+- `WebView` sigue guardado como `WeakReference`.
+- Todas las trazas `WV_*` se conservan textualmente.
+- `git diff --check`: sin salida.
+- SHA-256 de los tres archivos ajenos: idénticos a los registrados.
+
+### 19.6 Resultado
+
+**Subfase 4.1 CERRADA — GO.** Compilación verde, pruebas focales instrumentadas
+2/2 verdes, extracción estructural sin cambios funcionales, hashes protegidos
+intactos y staging limpio tras el commit. Commit aislado creado con pathspecs
+explícitos. Siguiente subfase: 4.2 (lifecycle y restauración de scroll).
