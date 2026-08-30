@@ -822,3 +822,80 @@ Confirmado en logcat y en la evidencia publicada (`/data/local/tmp/emailbody-3.2
 staging limpio tras commit y sin cambios observables en navegación, visual
 callbacks o lifecycle. Commit aislado creado con pathspecs explícitos. Siguiente
 subfase: 3.3 (cliente de navegación y página lista).
+
+---
+
+## 18. Subfase 3.3 — Cliente de navegación y página lista
+
+Fecha de ejecución: 2026-08-30T16:16:00-0600 (CST)
+Ejecutor: DeepSeek V4 Flash
+Revisión: DeepSeek V4 Pro (obligatoria)
+Naturaleza: extracción de `CustomTabsWebViewClient`.
+
+### 18.1 Estado inicial verificado
+
+| Campo | Valor |
+|---|---|
+| Rama | `main` |
+| HEAD | `3252921dd9b87d869eea897c9e9f823a71f81c34` (commit de 3.2) |
+| origin/main | `de48b270521144d7927bbda92c01aeac86c3904d` |
+| Divergencia | `main` adelante 4 |
+| Staging | vacío |
+
+### 18.2 Hashes de los tres archivos ajenos protegidos (SHA-256)
+
+| Archivo | SHA-256 | ¿Coincide? |
+|---|---|---|
+| `ComposeScreen.kt` | `2505050cf45aab8fc691a2b439d442a9b1a73c62c1d0a32c53bc3703469f5e69` | Sí |
+| `MainNavHost.kt` | `a6840cfc931e19185fbc29db02e11cc31152b9d719cd1b31fff564060feea088` | Sí |
+| `gradle.properties` | `3339808f9445e215b61f0e7a61ccaacc00f97ffc6e7ff0c6581ec0b79c55d476` | Sí |
+
+### 18.3 Cambios de implementación
+
+- Movido `CustomTabsWebViewClient` a `EmailBodyWebViewClients.kt`, junto a
+  `TraceWebChromeClient`; visibilidad `private` → `internal`.
+- Conservados `onPageStarted`, `onPageCommitVisible`, `onPageFinished`,
+  `postVisualStateCallback`, ambos overloads de `shouldOverrideUrlLoading`,
+  retorno `true`, apertura con `CustomTabsIntent`, captura de `Exception`,
+  mensajes `Log.w` y callback `onPageReady`.
+- Añadidos en `EmailBodyWebViewClients.kt` los imports: `android.content.Context`,
+  `android.graphics.Bitmap`, `android.net.Uri`, `android.util.Log`,
+  `android.webkit.WebResourceRequest`, `android.webkit.WebView`,
+  `android.webkit.WebViewClient`, `androidx.browser.customtabs.CustomTabsIntent`.
+  Las referencias calificadas `android.content.Context` y `android.net.Uri`
+  quedaron como `Context` y `Uri`.
+- Retirados de `EmailBodyWebView.kt` los imports `Bitmap`, `Log`,
+  `WebResourceRequest`, `WebViewClient` y `CustomTabsIntent`.
+- La referencia KDoc `[WebViewClient.shouldOverrideUrlLoading]` se convirtió a
+  texto literal con backticks (precedente de 3.1) por quedar huérfana.
+- La llamada `CustomTabsWebViewClient(context, traceMail, document.key) { ... }`
+  permanece intacta; la lógica del lambda `onPageReady` no se extrajo.
+- Normalizada una línea en blanco final al mover el bloque (para mantener
+  `git diff --check` limpio).
+
+### 18.4 Pruebas
+
+- `./gradlew compileDebugKotlin` → **BUILD SUCCESSFUL**.
+- Instrumentación focal (emulador `Medium_Phone_API_36.1`, API 36):
+  ```
+  ANDROID_SERIAL=emulator-5554 ./gradlew connectedDebugAndroidTest --rerun-tasks \
+    -Pandroid.testInstrumentationRunnerArguments.class=...s02_simpleLight_initial,...s16_release_andReopen_createsNewInstance
+  ```
+  → **BUILD SUCCESSFUL, 2/2** (0 fallos, 0 errores, 0 omitidas; XML `tests="2"`).
+
+### 18.5 Verificación estática
+
+- `CustomTabsWebViewClient` ya no existe en `EmailBodyWebView.kt`.
+- `CustomTabsWebViewClient` existe en `EmailBodyWebViewClients.kt` como `internal`.
+- `WV_PAGE_STARTED`, `WV_COMMIT_VISIBLE`, `WV_PAGE_FINISHED`,
+  `WV_VISUAL_REQUESTED` y `WV_VISUAL_CALLBACK` se conservan textualmente.
+- Ambos overloads de `shouldOverrideUrlLoading` siguen presentes.
+- `git diff --check`: sin salida (tras normalizar el blank line final).
+- SHA-256 de los tres archivos ajenos: idénticos a los registrados.
+
+### 18.6 Resultado
+
+**GO** — compilación verde, pruebas focales instrumentadas 2/2 verdes, sin
+cambios funcionales, hashes protegidos intactos y staging limpio tras el commit.
+Commit aislado creado con pathspecs explícitos. Siguiente subfase: 4.1 (estado
+runtime).

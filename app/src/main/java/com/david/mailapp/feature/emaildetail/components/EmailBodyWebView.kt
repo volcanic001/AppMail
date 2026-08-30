@@ -1,14 +1,9 @@
 package com.david.mailapp.feature.emaildetail.components
 
 import android.annotation.SuppressLint
-import android.graphics.Bitmap
-import android.util.Log
 import android.view.View
 import android.view.ViewGroup
-import android.webkit.WebResourceRequest
 import android.webkit.WebView
-import android.webkit.WebViewClient
-import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
@@ -39,7 +34,7 @@ import java.lang.ref.WeakReference
  * - D6: CSS-injected dark mode from [MaterialTheme.colorScheme] colors
  *   + `WebSettingsCompat.setAlgorithmicDarkeningAllowed` for content without
  *   its own background.
- * - D7: [WebViewClient.shouldOverrideUrlLoading] → Chrome Custom Tabs.
+ * - D7: `WebViewClient.shouldOverrideUrlLoading` → Chrome Custom Tabs.
  * - D10: Lifecycle managed via [DisposableEffect] + [LifecycleEventObserver];
  *   scroll position is preserved across ON_PAUSE/ON_RESUME and restored
  *   after new document loads via [postVisualStateCallback].
@@ -385,78 +380,5 @@ fun EmailBodyWebView(
             },
             modifier = Modifier.fillMaxSize()
         )
-    }
-}
-
-// ── UrlInterception (D7) ────────────────────────────────────────────
-
-private class CustomTabsWebViewClient(
-    private val ctx: android.content.Context,
-    private val traceMail: String,
-    private val loadKey: String,
-    private val onPageReady: () -> Unit
-) : WebViewClient() {
-    companion object {
-        private const val TAG = "CustomTabsWebViewClient"
-    }
-
-    override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
-        super.onPageStarted(view, url, favicon)
-        EmailRenderTrace.d(traceMail, "WV", "WV_PAGE_STARTED", "loadKey=$loadKey")
-    }
-
-    override fun onPageCommitVisible(view: WebView?, url: String?) {
-        super.onPageCommitVisible(view, url)
-        EmailRenderTrace.d(traceMail, "WV", "WV_COMMIT_VISIBLE", "loadKey=$loadKey")
-    }
-
-    override fun onPageFinished(view: WebView?, url: String?) {
-        super.onPageFinished(view, url)
-        EmailRenderTrace.d(traceMail, "WV", "WV_PAGE_FINISHED", "loadKey=$loadKey")
-        EmailRenderTrace.d(traceMail, "WV", "WV_VISUAL_REQUESTED", "loadKey=$loadKey")
-        view?.postVisualStateCallback(
-            0L,
-            object : WebView.VisualStateCallback() {
-                override fun onComplete(requestId: Long) {
-                    EmailRenderTrace.d(
-                        traceMail,
-                        "WV",
-                        "WV_VISUAL_CALLBACK",
-                        "loadKey=$loadKey requestId=$requestId"
-                    )
-                    onPageReady()
-                }
-            }
-        )
-    }
-
-    override fun shouldOverrideUrlLoading(
-        view: WebView?,
-        request: WebResourceRequest?
-    ): Boolean {
-        val url = request?.url?.toString() ?: return true
-        try {
-            CustomTabsIntent.Builder()
-                .setShowTitle(true)
-                .build()
-                .launchUrl(ctx, android.net.Uri.parse(url))
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to open link via modern WebView API", e)
-        }
-        return true
-    }
-
-    @Deprecated("Deprecated in Java")
-    override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
-        val safeUrl = url ?: return true
-        try {
-            CustomTabsIntent.Builder()
-                .setShowTitle(true)
-                .build()
-                .launchUrl(ctx, android.net.Uri.parse(safeUrl))
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to open link via legacy WebView API", e)
-        }
-        return true
     }
 }
