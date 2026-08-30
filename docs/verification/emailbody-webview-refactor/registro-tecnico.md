@@ -1240,9 +1240,9 @@ con montaje delegado a un host composable.
 
 ### 23.1 Preflight
 
-El acta externa de 4.4 (notas privadas del usuario) queda pendiente de
-resolución por el usuario; la evidencia completa ya está registrada en la
-sección 22 de este registro (tres corridas 22/22). No bloquea el inicio de 5.1.
+El acta externa de 4.4 fue completada con la evidencia de la sección 22 antes
+del cierre documental de 5.1. La documentación externa y este registro quedan
+alineados; no hay una acción pendiente atribuida al usuario.
 
 ### 23.2 Estado inicial verificado
 
