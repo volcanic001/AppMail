@@ -1002,7 +1002,7 @@ Naturaleza: extracción estructural del binding de lifecycle.
 |---|---|---|
 | `ComposeScreen.kt` | `2505050cf45aab8fc691a2b439d442a9b1a73c62c1d0a32c53bc3703469f5e69` | Sí |
 | `MainNavHost.kt` | `a6840cfc931e19185fbc29db02e11cc31152b9d719cd1b31fff564060feea088` | Sí |
-| `gradle.properties` | `3339808f9445e215b61f0e7a61cca00f97ffc6e7ff0c6581ec0b79c55d476` | Sí |
+| `gradle.properties` | `3339808f9445e215b61f0e7a61ccaacc00f97ffc6e7ff0c6581ec0b79c55d476` | Sí |
 
 ### 20.3 Cambios de implementación
 
@@ -1060,3 +1060,84 @@ Naturaleza: extracción estructural del binding de lifecycle.
 hashes protegidos intactos y staging limpio tras el commit. Commit aislado
 creado con pathspecs explícitos. Siguiente subfase: 4.3 (factory, attach y
 long-press).
+
+---
+
+## 21. Subfase 4.3 — Factory, attach y long-press
+
+Fecha de ejecución: 2026-08-30T20:03:00-0600 (CST)
+Ejecutor: DeepSeek V4 Pro
+Revisión: DeepSeek V4 Pro
+Naturaleza: extracción estructural de la creación inicial del WebView.
+
+### 21.1 Corrección documental de 4.2
+
+El plan exigía corregir en el registro de 4.2 el SHA mal transcrito de
+`gradle.properties` (truncado a 61 caracteres). Corregido al valor completo:
+`3339808f9445e215b61f0e7a61ccaacc00f97ffc6e7ff0c6581ec0b79c55d476`
+(verificado con `shasum -a 256` en esta subfase).
+
+### 21.2 Estado inicial verificado
+
+| Campo | Valor |
+|---|---|
+| Rama | `main` |
+| HEAD | `e86385c986061d6757cdb6fd9d37ac56a3044b20` (commit de 4.2) |
+| origin/main | `de48b270521144d7927bbda92c01aeac86c3904d` |
+| Divergencia | `main` adelante 7 |
+| Staging | vacío |
+
+### 21.3 Hashes de los tres archivos ajenos protegidos (SHA-256, regenerados)
+
+| Archivo | SHA-256 | ¿Coincide? |
+|---|---|---|
+| `ComposeScreen.kt` | `2505050cf45aab8fc691a2b439d442a9b1a73c62c1d0a32c53bc3703469f5e69` | Sí |
+| `MainNavHost.kt` | `a6840cfc931e19185fbc29db02e11cc31152b9d719cd1b31fff564060feea088` | Sí |
+| `gradle.properties` | `3339808f9445e215b61f0e7a61ccaacc00f97ffc6e7ff0c6581ec0b79c55d476` | Sí |
+
+### 21.4 Cambios de implementación
+
+- Creado `EmailBodyWebViewHost.kt` en
+  `com.david.mailapp.feature.emaildetail.components` con
+  `internal fun EmailBodyWebViewHost(context, runtimeState, traceMail, currentKey, surfaceArgb, showImages, isDark, onImageLongPress): WebView`.
+- Movida íntegra la creación del WebView desde `AndroidView.factory`:
+  - `instance` + traza `WV_FACTORY`;
+  - `MATCH_PARENT`, scrollbars desactivadas, `setBackgroundColor(surfaceArgb)` y
+    `applyHardening(showImages, isDark)`;
+  - listener attach/detach con payloads literales de `WV_ATTACHED`/`WV_DETACHED`;
+  - long-press: solo `IMAGE_TYPE`/`SRC_IMAGE_ANCHOR_TYPE`, rechaza URL nula/vacía,
+    entrega `hitTestResult.extra` y retorna `true` solo al despachar;
+  - `runtimeState.webViewRef.value = WeakReference(...)`.
+- `EmailBodyWebView.kt` sustituyó el cuerpo del factory por la llamada a
+  `EmailBodyWebViewHost(...)`; `AndroidView`, `update`, `onRelease`, lifecycle y
+  `Box` no se movieron.
+- Retirados de `EmailBodyWebView.kt` los imports `android.view.View`,
+  `android.view.ViewGroup` y `android.webkit.WebView` (quedaron sin uso).
+
+### 21.5 Pruebas
+
+- `./gradlew compileDebugKotlin` → **BUILD SUCCESSFUL**.
+- Instrumentación focal (emulador `Medium_Phone_API_36.1`, API 36):
+  ```
+  ANDROID_SERIAL=emulator-5554 ./gradlew connectedDebugAndroidTest --rerun-tasks \
+    -Pandroid.testInstrumentationRunnerArguments.class=...s01_bodyNullToSimple_light_loadsAndTraces,...s15_longPress_onDataImage_deliversExactDataUrl,...s16_release_andReopen_createsNewInstance
+  ```
+  → **BUILD SUCCESSFUL, 3/3** (0 fallos, 0 errores, 0 omitidas; XML `tests="3"`).
+
+### 21.6 Verificación estática
+
+- `WebView(...)`, `setOnLongClickListener` y `addOnAttachStateChangeListener`
+  solo aparecen en `EmailBodyWebViewHost.kt`.
+- `EmailBodyWebView.kt` conserva el mismo `AndroidView` y no altera `update` ni
+  `onRelease`.
+- Las trazas `WV_FACTORY`, `WV_ATTACHED` y `WV_DETACHED` mantienen nombres,
+  orden y payloads.
+- `git diff --check`: sin salida.
+- SHA-256 de los tres archivos ajenos: idénticos a los registrados.
+
+### 21.7 Resultado
+
+**Subfase 4.3 CERRADA — GO.** Compilación verde, corrida focal 3/3 verde (S01,
+S15, S16), sin cambios funcionales, hashes protegidos intactos y staging limpio
+tras el commit. Commit aislado creado con pathspecs explícitos. Siguiente
+subfase: 4.4 (update, carga y release).

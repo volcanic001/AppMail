@@ -1,9 +1,6 @@
 package com.david.mailapp.feature.emaildetail.components
 
 import android.annotation.SuppressLint
-import android.view.View
-import android.view.ViewGroup
-import android.webkit.WebView
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
@@ -115,59 +112,16 @@ fun EmailBodyWebView(
     Box(modifier = modifier) {
         AndroidView(
             factory = { ctx ->
-                WebView(ctx).apply {
-                    val instance = System.identityHashCode(this).toUInt().toString(16)
-                    EmailRenderTrace.d(
-                        traceMail,
-                        "WV",
-                        "WV_FACTORY",
-                        "instance=$instance loadKey=${currentKey ?: "none"}"
-                    )
-                    layoutParams = ViewGroup.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT
-                    )
-                    isVerticalScrollBarEnabled = false
-                    isHorizontalScrollBarEnabled = false
-                    setBackgroundColor(surfaceArgb)
-                    settings.applyHardening(showImages, isDark)
-
-                    addOnAttachStateChangeListener(
-                        object : View.OnAttachStateChangeListener {
-                            override fun onViewAttachedToWindow(view: View) {
-                                EmailRenderTrace.d(
-                                    traceMail,
-                                    "WV",
-                                    "WV_ATTACHED",
-                                    "instance=$instance width=${view.width} height=${view.height}"
-                                )
-                            }
-
-                            override fun onViewDetachedFromWindow(view: View) {
-                                EmailRenderTrace.d(
-                                    traceMail,
-                                    "WV",
-                                    "WV_DETACHED",
-                                    "instance=$instance width=${view.width} height=${view.height}"
-                                )
-                            }
-                        }
-                    )
-
-                    // Detectar long-press sobre imágenes
-                    setOnLongClickListener {
-                        val hitTestResult = this.hitTestResult
-                        if (hitTestResult.type == WebView.HitTestResult.IMAGE_TYPE ||
-                            hitTestResult.type == WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE) {
-                            val imageUrl = hitTestResult.extra
-                            if (!imageUrl.isNullOrBlank()) {
-                                onImageLongPress?.invoke(imageUrl)
-                                return@setOnLongClickListener true
-                            }
-                        }
-                        false
-                    }
-                }.also { runtimeState.webViewRef.value = WeakReference(it) }
+                EmailBodyWebViewHost(
+                    context = ctx,
+                    runtimeState = runtimeState,
+                    traceMail = traceMail,
+                    currentKey = currentKey,
+                    surfaceArgb = surfaceArgb,
+                    showImages = showImages,
+                    isDark = isDark,
+                    onImageLongPress = onImageLongPress
+                )
             },
             update = { webView ->
                 val document = preparedDocument
