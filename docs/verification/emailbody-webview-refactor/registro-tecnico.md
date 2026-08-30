@@ -1141,3 +1141,89 @@ El plan exigía corregir en el registro de 4.2 el SHA mal transcrito de
 S15, S16), sin cambios funcionales, hashes protegidos intactos y staging limpio
 tras el commit. Commit aislado creado con pathspecs explícitos. Siguiente
 subfase: 4.4 (update, carga y release).
+
+---
+
+## 22. Subfase 4.4 — Update, carga y release
+
+Fecha de ejecución: 2026-08-30T21:43:00-0600 (CST)
+Ejecutor: DeepSeek V4 Pro
+Revisión: DeepSeek V4 Pro
+Naturaleza: extracción estructural de `AndroidView.update` y `onRelease`.
+
+### 22.1 Estado inicial verificado
+
+| Campo | Valor |
+|---|---|
+| Rama | `main` |
+| HEAD | `8936637eb4077b0fd2747afc0614d966b9fb7b1b` (commit de 4.3) |
+| origin/main | `de48b270521144d7927bbda92c01aeac86c3904d` |
+| Divergencia | `main` adelante 8 |
+| Staging | vacío |
+
+### 22.2 Hashes de los tres archivos ajenos protegidos (SHA-256, regenerados)
+
+| Archivo | SHA-256 | ¿Coincide? |
+|---|---|---|
+| `ComposeScreen.kt` | `2505050cf45aab8fc691a2b439d442a9b1a73c62c1d0a32c53bc3703469f5e69` | Sí |
+| `MainNavHost.kt` | `a6840cfc931e19185fbc29db02e11cc31152b9d719cd1b31fff564060feea088` | Sí |
+| `gradle.properties` | `3339808f9445e215b61f0e7a61ccaacc00f97ffc6e7ff0c6581ec0b79c55d476` | Sí |
+
+### 22.3 Cambios de implementación
+
+- Creado `EmailBodyWebViewUpdate.kt` en
+  `com.david.mailapp.feature.emaildetail.components` con:
+  - `internal fun updateEmailBodyWebView(webView, document, currentKey, context, surfaceArgb, showImages, isDark, runtimeState, traceMail, onPageRendered)`.
+  - `internal fun releaseEmailBodyWebView(webView, runtimeState, traceMail)`.
+- Movida íntegra la lógica de `update`: ramas wait (body_pending /
+  html_pending:$currentKey con deduplicación por `loggedWaitingState`), load
+  (orden lastLoaded → activeLoadKey → reset logs → released=false →
+  WeakReference → fondo/settings → clientes → `loadDataWithBaseURL`) y skip
+  (deduplicación por `loggedSkippedKey`).
+- Conservados los guardas stale (antes del `post` y dentro del `webView.post`),
+  trazas `WV_UPDATE`, `WV_LOAD_DATA`, `WV_SCROLL_RESTORE_*`,
+  `WV_PAGE_RENDERED_*` y `loadDataWithBaseURL(null, html, "text/html", "UTF-8", null)`.
+- Movido íntegro el release con su orden: traza → guardar scroll → released=true
+  → activeLoadKey=null → referencia nula → stopLoading() → destroy().
+- `EmailBodyWebView.kt` ahora delega `update` y `onRelease` a los helpers; no se
+  movieron `AndroidView`, factory/host, lifecycle, `Box` ni preparación async.
+- Retirado de `EmailBodyWebView.kt` el import `java.lang.ref.WeakReference`
+  (quedó sin uso). La única referencia restante de carga en ese archivo es el
+  KDoc `[loadDataWithBaseURL]` (comentario).
+
+### 22.4 Pruebas — EmailBodyWebViewBaselineTest completo, 3 corridas consecutivas
+
+Comando (emulador `Medium_Phone_API_36.1`, API 36):
+```
+env ANDROID_SERIAL=emulator-5554 ./gradlew connectedDebugAndroidTest --rerun-tasks --console=plain \
+  -Pandroid.testInstrumentationRunnerArguments.class=com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest
+```
+
+| Corrida | Resultado | XML |
+|---|---|---|
+| 1 | BUILD SUCCESSFUL — **22/22** | `tests="22" failures="0" errors="0" skipped="0"` |
+| 2 | BUILD SUCCESSFUL — **22/22** | `tests="22" failures="0" errors="0" skipped="0"` |
+| 3 | BUILD SUCCESSFUL — **22/22** | `tests="22" failures="0" errors="0" skipped="0"` |
+
+- `./gradlew compileDebugKotlin` → **BUILD SUCCESSFUL**.
+- Focales validados presentes en las corridas (cada uno 1/1 por corrida): T1
+  `bodyPending_keepsWebViewMounted_andLoadsWhenBodyArrives`, T6
+  `replacedDocument_doesNotDispatchStaleCallback`, S01, S09, S10, S11, S12,
+  S13, S14 y S16 — cubren wait/load/skip, callbacks stale, cambios de
+  body/tema/imágenes, lifecycle y release/reapertura.
+
+### 22.5 Verificación
+
+- `EmailBodyWebView.kt` ya no contiene lógica wait/load/skip/release (solo el
+  KDoc `[loadDataWithBaseURL]`).
+- Los helpers contienen una única implementación de cada rama sin cambiar
+  literales de carga ni trazas.
+- `git diff --check`: sin salida.
+- SHA-256 de los tres archivos ajenos: idénticos a los registrados.
+
+### 22.6 Resultado
+
+**Subfase 4.4 CERRADA — GO.** Compilación verde, **tres corridas consecutivas
+22/22** de la suite completa focal, sin cambios funcionales, hashes protegidos
+intactos y staging limpio tras el commit. Commit aislado creado con pathspecs
+explícitos. Etapa 4 completada; siguiente subfase: 5.1 (fachada pública).
