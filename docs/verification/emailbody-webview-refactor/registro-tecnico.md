@@ -1227,3 +1227,79 @@ env ANDROID_SERIAL=emulator-5554 ./gradlew connectedDebugAndroidTest --rerun-tas
 22/22** de la suite completa focal, sin cambios funcionales, hashes protegidos
 intactos y staging limpio tras el commit. Commit aislado creado con pathspecs
 explícitos. Etapa 4 completada; siguiente subfase: 5.1 (fachada pública).
+
+---
+
+## 23. Subfase 5.1 — Fachada pública
+
+Fecha de ejecución: 2026-08-30T23:47:00-0600 (CST)
+Ejecutor: DeepSeek V4 Pro
+Revisión: DeepSeek V4 Pro
+Naturaleza: conversión de `EmailBodyWebView` en fachada pública de 80–140 líneas
+con montaje delegado a un host composable.
+
+### 23.1 Preflight
+
+El acta externa de 4.4 (notas privadas del usuario) queda pendiente de
+resolución por el usuario; la evidencia completa ya está registrada en la
+sección 22 de este registro (tres corridas 22/22). No bloquea el inicio de 5.1.
+
+### 23.2 Estado inicial verificado
+
+| Campo | Valor |
+|---|---|
+| Rama | `main` |
+| HEAD | `89f27d17f01bb5758c2eb29a448bd899234bd37d` (commit de 4.4) |
+| origin/main | `de48b270521144d7927bbda92c01aeac86c3904d` |
+| Divergencia | `main` adelante 9 |
+| Staging | vacío |
+
+### 23.3 Hashes de los tres archivos ajenos protegidos (SHA-256, regenerados)
+
+| Archivo | SHA-256 | ¿Coincide? |
+|---|---|---|
+| `ComposeScreen.kt` | `2505050cf45aab8fc691a2b439d442a9b1a73c62c1d0a32c53bc3703469f5e69` | Sí |
+| `MainNavHost.kt` | `a6840cfc931e19185fbc29db02e11cc31152b9d719cd1b31fff564060feea088` | Sí |
+| `gradle.properties` | `3339808f9445e215b61f0e7a61ccaacc00f97ffc6e7ff0c6581ec0b79c55d476` | Sí |
+
+### 23.4 Cambios de implementación
+
+- `EmailBodyWebViewHost.kt`:
+  - El factory se renombró a `internal fun createEmailBodyWebViewHost(...)`.
+  - Se creó `@Composable internal fun EmailBodyWebViewHost(context, currentKey, preparedDocument, surfaceArgb, showImages, isDark, runtimeState, traceMail, onPageRendered, onImageLongPress, modifier)` que contiene el `Box(modifier)` y el `AndroidView` completo: factory → `createEmailBodyWebViewHost`, update → `updateEmailBodyWebView`, onRelease → `releaseEmailBodyWebView`, y `Modifier.fillMaxSize()`.
+- `EmailBodyWebView.kt` (fachada pública, **121 líneas**, dentro de 80–140):
+  - Conserva firma, defaults, KDoc y `@Composable`.
+  - Obtiene `context`, `lifecycleOwner`, `MaterialTheme` y los tres ARGB.
+  - `remember(body, showImages, isDark, surfaceArgb, onSurfaceArgb, primaryArgb)` para `currentKey`.
+  - `rememberPreparedEmailBodyDocument(...)`, `rememberEmailBodyWebViewRuntimeState()`.
+  - `DisposableEffect(traceMail)` exactamente antes de `BindEmailBodyWebViewLifecycle`.
+  - Delega el montaje a `EmailBodyWebViewHost(...)`.
+- Retirados de la fachada los imports `Box`, `fillMaxSize` y `AndroidView`.
+
+### 23.5 Verificación estática
+
+- `EmailBodyWebView` es la única declaración pública del paquete; todos los
+  demás símbolos extraídos son `internal`/`private`.
+- `EmailDetailContent.kt` conserva su hash baseline
+  (`1b48e82b9af0f1322a20253741eda167c7c867bd4fb4d65425a54c161fde1002`).
+- El host conserva un único `Box`, un único `AndroidView`, factory/update/onRelease
+  y los mismos modificadores.
+- `git diff --check`: sin salida.
+
+### 23.6 Pruebas
+
+- `./gradlew compileDebugKotlin` → **BUILD SUCCESSFUL**.
+- Instrumentación focal (emulador `Medium_Phone_API_36.1`, API 36):
+  ```
+  ANDROID_SERIAL=emulator-5554 ./gradlew connectedDebugAndroidTest --rerun-tasks \
+    -Pandroid.testInstrumentationRunnerArguments.class=...s01,...s10,...s11,...s12,...s13,...s14,...s16
+  ```
+  → **BUILD SUCCESSFUL, 7/7** (0 fallos, 0 errores, 0 omitidas; XML `tests="7"`).
+
+### 23.7 Resultado
+
+**Subfase 5.1 CERRADA — GO.** Fachada pública de 121 líneas (rango 80–140),
+compilación verde, pruebas focales 7/7 verdes en una corrida, sin cambios de
+firma ni comportamiento, hashes protegidos intactos y staging limpio tras el
+commit. Commit aislado creado con pathspecs explícitos. Siguiente subfase: 5.2
+(consolidación estructural).

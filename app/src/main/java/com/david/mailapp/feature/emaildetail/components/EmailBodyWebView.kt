@@ -1,8 +1,6 @@
 package com.david.mailapp.feature.emaildetail.components
 
 import android.annotation.SuppressLint
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -11,7 +9,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
-import androidx.compose.ui.viewinterop.AndroidView
 import com.david.mailapp.feature.emaildetail.EmailRenderTrace
 
 /**
@@ -108,42 +105,17 @@ fun EmailBodyWebView(
         traceMail = traceMail
     )
 
-    Box(modifier = modifier) {
-        AndroidView(
-            factory = { ctx ->
-                EmailBodyWebViewHost(
-                    context = ctx,
-                    runtimeState = runtimeState,
-                    traceMail = traceMail,
-                    currentKey = currentKey,
-                    surfaceArgb = surfaceArgb,
-                    showImages = showImages,
-                    isDark = isDark,
-                    onImageLongPress = onImageLongPress
-                )
-            },
-            update = { webView ->
-                updateEmailBodyWebView(
-                    webView = webView,
-                    document = preparedDocument,
-                    currentKey = currentKey,
-                    context = context,
-                    surfaceArgb = surfaceArgb,
-                    showImages = showImages,
-                    isDark = isDark,
-                    runtimeState = runtimeState,
-                    traceMail = traceMail,
-                    onPageRendered = onPageRendered
-                )
-            },
-            onRelease = { webView ->
-                releaseEmailBodyWebView(
-                    webView = webView,
-                    runtimeState = runtimeState,
-                    traceMail = traceMail
-                )
-            },
-            modifier = Modifier.fillMaxSize()
-        )
-    }
+    EmailBodyWebViewHost(
+        context = context,
+        currentKey = currentKey,
+        preparedDocument = preparedDocument,
+        surfaceArgb = surfaceArgb,
+        showImages = showImages,
+        isDark = isDark,
+        runtimeState = runtimeState,
+        traceMail = traceMail,
+        onPageRendered = onPageRendered,
+        onImageLongPress = onImageLongPress,
+        modifier = modifier
+    )
 }
