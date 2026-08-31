@@ -1579,3 +1579,77 @@ nombres, orden y payload de `HTML_BUILD_*` y `WV_*` equivalentes al baseline;
 sin regresiones; defectos conocidos preservados. Commit documental aislado
 creado con pathspecs explícitos. Siguiente subfase: 6.3 (suite completa y
 Pixel 9).
+
+---
+
+## 27. Subfase 6.3 — Suite completa y Pixel 9
+
+Fecha de ejecución: 2026-08-30, CST (`-0600`).
+
+- Emulador `Medium_Phone_API_36.1`, API 36, `sys.boot_completed=1`:
+  `connectedDebugAndroidTest --rerun-tasks` terminó **306/306**, sin fallos,
+  errores ni omitidas (`BUILD SUCCESSFUL`, 8m52s). El XML declara
+  `tests="306" failures="0" errors="0" skipped="0"`.
+- Pixel 9 detectado dinámicamente como `55080DLAQ002CK`: estado `device`, API
+  37, boot completo y `wm size` físico `1080x2424`, sin override. La focal de
+  `EmailBodyWebViewBaselineTest` terminó **22/22**, sin fallos, errores ni
+  omitidas (`BUILD SUCCESSFUL`, 2m30s); XML `tests="22" failures="0"
+  errors="0" skipped="0"`.
+- Se copiaron sin modificar el dispositivo 16 trazas y 16 PNG desde
+  `/data/local/tmp/emailbody-4.1/` a un directorio temporal. Los 16 logs son
+  parseables y las capturas miden 1080×2424. S14 conserva sus capturas antes/
+  después idénticas dentro de la corrida.
+- La comparación física conserva las secuencias/payloads normalizados en 15
+  escenarios; S06 presenta el mismo contrato con `WV_COMMIT_VISIBLE` antes del
+  progreso 100, una variación temporal permitida. F02 y la imagen remota
+  sintética permanecen defectos conocidos, no regresiones.
+
+## 28. Subfase 6.4 — Auditoría y handoff final
+
+Fecha de auditoría: 2026-08-30T20:57:51-0600.
+
+### 28.1 API, consumidor y estructura
+
+- La firma pública de `EmailBodyWebView` se comparó literalmente contra
+  `2a433a67af4ea6f4f27e320133c963a408e80453`: sin cambios de nombre, orden,
+  tipos o defaults. `EmailDetailContent.kt` sigue siendo el único consumidor
+  de producción; la prueba baseline es el único consumidor de test.
+- La fachada tiene 121 líneas. El paquete final separa documento (100),
+  preparación (73), host (131), update/release (141), clients (110), lifecycle
+  (96), settings (34) y runtime (24) en helpers internos/privados. No existe
+  API pública nueva.
+- `EmailDetailContent.kt` conserva SHA-256
+  `1b48e82b9af0f1322a20253741eda167c7c867bd4fb4d65425a54c161fde1002` y
+  `EmailHtmlCleaner.kt` conserva
+  `db853aa50a6d152e4ad959fb7037d561c66aef4ee1ee93b4d488445c5fb947db`.
+
+### 28.2 Diff y evidencia
+
+- El diff comprometido desde el baseline sólo modifica/agrega los nueve
+  archivos de `feature/emaildetail/components` dedicados a esta extracción;
+  no hay cambios comprometidos en Gradle, cleaner, navegación, DI ni lógica
+  ajena al componente.
+- Las puertas aceptadas son: 593/593 JVM, build debug/release y lint (0
+  errores, 66 warnings no atribuibles); tres focales 22/22 en emulador, suite
+  completa 306/306 y Pixel 9 API 37 22/22. Los 40 contratos del baseline (34
+  automatizados y 6 manuales) permanecen aprobados.
+- S14 conserva equivalencia visual en la corrida física; S06 registra una
+  variación de temporización no contractual. F02 y la imagen remota sintética
+  no cargada siguen aceptados como defectos de referencia.
+
+### 28.3 Integridad y decisión
+
+- Antes de preparar documentación: `git diff --check` limpio y staging vacío.
+- Los cambios ajenos permanecen idénticos: `ComposeScreen.kt`
+  `2505050cf45aab8fc691a2b439d442a9b1a73c62c1d0a32c53bc3703469f5e69`,
+  `MainNavHost.kt`
+  `a6840cfc931e19185fbc29db02e11cc31152b9d719cd1b31fff564060feea088`, y
+  `gradle.properties`
+  `3339808f9445e215b61f0e7a61ccaacc00f97ffc6e7ff0c6581ec0b79c55d476`.
+- El commit documental final se limita mediante pathspecs explícitos a este
+  registro y `docs/verification/emailbody-webview-baseline/registro-tecnico.md`.
+  No se registra el SHA aquí para evitar una referencia circular dentro del
+  propio commit; consta en el acta externa de la subfase.
+
+**Subfase 6.4 CERRADA — GO.** API y consumidor conservados, responsabilidades
+separadas y las puertas funcionales, visuales y de trazas verdes.

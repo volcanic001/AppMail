@@ -380,3 +380,88 @@ automatizada y permite al Plan B distinguir con precisión sus puertas.
 B.** El commit aislado debe contener solo documentación y código/assets de
 prueba enumerados en el alcance final. La producción permanece idéntica al
 punto de partida.
+
+---
+
+## Subfase 6.3 — Suite completa y puerta Pixel 9
+
+### Ejecución real
+
+- Host: 2026-08-30T19:59:38-0600; HEAD
+  `32616dc5970fd1f4decbc3fe6cf13b06da1661d6`.
+- Emulador iniciado: `Medium_Phone_API_36.1`, serial `emulator-5554`, estado
+  `device`, `sys.boot_completed=1`, API 36.
+- Comando ejecutado:
+
+  ```sh
+  env ANDROID_SERIAL=emulator-5554 ./gradlew connectedDebugAndroidTest --rerun-tasks --console=plain
+  ```
+
+- Resultado: **306/306**, sin fallos, errores ni omitidas; `BUILD SUCCESSFUL`
+  en 8m52s. El XML
+  `app/build/outputs/androidTest-results/connected/debug/TEST-Medium_Phone_API_36.1(AVD) - 16-_app-.xml`
+  declara `tests="306" failures="0" errors="0" skipped="0"` (tiempo
+  `416.037`).
+- Los warnings de APIs/opciones deprecadas y de símbolos nativos no
+  strippeables no afectaron el resultado. No se modificó producción, tests,
+  Gradle, baseline histórico ni snapshots.
+
+### Puerta física y decisión
+
+- La detección ADB tras la corrida mostró únicamente el emulador
+  `sdk_gphone64_x86_64`; no había ningún dispositivo físico modelo `Pixel_9`.
+- En consecuencia no hubo serial físico válido para comprobar boot, API 37 o
+  override de resolución; tampoco se ejecutó la focal de 22 casos, se extrajo
+  `/data/local/tmp/emailbody-4.1/` ni se compararon artefactos S01–S16.
+- **Estado de Subfase 6.3: NO-GO por infraestructura.** El verde 306/306
+  demuestra la puerta de emulador, pero no sustituye la validación contractual
+  Pixel 9/API 37. F02 (overflow) y la imagen remota sintética no cargada
+  continúan siendo defectos conocidos, no regresiones.
+
+### Integridad
+
+- `git diff --check`: sin salida; staging vacío.
+- Cambios ajenos preservados: `ComposeScreen.kt`, `MainNavHost.kt` y
+  `gradle.properties`.
+- SHA-256 verificados: `ComposeScreen.kt`
+  `2505050cf45aab8fc691a2b439d442a9b1a73c62c1d0a32c53bc3703469f5e69`,
+  `MainNavHost.kt`
+  `a6840cfc931e19185fbc29db02e11cc31152b9d719cd1b31fff564060feea088`, y
+  `gradle.properties`
+  `3339808f9445e215b61f0e7a61ccaacc00f97ffc6e7ff0c6581ec0b79c55d476`.
+
+### Reanudación física y cierre GO
+
+- El Pixel fue conectado después del NO-GO inicial y se detectó dinámicamente
+  como `55080DLAQ002CK`: estado `device`, modelo `Pixel 9`, dispositivo
+  `tokay`, `sys.boot_completed=1`, API 37 y `wm size` físico `1080x2424` sin
+  override de tamaño ni densidad.
+- Comando ejecutado, con el serial detectado:
+
+  ```sh
+  env ANDROID_SERIAL=55080DLAQ002CK ./gradlew connectedDebugAndroidTest --rerun-tasks --console=plain \
+    -Pandroid.testInstrumentationRunnerArguments.class=com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest
+  ```
+
+- Resultado físico: **22/22**, `failures=0`, `errors=0`, `skipped=0`,
+  `BUILD SUCCESSFUL` en 2m30s. XML:
+  `app/build/outputs/androidTest-results/connected/debug/TEST-Pixel 9 - 17-_app-.xml`
+  (`time=64.917`).
+- Se extrajeron 32 artefactos, sin borrar ni modificar el dispositivo, a
+  `/private/tmp/emailbody-63.FXKg4O/`: 16 logs y 16 PNG de S01–S16. Todos los
+  PNG son 1080×2424. Los 16 logs son parseables y contienen las trazas
+  `HTML_BUILD_*`, `WV_*` y callbacks esperados.
+- La comparación con el baseline físico conserva secuencias/payloads
+  normalizados en 15 escenarios. S06 presenta la misma secuencia contractual
+  con una reordenación temporal permitida: `WV_COMMIT_VISIBLE` antes del
+  progreso 100. La prueba verde confirma que no modifica la entrega de página;
+  la imagen remota sintética permanece el defecto conocido esperado.
+- Las capturas de corridas distintas no son idénticas byte a byte; S14 cumple
+  su contrato visual dentro de la corrida: sus PNG antes/después son idénticos
+  (`aeb65889c06ddd4d2127ef03fbd8737fc6add4646ebd434307035b4d7763e87a`).
+  F02 mantiene su overflow conocido. No hay regresión funcional ni visual
+  contractual.
+
+**Subfase 6.3 CERRADA — GO:** emulador API 36, 306/306; Pixel 9 API 37,
+22/22. La condición de infraestructura inicial queda resuelta con evidencia,
+sin relajar pruebas ni alterar código.
