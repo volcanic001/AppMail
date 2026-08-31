@@ -1400,7 +1400,7 @@ Commit: `7a4087263a7d7b4ad02c533e65d97f6f7dd3cd19`
 ### 24.8 Resultado
 
 **Subfase 5.2 CERRADA — GO.** Auditoría estructural completa: una única API
-pública, 15 símbolos con implementación única, sin imports/comentarios
+pública, 16 símbolos con implementación única, sin imports/comentarios
 obsoletos que eliminar, equivalencia confirmada contra la matriz, compilación y
 JVM verdes, y corrida focal 22/22 verde (tras la flakiness S09 transitoria).
 Commit aislado documental creado con pathspecs explícitos. Siguiente subfase:
@@ -1414,6 +1414,7 @@ Fecha de ejecución: 2026-08-31T00:15:00-0600 (CST)
 Ejecutor: DeepSeek V4 Flash
 Revisión y decisión final: DeepSeek V4 Pro
 Naturaleza: verificación local no instrumentada; sin modificar producción.
+Commit: `68e5a775a7ae8406639146798b7e96baa8a67a03`
 
 ### 25.1 Estado inicial verificado
 
