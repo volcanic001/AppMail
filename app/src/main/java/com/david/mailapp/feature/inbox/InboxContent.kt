@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -27,7 +26,6 @@ import kotlinx.coroutines.delay
  * This function owns only the existing presentation/effects from [InboxScreen].
  * The public screen remains responsible for ViewModel creation and dependency wiring.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun InboxContent(
     uiState: InboxUiState,

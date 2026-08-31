@@ -61,6 +61,23 @@ Se autorizan exclusivamente estos tags no visuales para la prueba: `inbox_root`,
 | C31 | S11 | Tweens/springs de `animateItem` coinciden por inspección y captura. |
 | C32 | S11 | `showEmailDividers` cambia únicamente la visibilidad del divisor. |
 
+## Ubicación final de contratos
+
+| Contratos | Propietario final |
+|---|---|
+| C01, C03–C06 | `InboxScreen` |
+| C02 | `MainNavHost` (consumidor sin cambios) |
+| C07, C11, C22, C26–C28 | `InboxContent` |
+| C08–C09 | `InboxTopBar` |
+| C10 | `InboxContent` (padding superior) e `InboxEmailList` (padding inferior) |
+| C12–C13 | `InboxPlaceholders` |
+| C14–C18, C23, C31–C32 | `InboxEmailList` y `EmailListItem` sin cambios |
+| C19–C21 | `ActionFeedbackEffect` invocado por `InboxContent` |
+| C24–C25 | `InboxSuccessContent` |
+| C29–C30 | `InboxPaginationEffect` privado en `InboxEmailList` |
+
+Las entradas de presentación extraídas son `internal` o `private`; `InboxScreen` es la única fachada pública de la UI. Los tipos públicos preexistentes fuera de esta fachada no cambian de visibilidad.
+
 ## Capturas canónicas
 
 Las capturas se generarán con fixtures sintéticos, en modo claro y oscuro donde aplique:

@@ -1,7 +1,6 @@
 package com.david.mailapp.feature.inbox
 
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -12,7 +11,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.david.mailapp.core.di.AppContainer
 
 /** Public Inbox entry point. ViewModel creation and dependency wiring stay here. */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InboxScreen(
     listState: LazyListState,
