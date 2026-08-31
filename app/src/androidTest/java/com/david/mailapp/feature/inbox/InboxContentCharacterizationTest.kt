@@ -5,6 +5,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -76,6 +77,41 @@ class InboxContentCharacterizationTest {
         composeRule.onNodeWithTag("inbox_refresh_indicator").assertIsDisplayed()
     }
 
+    @Test
+    fun populated_list_triggers_menu_and_search_callbacks() {
+        var menuCalled = false
+        var searchCalled = false
+
+        composeRule.setContent {
+            MaterialTheme {
+                InboxContent(
+                    uiState = InboxUiState.Success(emails = listOf(testEmail("e1"))),
+                    listState = rememberLazyListState(),
+                    highlightedEmailId = null,
+                    showEmailDividers = true,
+                    onClearHighlight = {},
+                    onMenuClick = { menuCalled = true },
+                    onSearchClick = { searchCalled = true },
+                    onEmailClick = {},
+                    onRefresh = {},
+                    onLoadNextPage = {},
+                    onMoveToTrash = {},
+                    onFeedbackConsumed = {},
+                    onUndoMoveToTrash = {},
+                    snackbarHostState = SnackbarHostState()
+                )
+            }
+        }
+
+        // Tap Menu
+        composeRule.onNodeWithContentDescription("Menú").performClick()
+        // Tap Search
+        composeRule.onNodeWithContentDescription("Buscar").performClick()
+
+        assertEquals(true, menuCalled)
+        assertEquals(true, searchCalled)
+    }
+
     private fun setContent(
         state: InboxUiState,
         onRefresh: () -> Unit = {},
@@ -118,4 +154,5 @@ class InboxContentCharacterizationTest {
         labels = emptyList(),
         folder = EmailFolder.Inbox
     )
+
 }
