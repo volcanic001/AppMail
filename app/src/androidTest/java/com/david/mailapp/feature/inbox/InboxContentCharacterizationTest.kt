@@ -16,6 +16,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.swipeDown
 import androidx.test.platform.app.InstrumentationRegistry
 import com.david.mailapp.R
 import com.david.mailapp.core.localization.UiErrorReason
@@ -82,6 +83,35 @@ class InboxContentCharacterizationTest {
 
         composeRule.onNodeWithTag("inbox_list").assertIsDisplayed()
         composeRule.onNodeWithTag("inbox_refresh_indicator").assertIsDisplayed()
+    }
+
+    @Test
+    fun refreshing_empty_state_renders_indicator_list_and_empty_item() {
+        setContent(
+            InboxUiState.Success(
+                emails = emptyList(),
+                isRefreshing = true
+            )
+        )
+
+        composeRule.onNodeWithTag("inbox_list").assertIsDisplayed()
+        composeRule.onNodeWithTag("inbox_empty").assertIsDisplayed()
+        composeRule.onNodeWithTag("inbox_refresh_indicator").assertIsDisplayed()
+    }
+
+    @Test
+    fun pull_to_refresh_gesture_on_empty_state_triggers_refresh_callback() {
+        var refreshCalls = 0
+        setContent(
+            InboxUiState.Success(emails = emptyList()),
+            onRefresh = { refreshCalls++ }
+        )
+
+        composeRule.onNodeWithTag("inbox_list").performTouchInput {
+            swipeDown()
+        }
+
+        assertEquals(1, refreshCalls)
     }
 
     @Test
