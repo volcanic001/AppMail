@@ -41,3 +41,21 @@ El commit aislado de esta subfase se registra en el handoff de ejecución; no in
 | `connectedDebugAndroidTest ... InboxContentCharacterizationTest` en Pixel 9 | **5/5**, BUILD SUCCESSFUL |
 
 **GO.** La extracción estructural de 2.2 mantiene los contratos observables y deja el contenido listo para la siguiente subfase.
+
+## Resultados Subfase 2.3 — extracción de error recuperable
+
+- Se extrajo `InboxErrorContent` a `InboxStatePlaceholders.kt` como componente `internal`.
+- Se conservaron símbolo, razón localizada, espaciados, estilos y callback de reintento.
+- `InboxContent` mantiene el mismo tag `inbox_error` y el mismo flujo de `onRefresh`.
+- No se modificaron lógica de producto, estado, navegación, DI, recursos ni Gradle.
+
+### Verificación 2.3
+
+| Verificación | Resultado |
+|---|---|
+| `compileDebugKotlin --rerun-tasks` | BUILD SUCCESSFUL |
+| `testDebugUnitTest --tests com.david.mailapp.feature.inbox.* --rerun-tasks` | **28/28**, BUILD SUCCESSFUL |
+| `connectedDebugAndroidTest ... InboxContentCharacterizationTest` en emulador | **5/5**, BUILD SUCCESSFUL |
+| `connectedDebugAndroidTest ... InboxContentCharacterizationTest` en Pixel 9 | **5/5**, BUILD SUCCESSFUL |
+
+**GO.** La extracción de estados visuales recuperables conserva los contratos observables y cierra la subfase 2.3.
