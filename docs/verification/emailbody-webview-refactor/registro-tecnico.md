@@ -1488,3 +1488,93 @@ parámetro (contrato inmodificable) y `Uri.parse` en `CustomTabsWebViewClient`
 preexistentes/externos), `git diff --check` limpio y hashes protegidos intactos.
 Commit documental aislado creado con pathspecs explícitos. Siguiente subfase:
 6.2 (baseline focal en emulador).
+
+---
+
+## 26. Subfase 6.2 — Baseline focal en emulador
+
+Fecha de ejecución: 2026-08-31T01:20:00-0600 (CST)
+Ejecutor: DeepSeek V4 Flash
+Evaluación y diagnóstico: DeepSeek V4 Pro
+Naturaleza: revalidación del comportamiento completo de `EmailBodyWebView` en
+emulador (sin cambios de producción).
+
+### 26.1 Entorno
+
+| Campo | Valor |
+|---|---|
+| AVD | `Medium_Phone_API_36.1` |
+| Serial | `emulator-5554` |
+| API | 36 |
+| Estado | `device`, `sys.boot_completed=1` |
+| Evidencia persistente | `/data/local/tmp/emailbody-3.2/` (emulador) |
+
+### 26.2 Tres corridas consecutivas
+
+Comando (idéntico en las tres):
+```
+env ANDROID_SERIAL=emulator-5554 ./gradlew connectedDebugAndroidTest --rerun-tasks --console=plain \
+  -Pandroid.testInstrumentationRunnerArguments.class=com.david.mailapp.feature.emaildetail.components.EmailBodyWebViewBaselineTest
+```
+
+| Corrida | Resultado | Duración | XML |
+|---|---|---|---|
+| 1 | BUILD SUCCESSFUL — **22/22** | 6m 58s | `tests="22" failures="0" errors="0" skipped="0"` |
+| 2 | BUILD SUCCESSFUL — **22/22** | 4m 45s | `tests="22" failures="0" errors="0" skipped="0"` |
+| 3 | BUILD SUCCESSFUL — **22/22** | 4m 8s | `tests="22" failures="0" errors="0" skipped="0"` |
+
+Sin intentos fallidos: las tres corridas limpias son consecutivas.
+
+### 26.3 Criterios de equivalencia validados
+
+- **body pending**: S01 — `WV_UPDATE action=wait reason=body_pending` y
+  `HTML_BUILD_WAITING` antes de la llegada del cuerpo; luego
+  `HTML_BUILD_START/END/READY`, `action=load` y `WV_LOAD_DATA` con payloads
+  correctos (`loadKey`, `bodyLen`, `htmlLen`, `durationMs`).
+- **HTML/carga y settings**: T1/T2/S01–S08 con capturas y trazas publicadas.
+- **Recomposición equivalente**: S10 — un único `action=skip reason=already_loaded`,
+  misma instancia y cliente.
+- **Cambios body/tema/política**: S11/S12/S13 — dos claves/cargas por cambio.
+- **Custom Tab**: S09 — sin `WV_RELEASE`, un dispatch, `WV_ON_RESUME` al volver.
+- **Callbacks stale**: T6/S16 — `WV_PAGE_RENDERED_IGNORED` ante claves obsoletas.
+- **Lifecycle/scroll**: S14 — `WV_ON_PAUSE scrollY=1000`, `WV_ON_RESUME
+  savedScrollY=1000`, `WV_RESUME_VISUAL_REQUESTED/CALLBACK` y
+  `WV_RESUME_SCROLL_APPLIED scrollY=1000`.
+- **Long-press**: S15 — entrega exacta de la URL `data:`.
+- **Release/reapertura**: S16 — 2 `WV_FACTORY` (instancias distintas), 1
+  `WV_RELEASE` entre dos dispatches.
+- **Progreso**: `WV_PROGRESS` presente (milestones 0/100) en las cargas.
+- **Trazas UI_***: pertenecen a `EmailDetailContent` (fuera de alcance, hash
+  baseline intacto `1b48e82b...`); no se producen en el baseline focal, que
+  monta el componente aislado.
+- **Defectos conocidos preservados (no corregidos)**: overflow de F02 y ausencia
+  de carga de la imagen remota sintética de S06.
+
+### 26.4 Evidencia producida
+
+- 16 logs `.log` y capturas PNG de S01–S16 (32 archivos) en
+  `/data/local/tmp/emailbody-3.2/`, frescos de las corridas (reloj del emulador
+  verificado).
+- XML de cada corrida conservados fuera del repo (`/tmp/emulator-62/corrida-N.xml`).
+
+### 26.5 Hashes de los tres archivos ajenos protegidos (regenerados)
+
+| Archivo | SHA-256 | ¿Coincide? |
+|---|---|---|
+| `ComposeScreen.kt` | `2505050cf45aab8fc691a2b439d442a9b1a73c62c1d0a32c53bc3703469f5e69` | Sí |
+| `MainNavHost.kt` | `a6840cfc931e19185fbc29db02e11cc31152b9d719cd1b31fff564060feea088` | Sí |
+| `gradle.properties` | `3339808f9445e215b61f0e7a61ccaacc00f97ffc6e7ff0c6581ec0b79c55d476` | Sí |
+
+### 26.6 Verificación
+
+- `git diff --check`: sin salida.
+- Staging vacío; working tree con solo los tres archivos ajenos protegidos (M).
+- Sin modificación de código, tests, baseline histórico, Gradle ni snapshots.
+
+### 26.7 Resultado
+
+**GO** — tres corridas consecutivas 22/22 en `Medium_Phone_API_36.1` (API 36) con
+nombres, orden y payload de `HTML_BUILD_*` y `WV_*` equivalentes al baseline;
+sin regresiones; defectos conocidos preservados. Commit documental aislado
+creado con pathspecs explícitos. Siguiente subfase: 6.3 (suite completa y
+Pixel 9).
