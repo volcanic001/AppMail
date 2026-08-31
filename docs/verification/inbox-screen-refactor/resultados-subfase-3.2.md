@@ -4,7 +4,7 @@ Fecha: 2026-08-31 (CST)
 
 ## Cambios realizados
 - **Auditoría de Barra Superior**: Se confirmó que `InboxTopBar.kt` conserva fielmente la secuencia de escala `Animatable(1f)` a `MotionTokens.pressScale` (0.97f), rebotando a `1.02f` (iconTap) y estabilizándose en `1f` (con spring dampingRatio = 0.35f, stiffness = 500f). También se despacha de forma inmediata y síncrona el callback `onSearchClick()`.
-- **Ampliación de Caracterización**: Se añadió el caso de prueba `populated_list_triggers_menu_and_search_callbacks` en [`InboxContentCharacterizationTest.kt`](file:///Users/david/Desktop/MailApp%200.3.0%202/app/src/androidTest/java/com/david/mailapp/feature/inbox/InboxContentCharacterizationTest.kt) para verificar los callbacks de Menú y Buscar localizados por su `contentDescription`.
+- **Ampliación de Caracterización**: Se actualizó el caso de prueba `populated_list_triggers_menu_and_search_callbacks` en `app/src/androidTest/java/com/david/mailapp/feature/inbox/InboxContentCharacterizationTest.kt`. La prueba resuelve las descripciones accesibles desde recursos de localización (`R.string.action_menu` y `R.string.action_search`) y valida con contadores explícitos (`menuCalls`, `searchCalls`) el despacho exactamente una vez (`assertEquals(1, ...)`), síncronamente tras cada pulsación (`performClick()`).
 - No se modificó la API pública de `InboxScreen`, el ViewModel, ni los archivos ajenos.
 
 ## Verificación

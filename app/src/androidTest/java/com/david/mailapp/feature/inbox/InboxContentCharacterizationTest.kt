@@ -11,6 +11,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.click
+import androidx.test.platform.app.InstrumentationRegistry
+import com.david.mailapp.R
 import com.david.mailapp.core.localization.UiErrorReason
 import com.david.mailapp.domain.model.Email
 import com.david.mailapp.domain.model.EmailFolder
@@ -79,8 +81,12 @@ class InboxContentCharacterizationTest {
 
     @Test
     fun populated_list_triggers_menu_and_search_callbacks() {
-        var menuCalled = false
-        var searchCalled = false
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val menuDescription = context.getString(R.string.action_menu)
+        val searchDescription = context.getString(R.string.action_search)
+
+        var menuCalls = 0
+        var searchCalls = 0
 
         composeRule.setContent {
             MaterialTheme {
@@ -90,8 +96,8 @@ class InboxContentCharacterizationTest {
                     highlightedEmailId = null,
                     showEmailDividers = true,
                     onClearHighlight = {},
-                    onMenuClick = { menuCalled = true },
-                    onSearchClick = { searchCalled = true },
+                    onMenuClick = { menuCalls++ },
+                    onSearchClick = { searchCalls++ },
                     onEmailClick = {},
                     onRefresh = {},
                     onLoadNextPage = {},
@@ -104,12 +110,12 @@ class InboxContentCharacterizationTest {
         }
 
         // Tap Menu
-        composeRule.onNodeWithContentDescription("Menú").performClick()
-        // Tap Search
-        composeRule.onNodeWithContentDescription("Buscar").performClick()
+        composeRule.onNodeWithContentDescription(menuDescription).performClick()
+        assertEquals(1, menuCalls)
 
-        assertEquals(true, menuCalled)
-        assertEquals(true, searchCalled)
+        // Tap Search
+        composeRule.onNodeWithContentDescription(searchDescription).performClick()
+        assertEquals(1, searchCalls)
     }
 
     private fun setContent(
