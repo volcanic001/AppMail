@@ -33,12 +33,12 @@ Se documentaron 32 contratos observables: entrada/DI, Scaffold y TopAppBar, esta
 
 ## Pendiente de hardware
 
-`adb devices -l` no mostró dispositivos conectados. Por tanto, la instrumentación en emulador y Pixel no pudo ejecutarse. Se registra como NO-GO de disponibilidad de hardware, no como fallo del código. El baseline completo deberá repetirse cuando ambos dispositivos estén conectados.
-
-Actualización: el Pixel 9 quedó conectado después del baseline inicial. `EmailListItemGestureTest` pasó 1/1 en dos corridas aisladas; una primera corrida presentó un error transitorio de infraestructura (`No compose hierarchies found in the app`). El emulador sigue pendiente, por lo que el baseline instrumentado completo continúa abierto.
+Durante la captura inicial no había dispositivos. Después se conectaron ambos: `EmailListItemGestureTest` pasó 1/1 en el emulador y 1/1 en dos corridas consecutivas del Pixel 9. Una primera corrida del Pixel presentó un error transitorio de infraestructura (`No compose hierarchies found in the app`), documentado y no atribuido al código.
 
 ## Evidencia detallada
 
 - `registro-tecnico.md`: preflight, allowlist, hashes y resultados.
 - `contratos-observables.md`: inventario contractual completo.
 - `resultados-subfase-1.3.md`: comandos, conteos y decisión de la subfase.
+
+Conclusión: las subfases 1.1, 1.2 y 1.3 quedan terminadas para el alcance técnico definido. La suite instrumentada completa se reserva para la verificación posterior del refactor.

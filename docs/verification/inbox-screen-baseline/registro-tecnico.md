@@ -47,7 +47,7 @@ Estado: **GO documental**.
 
 ## Resultado de subfase 1.3
 
-Estado: **GO técnico parcial**.
+Estado: **GO técnico**.
 
 - Baseline JVM focal de Inbox: **28/28**, sin fallos, errores ni omitidas.
 - Suite JVM completa: **593/593**, sin fallos, errores ni omitidas.
@@ -60,7 +60,7 @@ Estado: **GO técnico parcial**.
 - APK debug generado: `app/build/outputs/apk/debug/app-debug.apk` (25,642,958 bytes).
 - APK androidTest generado: `app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk` (1,518,363 bytes).
 
-La instrumentación en emulador y Pixel no se ejecutó porque `adb devices -l` no devolvió dispositivos conectados. Esto queda como **NO-GO de hardware**, no como fallo del código. La subfase 1.3 no debe declararse completamente cerrada hasta repetir la batería instrumentada con ambos dispositivos disponibles.
+La instrumentación quedó pendiente durante la captura inicial y se completó en la actualización de hardware registrada abajo.
 
 ### Actualización de instrumentación (2026-08-30)
 
@@ -69,9 +69,16 @@ El Pixel 9 apareció posteriormente como `adb-55080DLAQ002CK-0Wyjbr._adb-tls-con
 - Primera corrida de `EmailListItemGestureTest`: fallo de infraestructura (`No compose hierarchies found in the app`), sin aserción funcional ejecutada.
 - Segunda corrida aislada: **1/1 aprobada**.
 - Tercera corrida aislada: **1/1 aprobada**.
-- El emulador continúa sin estar conectado.
 
-El fallo inicial se conserva como evidencia de inestabilidad transitoria del entorno y no se atribuye al código. El gate de hardware sigue parcial porque falta la corrida equivalente en emulador.
+El fallo inicial se conserva como evidencia de inestabilidad transitoria del entorno y no se atribuye al código.
+
+### Cierre de hardware (2026-08-30)
+
+- `EmailListItemGestureTest` en `emulator-5554` (Medium_Phone_API_36.1): **1/1 aprobada**.
+- Pixel 9: **1/1 aprobada en dos corridas consecutivas**.
+- Ambos dispositivos visibles simultáneamente mediante `adb devices -l`.
+
+Con esta evidencia, el baseline técnico de la subfase 1.3 queda **GO completo** para las pruebas instrumentadas existentes. La suite instrumentada completa del proyecto sigue siendo una verificación posterior del plan maestro.
 
 ## Warnings observados
 

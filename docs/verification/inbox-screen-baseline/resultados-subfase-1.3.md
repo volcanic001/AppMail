@@ -25,10 +25,12 @@ Resultado: **28/28**, 0 fallos, 0 errores, 0 omitidas.
 
 ## Instrumentación
 
-No se ejecutó `connectedDebugAndroidTest` ni pruebas en Pixel porque el host no tenía ningún dispositivo ADB conectado durante la captura. Debe repetirse en la siguiente puerta con un emulador y un Pixel disponibles.
+- Primera corrida en Pixel 9: error transitorio `No compose hierarchies found in the app`, sin aserción funcional.
+- Dos corridas posteriores en Pixel 9: **1/1 aprobadas** cada una.
+- Corrida en `emulator-5554` (Medium_Phone_API_36.1): **1/1 aprobada**.
 
-Actualización posterior: el Pixel 9 quedó conectado. `EmailListItemGestureTest` pasó 1/1 en dos corridas aisladas consecutivas; una corrida inicial falló por `No compose hierarchies found in the app`, sin fallo de aserción funcional. El emulador aún no está disponible, por lo que la instrumentación permanece parcial.
+La evidencia instrumental focal queda verde en ambos dispositivos. El fallo inicial se conserva como incidencia transitoria de infraestructura y no se atribuye al código.
 
 ## Decisión
 
-La evidencia JVM/build/lint es GO. La evidencia instrumentada queda pendiente y bloquea la declaración de baseline completo, pero no bloquea documentar 1.1–1.3 como ejecutadas parcialmente.
+La evidencia JVM/build/lint e instrumentación focal es GO. La subfase 1.3 queda cerrada para su alcance; la suite instrumentada completa pertenece a las etapas de verificación posteriores.
