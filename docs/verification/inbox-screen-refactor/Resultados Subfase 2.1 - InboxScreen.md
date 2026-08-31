@@ -59,3 +59,24 @@ El commit aislado de esta subfase se registra en el handoff de ejecución; no in
 | `connectedDebugAndroidTest ... InboxContentCharacterizationTest` en Pixel 9 | **5/5**, BUILD SUCCESSFUL |
 
 **GO.** La extracción de estados visuales recuperables conserva los contratos observables y cierra la subfase 2.3.
+
+## Resultados Subfase 2.4 — extracción de lista, refresh y paginación
+
+- Se extrajo `InboxEmailList.kt` como componente `internal` para el estado exitoso.
+- Se preservaron `PullToRefreshBox`, indicador, tags, `LazyColumn`, claves de correos,
+  callbacks recordados, animaciones, empty state y loader de siguiente página.
+- El efecto de paginación conserva su misma clave, lectura de `layoutInfo` y umbral de
+  tres ítems; `InboxContent` mantiene los efectos de highlight, refresh y feedback.
+- No se modificaron lógica de producto, estado, navegación, DI, recursos ni Gradle.
+
+### Verificación 2.4
+
+| Verificación | Resultado |
+|---|---|
+| `compileDebugKotlin --rerun-tasks` | BUILD SUCCESSFUL |
+| `testDebugUnitTest --tests com.david.mailapp.feature.inbox.* --rerun-tasks` | **28/28**, BUILD SUCCESSFUL |
+| `connectedDebugAndroidTest ... InboxContentCharacterizationTest` en Pixel 9 | **5/5**, BUILD SUCCESSFUL |
+| `git diff --check` | limpio |
+
+**GO.** La extracción de la lista conserva los contratos caracterizados y cierra la
+subfase 2.4.
