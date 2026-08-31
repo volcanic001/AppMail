@@ -83,3 +83,11 @@ Con esta evidencia, el baseline técnico de la subfase 1.3 queda **GO completo**
 ## Warnings observados
 
 Los warnings pertenecen a deprecaciones y anotaciones existentes en distintas áreas del proyecto (Compose/Lifecycle, WebView, Kotlin y tests). No se corrigieron ni atribuyeron al refactor de InboxScreen.
+
+## Resultado de subfase 1.4
+
+Estado: **GO**.
+
+- La matriz de seguridad Compose cubre los 32 contratos del inventario.
+- La interfaz de prueba futura, las fixtures, los tags, los escenarios y las capturas quedaron decididos.
+- La etapa 1 queda cerrada; el siguiente paso autorizado es 2.1.

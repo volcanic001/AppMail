@@ -20,6 +20,8 @@ El código productivo no fue modificado. El único contenido añadido pertenece 
 
 Se documentaron 32 contratos observables: entrada/DI, Scaffold y TopAppBar, estados Loading/Error/Empty/Success, feedback y undo, highlight, pull-to-refresh, reposicionamiento, keys de LazyColumn, animaciones, dividers y paginación.
 
+La subfase 1.4 añade una matriz que vincula los 32 contratos a 11 escenarios Compose, nueve capturas sintéticas y criterios GO/NO-GO. La interfaz de caracterización futura queda definida sin modificar producción.
+
 ## Verificación técnica
 
 - Suite JVM completa: **593/593**, BUILD SUCCESSFUL.
@@ -40,5 +42,7 @@ Durante la captura inicial no había dispositivos. Después se conectaron ambos:
 - `registro-tecnico.md`: preflight, allowlist, hashes y resultados.
 - `contratos-observables.md`: inventario contractual completo.
 - `resultados-subfase-1.3.md`: comandos, conteos y decisión de la subfase.
+- `matriz-seguridad-compose.md`: trazabilidad contrato → prueba y capturas.
+- `resultados-subfase-1.4.md`: cierre de la etapa 1.
 
-Conclusión: las subfases 1.1, 1.2 y 1.3 quedan terminadas para el alcance técnico definido. La suite instrumentada completa se reserva para la verificación posterior del refactor.
+Conclusión: las subfases 1.1, 1.2, 1.3 y 1.4 quedan terminadas. La etapa 1 está cerrada; la siguiente subfase autorizada es 2.1.
