@@ -35,6 +35,8 @@ Se documentaron 32 contratos observables: entrada/DI, Scaffold y TopAppBar, esta
 
 `adb devices -l` no mostró dispositivos conectados. Por tanto, la instrumentación en emulador y Pixel no pudo ejecutarse. Se registra como NO-GO de disponibilidad de hardware, no como fallo del código. El baseline completo deberá repetirse cuando ambos dispositivos estén conectados.
 
+Actualización: el Pixel 9 quedó conectado después del baseline inicial. `EmailListItemGestureTest` pasó 1/1 en dos corridas aisladas; una primera corrida presentó un error transitorio de infraestructura (`No compose hierarchies found in the app`). El emulador sigue pendiente, por lo que el baseline instrumentado completo continúa abierto.
+
 ## Evidencia detallada
 
 - `registro-tecnico.md`: preflight, allowlist, hashes y resultados.

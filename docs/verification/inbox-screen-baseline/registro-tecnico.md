@@ -62,6 +62,17 @@ Estado: **GO técnico parcial**.
 
 La instrumentación en emulador y Pixel no se ejecutó porque `adb devices -l` no devolvió dispositivos conectados. Esto queda como **NO-GO de hardware**, no como fallo del código. La subfase 1.3 no debe declararse completamente cerrada hasta repetir la batería instrumentada con ambos dispositivos disponibles.
 
+### Actualización de instrumentación (2026-08-30)
+
+El Pixel 9 apareció posteriormente como `adb-55080DLAQ002CK-0Wyjbr._adb-tls-connect._tcp`.
+
+- Primera corrida de `EmailListItemGestureTest`: fallo de infraestructura (`No compose hierarchies found in the app`), sin aserción funcional ejecutada.
+- Segunda corrida aislada: **1/1 aprobada**.
+- Tercera corrida aislada: **1/1 aprobada**.
+- El emulador continúa sin estar conectado.
+
+El fallo inicial se conserva como evidencia de inestabilidad transitoria del entorno y no se atribuye al código. El gate de hardware sigue parcial porque falta la corrida equivalente en emulador.
+
 ## Warnings observados
 
 Los warnings pertenecen a deprecaciones y anotaciones existentes en distintas áreas del proyecto (Compose/Lifecycle, WebView, Kotlin y tests). No se corrigieron ni atribuyeron al refactor de InboxScreen.

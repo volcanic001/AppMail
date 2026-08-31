@@ -27,6 +27,8 @@ Resultado: **28/28**, 0 fallos, 0 errores, 0 omitidas.
 
 No se ejecutó `connectedDebugAndroidTest` ni pruebas en Pixel porque el host no tenía ningún dispositivo ADB conectado durante la captura. Debe repetirse en la siguiente puerta con un emulador y un Pixel disponibles.
 
+Actualización posterior: el Pixel 9 quedó conectado. `EmailListItemGestureTest` pasó 1/1 en dos corridas aisladas consecutivas; una corrida inicial falló por `No compose hierarchies found in the app`, sin fallo de aserción funcional. El emulador aún no está disponible, por lo que la instrumentación permanece parcial.
+
 ## Decisión
 
 La evidencia JVM/build/lint es GO. La evidencia instrumentada queda pendiente y bloquea la declaración de baseline completo, pero no bloquea documentar 1.1–1.3 como ejecutadas parcialmente.
