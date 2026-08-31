@@ -1303,3 +1303,104 @@ compilación verde, pruebas focales 7/7 verdes en una corrida, sin cambios de
 firma ni comportamiento, hashes protegidos intactos y staging limpio tras el
 commit. Commit aislado creado con pathspecs explícitos. Siguiente subfase: 5.2
 (consolidación estructural).
+
+---
+
+## 24. Subfase 5.2 — Consolidación estructural
+
+Fecha de ejecución: 2026-08-31T00:10:00-0600 (CST)
+Ejecutor: DeepSeek V4 Pro
+Revisión: DeepSeek V4 Pro
+Naturaleza: auditoría y limpieza estructural sin cambios de comportamiento.
+
+### 24.1 Estado inicial verificado
+
+| Campo | Valor |
+|---|---|
+| Rama | `main` |
+| HEAD | `f0fb89a...` (commit de 5.1) |
+| origin/main | `de48b270521144d7927bbda92c01aeac86c3904d` |
+| Divergencia | `main` adelante 10 |
+| Staging | vacío |
+
+### 24.2 Hashes de los tres archivos ajenos protegidos (SHA-256, regenerados)
+
+| Archivo | SHA-256 | ¿Coincide? |
+|---|---|---|
+| `ComposeScreen.kt` | `2505050cf45aab8fc691a2b439d442a9b1a73c62c1d0a32c53bc3703469f5e69` | Sí |
+| `MainNavHost.kt` | `a6840cfc931e19185fbc29db02e11cc31152b9d719cd1b31fff564060feea088` | Sí |
+| `gradle.properties` | `3339808f9445e215b61f0e7a61ccaacc00f97ffc6e7ff0c6581ec0b79c55d476` | Sí |
+
+### 24.3 Inventario de símbolos, referencias y visibilidad
+
+| Archivo | Símbolos | Visibilidad |
+|---|---|---|
+| `EmailBodyWebView.kt` | `EmailBodyWebView(...)` | **pública** (única) |
+| `EmailBodyDocument.kt` | `PreparedDocument`, `buildLoadKey`, `toCssRgb`, `buildHtml` | internal |
+| `EmailBodyDocumentPreparation.kt` | `rememberPreparedEmailBodyDocument` | internal |
+| `EmailBodyWebViewRuntime.kt` | `EmailBodyWebViewRuntimeState`, `rememberEmailBodyWebViewRuntimeState` | internal |
+| `EmailBodyWebViewLifecycle.kt` | `BindEmailBodyWebViewLifecycle` | internal |
+| `EmailBodyWebViewHost.kt` | `EmailBodyWebViewHost` (composable), `createEmailBodyWebViewHost` | internal |
+| `EmailBodyWebViewSettings.kt` | `WebSettings.applyHardening` | internal |
+| `EmailBodyWebViewClients.kt` | `CustomTabsWebViewClient`, `TraceWebChromeClient` | internal |
+| `EmailBodyWebViewUpdate.kt` | `updateEmailBodyWebView`, `releaseEmailBodyWebView` | internal |
+
+- **15 símbolos** declarados una sola vez cada uno; sin helpers duplicados ni
+  antiguos.
+- Una sola declaración pública: `EmailBodyWebView`.
+
+### 24.4 Limpieza aplicada
+
+- Imports sin uso: **ninguno** (todos los imports de los nueve archivos están
+  referenciados; el `getValue`/`setValue` de `EmailBodyDocumentPreparation.kt`
+  se usa vía delegado `by`).
+- Comentarios separadores obsoletos: **ninguno** (no quedan separadores `──` en
+  los archivos extraídos; los huérfanos se eliminaron en las subfases 2.1–3.3).
+- **Resultado: auditoría sin diff funcional** — no se modificó producción (válido
+  según plan).
+
+### 24.5 Equivalencia confirmada contra la matriz (1.3)
+
+- Claves Compose y orden de efectos sin cambios.
+- Fórmula de `buildLoadKey` literal
+  (`${body.hashCode()}_...` con `onSurfaceArgb`).
+- `loadDataWithBaseURL(null, html, "text/html", "UTF-8", null)` intacto.
+- Literales HTML: wrapper `margin:0 16px; padding-top: 20px`, regla
+  `img:not([src^="data:"]){display:none!important}`, colores fijos
+  `rgb(224, 224, 224)` / `rgb(33, 33, 33)`, `LOAD_NO_CACHE`.
+- Trazas `HTML_BUILD_*`, `WV_*` y comportamiento de callbacks sin cambios.
+- `EmailDetailContent.kt` conserva su hash baseline
+  (`1b48e82b9af0f1322a20253741eda167c7c867bd4fb4d65425a54c161fde1002`).
+
+### 24.6 Pruebas
+
+- `./gradlew compileDebugKotlin` → **BUILD SUCCESSFUL**.
+- `./gradlew testDebugUnitTest` → **BUILD SUCCESSFUL, 593/593** (0 fallos, 0
+  errores, 0 omitidas).
+- Instrumentación (emulador `Medium_Phone_API_36.1`, API 36):
+  ```
+  env ANDROID_SERIAL=emulator-5554 ./gradlew connectedDebugAndroidTest --rerun-tasks \
+    -Pandroid.testInstrumentationRunnerArguments.class=...EmailBodyWebViewBaselineTest
+  ```
+  - Corrida 1: 21/22 — `s09` falló con la **flakiness de infraestructura** de la
+    Custom Tab ya documentada en 4.2 (`NoMatchingViewException`). No es
+    regresión (sin diff de producción en esta subfase).
+  - Corrida 2: **22/22** verde (0 fallos, 0 errores, 0 omitidas; XML `tests="22"`).
+
+### 24.7 Verificación
+
+- Búsqueda estática: sin helpers antiguos/duplicados; una sola declaración
+  pública de `EmailBodyWebView`; referencias únicas a factory/update/release.
+- `git diff --check`: sin salida.
+- SHA-256 de los tres archivos ajenos: idénticos a los registrados.
+- Working tree: solo los tres archivos ajenos protegidos modificados (cambios
+  previos del usuario, intactos).
+
+### 24.8 Resultado
+
+**Subfase 5.2 CERRADA — GO.** Auditoría estructural completa: una única API
+pública, 15 símbolos con implementación única, sin imports/comentarios
+obsoletos que eliminar, equivalencia confirmada contra la matriz, compilación y
+JVM verdes, y corrida focal 22/22 verde (tras la flakiness S09 transitoria).
+Commit aislado documental creado con pathspecs explícitos. Siguiente subfase:
+6.1 (JVM, build y lint).
