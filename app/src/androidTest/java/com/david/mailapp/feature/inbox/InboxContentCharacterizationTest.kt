@@ -1,8 +1,13 @@
 package com.david.mailapp.feature.inbox
 
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -116,6 +121,154 @@ class InboxContentCharacterizationTest {
         // Tap Search
         composeRule.onNodeWithContentDescription(searchDescription).performClick()
         assertEquals(1, searchCalls)
+    }
+
+    @Test
+    fun highlight_fallback_clears_after_2500ms_without_row() {
+        var clearCalls = 0
+        composeRule.mainClock.autoAdvance = false
+
+        composeRule.setContent {
+            MaterialTheme {
+                InboxContent(
+                    uiState = InboxUiState.Success(emails = emptyList()),
+                    listState = rememberLazyListState(),
+                    highlightedEmailId = "missing_email",
+                    showEmailDividers = true,
+                    onClearHighlight = { clearCalls++ },
+                    onMenuClick = {},
+                    onSearchClick = {},
+                    onEmailClick = {},
+                    onRefresh = {},
+                    onLoadNextPage = {},
+                    onMoveToTrash = {},
+                    onFeedbackConsumed = {},
+                    onUndoMoveToTrash = {},
+                    snackbarHostState = SnackbarHostState()
+                )
+            }
+        }
+
+        // Before 2500ms, not cleared
+        composeRule.mainClock.advanceTimeBy(2400)
+        assertEquals(0, clearCalls)
+
+        // At/after 2500ms, cleared exactly once
+        composeRule.mainClock.advanceTimeBy(200)
+        assertEquals(1, clearCalls)
+    }
+
+    @Test
+    fun refresh_transition_resets_scroll_only_when_started_below_offset_50() {
+        var isRefreshing by mutableStateOf(true)
+        val listState = LazyListState(firstVisibleItemIndex = 0, firstVisibleItemScrollOffset = 49)
+
+        composeRule.setContent {
+            MaterialTheme {
+                InboxContent(
+                    uiState = InboxUiState.Success(
+                        emails = (1..20).map { testEmail("e$it") },
+                        isRefreshing = isRefreshing
+                    ),
+                    listState = listState,
+                    highlightedEmailId = null,
+                    showEmailDividers = true,
+                    onClearHighlight = {},
+                    onMenuClick = {},
+                    onSearchClick = {},
+                    onEmailClick = {},
+                    onRefresh = {},
+                    onLoadNextPage = {},
+                    onMoveToTrash = {},
+                    onFeedbackConsumed = {},
+                    onUndoMoveToTrash = {},
+                    snackbarHostState = SnackbarHostState()
+                )
+            }
+        }
+
+        // When refreshing ends and was at offset 49, it scrolls to (0, 0)
+        isRefreshing = false
+        composeRule.waitForIdle()
+
+        assertEquals(0, listState.firstVisibleItemIndex)
+        assertEquals(0, listState.firstVisibleItemScrollOffset)
+    }
+
+    @Test
+    fun refresh_transition_does_not_reset_scroll_when_started_at_offset_50() {
+        var isRefreshing by mutableStateOf(true)
+        val listState = LazyListState(firstVisibleItemIndex = 0, firstVisibleItemScrollOffset = 50)
+
+        composeRule.setContent {
+            MaterialTheme {
+                InboxContent(
+                    uiState = InboxUiState.Success(
+                        emails = (1..20).map { testEmail("e$it") },
+                        isRefreshing = isRefreshing
+                    ),
+                    listState = listState,
+                    highlightedEmailId = null,
+                    showEmailDividers = true,
+                    onClearHighlight = {},
+                    onMenuClick = {},
+                    onSearchClick = {},
+                    onEmailClick = {},
+                    onRefresh = {},
+                    onLoadNextPage = {},
+                    onMoveToTrash = {},
+                    onFeedbackConsumed = {},
+                    onUndoMoveToTrash = {},
+                    snackbarHostState = SnackbarHostState()
+                )
+            }
+        }
+
+        // When refreshing ends and was at offset 50, it does not reset to 0
+        isRefreshing = false
+        composeRule.waitForIdle()
+
+        assertEquals(0, listState.firstVisibleItemIndex)
+        assertEquals(50, listState.firstVisibleItemScrollOffset)
+    }
+
+    @Test
+    fun action_feedback_shows_snackbar_and_handles_undo_and_consume() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val undoLabel = context.getString(R.string.action_undo)
+        var consumedId: ActionFeedbackId? = null
+        var undoId: String? = null
+
+        val feedback = ActionFeedback.MovedToTrash(emailId = "e1")
+
+        composeRule.setContent {
+            MaterialTheme {
+                InboxContent(
+                    uiState = InboxUiState.Success(
+                        emails = emptyList(),
+                        pendingFeedbackQueue = listOf(feedback)
+                    ),
+                    listState = rememberLazyListState(),
+                    highlightedEmailId = null,
+                    showEmailDividers = true,
+                    onClearHighlight = {},
+                    onMenuClick = {},
+                    onSearchClick = {},
+                    onEmailClick = {},
+                    onRefresh = {},
+                    onLoadNextPage = {},
+                    onMoveToTrash = {},
+                    onFeedbackConsumed = { consumedId = it },
+                    onUndoMoveToTrash = { undoId = it },
+                    snackbarHostState = remember { SnackbarHostState() }
+                )
+            }
+        }
+
+        composeRule.onNodeWithText(undoLabel).performClick()
+
+        assertEquals(feedback.id, consumedId)
+        assertEquals("e1", undoId)
     }
 
     private fun setContent(
