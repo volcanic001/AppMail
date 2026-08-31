@@ -9,6 +9,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -17,12 +18,14 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.swipeDown
+import androidx.compose.ui.test.swipeLeft
 import androidx.test.platform.app.InstrumentationRegistry
 import com.david.mailapp.R
 import com.david.mailapp.core.localization.UiErrorReason
 import com.david.mailapp.domain.model.Email
 import com.david.mailapp.domain.model.EmailFolder
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -299,6 +302,147 @@ class InboxContentCharacterizationTest {
 
         assertEquals(feedback.id, consumedId)
         assertEquals("e1", undoId)
+    }
+
+    @Test
+    fun visual_order_of_emails_matches_input_list() {
+        setContent(
+            InboxUiState.Success(
+                emails = listOf(testEmail("e1"), testEmail("e2"))
+            )
+        )
+
+        val firstEmail = composeRule.onNodeWithText("Asunto e1")
+        val secondEmail = composeRule.onNodeWithText("Asunto e2")
+
+        firstEmail.assertIsDisplayed()
+        secondEmail.assertIsDisplayed()
+
+        val firstBounds = firstEmail.getUnclippedBoundsInRoot()
+        val secondBounds = secondEmail.getUnclippedBoundsInRoot()
+        assertTrue(
+            "Expected e1 above e2, but tops were ${firstBounds.top} and ${secondBounds.top}",
+            firstBounds.top < secondBounds.top
+        )
+    }
+
+    @Test
+    fun swipe_left_on_email_row_dispatches_move_to_trash() {
+        var trashedId: String? = null
+        composeRule.setContent {
+            MaterialTheme {
+                InboxContent(
+                    uiState = InboxUiState.Success(emails = listOf(testEmail("e1"))),
+                    listState = rememberLazyListState(),
+                    highlightedEmailId = null,
+                    showEmailDividers = true,
+                    onClearHighlight = {},
+                    onMenuClick = {},
+                    onSearchClick = {},
+                    onEmailClick = {},
+                    onRefresh = {},
+                    onLoadNextPage = {},
+                    onMoveToTrash = { trashedId = it },
+                    onFeedbackConsumed = {},
+                    onUndoMoveToTrash = {},
+                    snackbarHostState = SnackbarHostState()
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Asunto e1").performTouchInput {
+            swipeLeft()
+        }
+
+        assertEquals("e1", trashedId)
+    }
+
+    @Test
+    fun active_action_email_row_disables_interactions_while_other_row_remains_operable() {
+        var clickedId: String? = null
+        var trashedId: String? = null
+
+        composeRule.setContent {
+            MaterialTheme {
+                InboxContent(
+                    uiState = InboxUiState.Success(
+                        emails = listOf(testEmail("e1"), testEmail("e2")),
+                        activeActionEmailIds = setOf("e1")
+                    ),
+                    listState = rememberLazyListState(),
+                    highlightedEmailId = null,
+                    showEmailDividers = true,
+                    onClearHighlight = {},
+                    onMenuClick = {},
+                    onSearchClick = {},
+                    onEmailClick = { clickedId = it },
+                    onRefresh = {},
+                    onLoadNextPage = {},
+                    onMoveToTrash = { trashedId = it },
+                    onFeedbackConsumed = {},
+                    onUndoMoveToTrash = {},
+                    snackbarHostState = SnackbarHostState()
+                )
+            }
+        }
+
+        // e1 is in activeActionEmailIds -> disabled
+        composeRule.onNodeWithText("Asunto e1").performTouchInput { click() }
+        assertEquals(null, clickedId)
+
+        composeRule.onNodeWithText("Asunto e1").performTouchInput { swipeLeft() }
+        assertEquals(null, trashedId)
+
+        // e2 is not in activeActionEmailIds -> operable
+        composeRule.onNodeWithText("Asunto e2").performTouchInput { click() }
+        assertEquals("e2", clickedId)
+    }
+
+    @Test
+    fun is_loading_next_page_renders_loader_item() {
+        setContent(
+            InboxUiState.Success(
+                emails = listOf(testEmail("e1")),
+                isLoadingNextPage = true
+            )
+        )
+
+        composeRule.onNodeWithTag("inbox_next_page_loader").assertIsDisplayed()
+    }
+
+    @Test
+    fun highlight_row_clears_internally_after_800ms() {
+        var clearCalls = 0
+        composeRule.mainClock.autoAdvance = false
+
+        composeRule.setContent {
+            MaterialTheme {
+                InboxContent(
+                    uiState = InboxUiState.Success(emails = listOf(testEmail("e1"))),
+                    listState = rememberLazyListState(),
+                    highlightedEmailId = "e1",
+                    showEmailDividers = true,
+                    onClearHighlight = { clearCalls++ },
+                    onMenuClick = {},
+                    onSearchClick = {},
+                    onEmailClick = {},
+                    onRefresh = {},
+                    onLoadNextPage = {},
+                    onMoveToTrash = {},
+                    onFeedbackConsumed = {},
+                    onUndoMoveToTrash = {},
+                    snackbarHostState = SnackbarHostState()
+                )
+            }
+        }
+
+        // Before 800ms, not cleared
+        composeRule.mainClock.advanceTimeBy(700)
+        assertEquals(0, clearCalls)
+
+        // At/after 800ms, row internal clear triggers
+        composeRule.mainClock.advanceTimeBy(150)
+        assertEquals(1, clearCalls)
     }
 
     private fun setContent(
