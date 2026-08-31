@@ -1405,3 +1405,85 @@ obsoletos que eliminar, equivalencia confirmada contra la matriz, compilación y
 JVM verdes, y corrida focal 22/22 verde (tras la flakiness S09 transitoria).
 Commit aislado documental creado con pathspecs explícitos. Siguiente subfase:
 6.1 (JVM, build y lint).
+
+---
+
+## 25. Subfase 6.1 — JVM, build y lint
+
+Fecha de ejecución: 2026-08-31T00:15:00-0600 (CST)
+Ejecutor: DeepSeek V4 Flash
+Revisión y decisión final: DeepSeek V4 Pro
+Naturaleza: verificación local no instrumentada; sin modificar producción.
+
+### 25.1 Estado inicial verificado
+
+| Campo | Valor |
+|---|---|
+| Rama | `main` |
+| HEAD | `c620ccfa2ef1bab23154f6882d3c5e796f66a5f0` |
+| origin/main | `de48b270521144d7927bbda92c01aeac86c3904d` |
+| Divergencia | `main` adelante 13 |
+| Staging | vacío |
+| Working tree | solo los tres archivos ajenos protegidos (M) |
+
+### 25.2 Comandos y resultados
+
+| # | Comando | Resultado | Duración |
+|---|---|---|---|
+| 1 | `./gradlew testDebugUnitTest` | BUILD SUCCESSFUL | 2s |
+| 2 | `./gradlew compileDebugKotlin` | BUILD SUCCESSFUL | 1s |
+| 3 | `./gradlew compileDebugAndroidTestKotlin` | BUILD SUCCESSFUL | 1s |
+| 4 | `./gradlew assembleDebug` | BUILD SUCCESSFUL | 1s |
+| 5 | `./gradlew assembleRelease` | BUILD SUCCESSFUL | 1m 35s |
+| 6 | `./gradlew lintDebug` | BUILD SUCCESSFUL | 1m 42s |
+| 7 | `git diff --check` | Sin salida (limpio) | — |
+
+- Tests JVM: **593/593** (0 fallos, 0 errores, 0 omitidas).
+
+### 25.3 Artefactos (no versionados)
+
+| Artefacto | Tamaño | SHA-256 |
+|---|---|---|
+| `app/build/outputs/apk/debug/app-debug.apk` | 25 642 958 bytes | `d87eccaeb1b236d9cd6d7251a494bbb9f3d08014e0f126173dcb383f95f54e9b` |
+| `app/build/outputs/apk/release/app-release.apk` | 4 952 662 bytes | `e32532aca0ee28b46a35ee8be98c799de699e7a24510198bb2dfa5e8f85b8743` |
+
+### 25.4 Lint (`app/build/reports/lint-results-debug.xml`)
+
+- **0 errores, 66 warnings**, 0 fatales, 0 information.
+
+| ID | Cantidad | Severidad | Clasificación |
+|---|---|---|---|
+| GradleDependency | 17 | Warning | Preexistente/externo |
+| NewerVersionAvailable | 15 | Warning | Preexistente/externo |
+| ModifierParameter | 15 | Warning | Preexistente (1 de ellos en `EmailBodyWebView.kt` = firma pública congelada) |
+| FrequentlyChangingValue | 6 | Warning | Preexistente |
+| UnusedResources | 3 | Warning | Preexistente |
+| UseKtx | 3 | Warning | Preexistente (1 de ellos en `EmailBodyWebViewClients.kt` = `Uri.parse` movido verbatim del baseline) |
+| AndroidGradlePluginVersion | 2 | Warning | Preexistente/externo |
+| OldTargetApi | 1 | Warning | Preexistente |
+| ConfigurationScreenWidthHeight | 1 | Warning | Preexistente |
+| ObsoleteSdkInt | 1 | Warning | Preexistente |
+| UseOfNonLambdaOffsetOverload | 1 | Warning | Preexistente |
+| IconLocation | 1 | Warning | Preexistente |
+| **Total** | **66** | | **0 atribuibles al refactor** |
+
+Los dos hallazgos que apuntan a archivos `EmailBody*` corresponden a patrones
+preexistentes: la firma congelada `modifier: Modifier = Modifier` como último
+parámetro (contrato inmodificable) y `Uri.parse` en `CustomTabsWebViewClient`
+(movido verbatim). No hay hallazgos nuevos introducidos por la lógica extraída.
+
+### 25.5 Hashes de los tres archivos ajenos protegidos (regenerados)
+
+| Archivo | SHA-256 | ¿Coincide? |
+|---|---|---|
+| `ComposeScreen.kt` | `2505050cf45aab8fc691a2b439d442a9b1a73c62c1d0a32c53bc3703469f5e69` | Sí |
+| `MainNavHost.kt` | `a6840cfc931e19185fbc29db02e11cc31152b9d719cd1b31fff564060feea088` | Sí |
+| `gradle.properties` | `3339808f9445e215b61f0e7a61ccaacc00f97ffc6e7ff0c6581ec0b79c55d476` | Sí |
+
+### 25.6 Resultado
+
+**GO** — los seis comandos Gradle terminan correctamente, tests JVM sin fallos
+(593/593), lint sin errores y sin hallazgos atribuibles al refactor (66 warnings
+preexistentes/externos), `git diff --check` limpio y hashes protegidos intactos.
+Commit documental aislado creado con pathspecs explícitos. Siguiente subfase:
+6.2 (baseline focal en emulador).
