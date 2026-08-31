@@ -15,13 +15,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.distinctUntilChanged
 
 /**
  * Internal characterization seam for Inbox UI.
@@ -115,24 +113,11 @@ internal fun InboxContent(
                             showEmailDividers = showEmailDividers,
                             onClearHighlight = onClearHighlight,
                             onEmailClick = onEmailClick,
+                            onLoadNextPage = onLoadNextPage,
                             onMoveToTrash = onMoveToTrash,
                             contentPadding = PaddingValues(bottom = paddingValues.calculateBottomPadding() + 24.dp),
                             modifier = Modifier.fillMaxSize()
                         )
-
-                        LaunchedEffect(listState, state.emails.isEmpty()) {
-                            snapshotFlow {
-                                val layout = listState.layoutInfo
-                                val lastIndex = layout.visibleItemsInfo.lastOrNull()?.index ?: 0
-                                lastIndex to layout.totalItemsCount
-                            }
-                                .distinctUntilChanged()
-                                .collect { (lastVisible, total) ->
-                                    if (state.emails.isNotEmpty() && total > 0 && lastVisible >= total - 3) {
-                                        onLoadNextPage()
-                                    }
-                                }
-                        }
                     }
                 }
             }

@@ -445,6 +445,71 @@ class InboxContentCharacterizationTest {
         assertEquals(1, clearCalls)
     }
 
+    @Test
+    fun scroll_far_from_end_does_not_trigger_load_next_page() {
+        var loadNextPageCalls = 0
+        val listState = LazyListState(firstVisibleItemIndex = 0)
+
+        composeRule.setContent {
+            MaterialTheme {
+                InboxContent(
+                    uiState = InboxUiState.Success(
+                        emails = (1..20).map { testEmail("e$it") }
+                    ),
+                    listState = listState,
+                    highlightedEmailId = null,
+                    showEmailDividers = true,
+                    onClearHighlight = {},
+                    onMenuClick = {},
+                    onSearchClick = {},
+                    onEmailClick = {},
+                    onRefresh = {},
+                    onLoadNextPage = { loadNextPageCalls++ },
+                    onMoveToTrash = {},
+                    onFeedbackConsumed = {},
+                    onUndoMoveToTrash = {},
+                    snackbarHostState = SnackbarHostState()
+                )
+            }
+        }
+
+        composeRule.waitForIdle()
+        assertEquals(0, loadNextPageCalls)
+    }
+
+    @Test
+    fun scroll_near_end_triggers_load_next_page() {
+        var loadNextPageCalls = 0
+        val emails = (1..20).map { testEmail("e$it") }
+        val listState = LazyListState(firstVisibleItemIndex = emails.size - 3)
+
+        composeRule.setContent {
+            MaterialTheme {
+                InboxContent(
+                    uiState = InboxUiState.Success(
+                        emails = emails
+                    ),
+                    listState = listState,
+                    highlightedEmailId = null,
+                    showEmailDividers = true,
+                    onClearHighlight = {},
+                    onMenuClick = {},
+                    onSearchClick = {},
+                    onEmailClick = {},
+                    onRefresh = {},
+                    onLoadNextPage = { loadNextPageCalls++ },
+                    onMoveToTrash = {},
+                    onFeedbackConsumed = {},
+                    onUndoMoveToTrash = {},
+                    snackbarHostState = SnackbarHostState()
+                )
+            }
+        }
+
+        composeRule.waitForIdle()
+        assertTrue(loadNextPageCalls >= 1)
+    }
+
     private fun setContent(
         state: InboxUiState,
         onRefresh: () -> Unit = {},

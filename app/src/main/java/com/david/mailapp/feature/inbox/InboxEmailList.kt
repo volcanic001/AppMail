@@ -11,13 +11,16 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.david.mailapp.feature.inbox.components.EmailListItem
 import com.david.mailapp.ui.components.ContainedLoadingIndicator
+import kotlinx.coroutines.flow.distinctUntilChanged
 
 @Composable
 internal fun InboxEmailList(
@@ -27,6 +30,7 @@ internal fun InboxEmailList(
     showEmailDividers: Boolean,
     onClearHighlight: () -> Unit,
     onEmailClick: (String) -> Unit,
+    onLoadNextPage: () -> Unit,
     onMoveToTrash: (String) -> Unit,
     contentPadding: PaddingValues,
     modifier: Modifier = Modifier
@@ -77,5 +81,32 @@ internal fun InboxEmailList(
                 }
             }
         }
+    }
+
+    InboxPaginationEffect(
+        state = state,
+        listState = listState,
+        onLoadNextPage = onLoadNextPage
+    )
+}
+
+@Composable
+private fun InboxPaginationEffect(
+    state: InboxUiState.Success,
+    listState: LazyListState,
+    onLoadNextPage: () -> Unit
+) {
+    LaunchedEffect(listState, state.emails.isEmpty()) {
+        snapshotFlow {
+            val layout = listState.layoutInfo
+            val lastIndex = layout.visibleItemsInfo.lastOrNull()?.index ?: 0
+            lastIndex to layout.totalItemsCount
+        }
+            .distinctUntilChanged()
+            .collect { (lastVisible, total) ->
+                if (state.emails.isNotEmpty() && total > 0 && lastVisible >= total - 3) {
+                    onLoadNextPage()
+                }
+            }
     }
 }
