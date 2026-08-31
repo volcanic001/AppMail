@@ -23,3 +23,21 @@ Firma pública, ViewModel/DI, Scaffold, TopAppBar, feedback, highlight, refresh,
 ## Commit
 
 El commit aislado de esta subfase se registra en el handoff de ejecución; no incluye cambios ajenos.
+
+## Resultados Subfase 2.2 — extracción de barra superior
+
+- Se extrajo `InboxTopBar.kt` como componente `internal`.
+- La animación de búsqueda, callbacks, título, iconos, colores y descripciones permanecen sin cambios.
+- `InboxContent.kt` conserva el mismo comportamiento y ahora delega únicamente la composición de la barra superior.
+- No se modificaron lógica de producto, estado, navegación, DI, recursos ni Gradle.
+
+### Verificación 2.2
+
+| Verificación | Resultado |
+|---|---|
+| `compileDebugKotlin --rerun-tasks` | BUILD SUCCESSFUL |
+| `testDebugUnitTest --tests com.david.mailapp.feature.inbox.* --rerun-tasks` | **28/28**, BUILD SUCCESSFUL |
+| `connectedDebugAndroidTest ... InboxContentCharacterizationTest` en emulador | **5/5**, BUILD SUCCESSFUL |
+| `connectedDebugAndroidTest ... InboxContentCharacterizationTest` en Pixel 9 | **5/5**, BUILD SUCCESSFUL |
+
+**GO.** La extracción estructural de 2.2 mantiene los contratos observables y deja el contenido listo para la siguiente subfase.
