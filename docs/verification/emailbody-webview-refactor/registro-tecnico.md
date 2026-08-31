@@ -1498,6 +1498,7 @@ Ejecutor: DeepSeek V4 Flash
 Evaluación y diagnóstico: DeepSeek V4 Pro
 Naturaleza: revalidación del comportamiento completo de `EmailBodyWebView` en
 emulador (sin cambios de producción).
+Commit: `83d1064f4022b9e9415b97d343f156ae8e8be3f1`
 
 ### 26.1 Entorno
 
