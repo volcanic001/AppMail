@@ -1312,6 +1312,7 @@ Fecha de ejecución: 2026-08-31T00:10:00-0600 (CST)
 Ejecutor: DeepSeek V4 Pro
 Revisión: DeepSeek V4 Pro
 Naturaleza: auditoría y limpieza estructural sin cambios de comportamiento.
+Commit: `7a4087263a7d7b4ad02c533e65d97f6f7dd3cd19`
 
 ### 24.1 Estado inicial verificado
 
@@ -1345,7 +1346,7 @@ Naturaleza: auditoría y limpieza estructural sin cambios de comportamiento.
 | `EmailBodyWebViewClients.kt` | `CustomTabsWebViewClient`, `TraceWebChromeClient` | internal |
 | `EmailBodyWebViewUpdate.kt` | `updateEmailBodyWebView`, `releaseEmailBodyWebView` | internal |
 
-- **15 símbolos** declarados una sola vez cada uno; sin helpers duplicados ni
+- **16 símbolos** declarados una sola vez cada uno; sin helpers duplicados ni
   antiguos.
 - Una sola declaración pública: `EmailBodyWebView`.
 
