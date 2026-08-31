@@ -46,3 +46,5 @@ Durante la captura inicial no había dispositivos. Después se conectaron ambos:
 - `resultados-subfase-1.4.md`: cierre de la etapa 1.
 
 Conclusión: las subfases 1.1, 1.2, 1.3 y 1.4 quedan terminadas. La etapa 1 está cerrada; la siguiente subfase autorizada es 2.1.
+
+La ejecución posterior de 2.1 se documenta en `docs/verification/inbox-screen-refactor/resultados-subfase-2.1.md` y en el informe separado del Escritorio.
