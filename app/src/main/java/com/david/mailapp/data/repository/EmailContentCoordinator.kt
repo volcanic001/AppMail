@@ -52,8 +52,7 @@ internal class EmailContentCoordinator(
             val pdfJson = PdfAttachmentMetadataCodec.encode(result.pdfAttachments)
             val hasAtt = result.pdfAttachments.isNotEmpty()
 
-            // Subfase 2.1: El cálculo de bytes usa UTF-8 de body, cleanBody y JSON de referencias.
-            // La persistencia real y la actualización de acceso (contentLastAccessEpochMs) quedan para 2.2/2.3
+            // Subfase 2.2: Consumir en EmailContentCoordinator los datos ya calculados
             val inlineRefsJson = com.david.mailapp.data.local.converter.InlineContentReferenceCodec.encode(result.inlineRefs)
             val cachedContentBytes = rawBody.toByteArray(Charsets.UTF_8).size.toLong() +
                                      cleanBody.toByteArray(Charsets.UTF_8).size.toLong() +
@@ -65,7 +64,11 @@ internal class EmailContentCoordinator(
                     body = rawBody,
                     cleanBody = cleanBody,
                     pdfAttachmentsJson = pdfJson,
-                    hasAttachments = hasAtt
+                    hasAttachments = hasAtt,
+                    contentState = result.contentState.name,
+                    bodyKind = result.bodyKind.name,
+                    inlineReferencesJson = inlineRefsJson,
+                    cachedContentBytes = cachedContentBytes
                 )
             }
             Log.d(RepositoryTrace.MAIL_PERF_TAG, "[REPO_BODY] CACHED emailId=$emailId roomMs=${RepositoryTrace.now() - tFetch} totalMs=${RepositoryTrace.now() - t0}")

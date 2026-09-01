@@ -156,7 +156,86 @@ class MailDatabaseMigrationTest {
         assertTrue("rfc_message_id column exists in table_info", foundRfcMessageId)
         assertTrue("rfc_references column exists in table_info", foundRfcReferences)
 
-        // 8. Close v6 database
         v6Db.close()
+    }
+
+    @Test
+    fun migrate6To7_addsContentStateAndByteCalculations() {
+        val v6Db: SupportSQLiteDatabase = helper.createDatabase(testDbName, 6)
+
+        // Fila 1: body no vacío
+        v6Db.execSQL(
+            """INSERT INTO emails (
+                id, thread_id, sender, sender_initials, recipient_to,
+                subject, snippet, timestamp, is_read, is_starred,
+                has_attachments, labels, folder, body, clean_body,
+                pdf_attachments_json, pdf_metadata_scanned, rfc_message_id, rfc_references
+            ) VALUES (
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            )"""
+                .trimIndent(),
+            arrayOf<Any?>(
+                "email-html", "thread-1", "A <a@b.com>", "A", "b@b.com", "Sub", "Snip", 1L, 1, 0, 1, "INBOX", "inbox",
+                "<html><body>ñ😊</body></html>", "ñ😊", "[]", 1, "msg-1", null
+            )
+        )
+
+        // Fila 2: body vacío, pero pdfs escaneados
+        v6Db.execSQL(
+            """INSERT INTO emails (
+                id, thread_id, sender, sender_initials, recipient_to,
+                subject, snippet, timestamp, is_read, is_starred,
+                has_attachments, labels, folder, body, clean_body,
+                pdf_attachments_json, pdf_metadata_scanned, rfc_message_id, rfc_references
+            ) VALUES (
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            )"""
+                .trimIndent(),
+            arrayOf<Any?>(
+                "email-empty", "thread-2", "C <c@d.com>", "C", "d@d.com", "Sub2", "Snip2", 2L, 1, 0, 1, "INBOX", "inbox",
+                "", "", "[{}]", 1, "msg-2", null
+            )
+        )
+
+        v6Db.close()
+
+        val v7Db: SupportSQLiteDatabase = helper.runMigrationsAndValidate(
+            testDbName, 7, true, MailDatabase.MIGRATION_6_7
+        )
+        assertEquals("Database migrated to version 7", 7, v7Db.version)
+
+        val cursor1 = v7Db.query("SELECT * FROM emails WHERE id = ?", arrayOf("email-html"))
+        assertTrue(cursor1.moveToFirst())
+        assertEquals("READY", cursor1.getString(cursor1.getColumnIndexOrThrow("content_state")))
+        assertEquals("HTML", cursor1.getString(cursor1.getColumnIndexOrThrow("body_kind")))
+        assertEquals("[]", cursor1.getString(cursor1.getColumnIndexOrThrow("inline_references_json")))
+        assertEquals(0L, cursor1.getLong(cursor1.getColumnIndexOrThrow("content_last_access_epoch_ms")))
+
+        // UTF-8 bytes for "<html><body>ñ😊</body></html>" (29 chars, ñ is 2, 😊 is 4) -> 6 + 6 + 2 + 4 + 7 + 7 = 32?
+        // Let's compute exact UTF-8 size:
+        val bodyStr = "<html><body>ñ😊</body></html>"
+        val cleanStr = "ñ😊"
+        val expectedBytes = bodyStr.toByteArray(Charsets.UTF_8).size + cleanStr.toByteArray(Charsets.UTF_8).size + 2
+        assertEquals(expectedBytes.toLong(), cursor1.getLong(cursor1.getColumnIndexOrThrow("cached_content_bytes")))
+        cursor1.close()
+
+        val cursor2 = v7Db.query("SELECT * FROM emails WHERE id = ?", arrayOf("email-empty"))
+        assertTrue(cursor2.moveToFirst())
+        assertEquals("NOT_FETCHED", cursor2.getString(cursor2.getColumnIndexOrThrow("content_state")))
+        assertEquals("UNKNOWN", cursor2.getString(cursor2.getColumnIndexOrThrow("body_kind")))
+        assertEquals("[]", cursor2.getString(cursor2.getColumnIndexOrThrow("inline_references_json")))
+        assertEquals(0L, cursor2.getLong(cursor2.getColumnIndexOrThrow("content_last_access_epoch_ms")))
+        assertEquals(0L, cursor2.getLong(cursor2.getColumnIndexOrThrow("cached_content_bytes")))
+        assertEquals("[{}]", cursor2.getString(cursor2.getColumnIndexOrThrow("pdf_attachments_json")))
+        assertEquals(1, cursor2.getInt(cursor2.getColumnIndexOrThrow("pdf_metadata_scanned")))
+        cursor2.close()
+
+        val pragmaCursor = v7Db.query("PRAGMA table_info(emails)")
+        var columnCount = 0
+        while (pragmaCursor.moveToNext()) columnCount++
+        pragmaCursor.close()
+        assertEquals("24 columns after migration", 24, columnCount)
+
+        v7Db.close()
     }
 }

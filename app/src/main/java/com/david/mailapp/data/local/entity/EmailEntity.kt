@@ -38,18 +38,18 @@ data class EmailEntity(
     @ColumnInfo(name = "rfc_message_id")
     val rfcMessageId: String? = null,
     @ColumnInfo(name = "rfc_references")
-    val rfcReferences: String? = null
+    val rfcReferences: String? = null,
+    @ColumnInfo(name = "content_state", defaultValue = "'NOT_FETCHED'")
+    val contentState: String = "NOT_FETCHED",
+    @ColumnInfo(name = "body_kind", defaultValue = "'UNKNOWN'")
+    val bodyKind: String = "UNKNOWN",
+    @ColumnInfo(name = "inline_references_json", defaultValue = "'[]'")
+    val inlineReferencesJson: String = "[]",
+    @ColumnInfo(name = "cached_content_bytes", defaultValue = "0")
+    val cachedContentBytes: Long = 0L,
+    @ColumnInfo(name = "content_last_access_epoch_ms", defaultValue = "0")
+    val contentLastAccessEpochMs: Long = 0L
 ) {
-    @androidx.room.Ignore
-    var contentState: com.david.mailapp.domain.model.EmailContentState = com.david.mailapp.domain.model.EmailContentState.NOT_FETCHED
-    @androidx.room.Ignore
-    var bodyKind: com.david.mailapp.domain.model.EmailBodyKind = com.david.mailapp.domain.model.EmailBodyKind.UNKNOWN
-    @androidx.room.Ignore
-    var inlineReferencesJson: String = "[]"
-    @androidx.room.Ignore
-    var cachedContentBytes: Long = 0L
-    @androidx.room.Ignore
-    var contentLastAccessEpochMs: Long = 0L
 
     fun toDomain(): Email {
         val pdfAttachments = PdfAttachmentMetadataCodec.decode(pdfAttachmentsJson)
@@ -74,8 +74,10 @@ data class EmailEntity(
             pdfMetadataScanned = pdfMetadataScanned,
             rfcMessageId = rfcMessageId,
             rfcReferences = rfcReferences,
-            contentState = contentState,
-            bodyKind = bodyKind,
+            contentState = runCatching { com.david.mailapp.domain.model.EmailContentState.valueOf(contentState) }
+                .getOrDefault(com.david.mailapp.domain.model.EmailContentState.NOT_FETCHED),
+            bodyKind = runCatching { com.david.mailapp.domain.model.EmailBodyKind.valueOf(bodyKind) }
+                .getOrDefault(com.david.mailapp.domain.model.EmailBodyKind.UNKNOWN),
             inlineReferences = inlineRefs,
             cachedContentBytes = cachedContentBytes,
             contentLastAccessEpochMs = contentLastAccessEpochMs
@@ -84,7 +86,7 @@ data class EmailEntity(
 
     companion object {
         fun fromDomain(email: Email, folder: EmailFolder): EmailEntity {
-            val entity = EmailEntity(
+            return EmailEntity(
                 id = email.id,
                 threadId = email.threadId,
                 from = email.from,
@@ -103,14 +105,13 @@ data class EmailEntity(
                 pdfAttachmentsJson = PdfAttachmentMetadataCodec.encode(email.pdfAttachments),
                 pdfMetadataScanned = email.pdfMetadataScanned,
                 rfcMessageId = email.rfcMessageId,
-                rfcReferences = email.rfcReferences
+                rfcReferences = email.rfcReferences,
+                contentState = email.contentState.name,
+                bodyKind = email.bodyKind.name,
+                inlineReferencesJson = com.david.mailapp.data.local.converter.InlineContentReferenceCodec.encode(email.inlineReferences),
+                cachedContentBytes = email.cachedContentBytes,
+                contentLastAccessEpochMs = email.contentLastAccessEpochMs
             )
-            entity.contentState = email.contentState
-            entity.bodyKind = email.bodyKind
-            entity.inlineReferencesJson = com.david.mailapp.data.local.converter.InlineContentReferenceCodec.encode(email.inlineReferences)
-            entity.cachedContentBytes = email.cachedContentBytes
-            entity.contentLastAccessEpochMs = email.contentLastAccessEpochMs
-            return entity
         }
     }
 }

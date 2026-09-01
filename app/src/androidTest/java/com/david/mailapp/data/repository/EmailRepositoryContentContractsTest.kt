@@ -134,6 +134,13 @@ class EmailRepositoryContentContractsTest {
         assertEquals(true, finalEmission.pdfMetadataScanned)
         assertEquals(true, finalEmission.hasAttachments)
         assertEquals(pdfs, finalEmission.toDomain().pdfAttachments)
+        assertEquals("READY", finalEmission.contentState)
+        assertEquals("HTML", finalEmission.bodyKind)
+
+        val refsJson = com.david.mailapp.data.local.converter.InlineContentReferenceCodec.encode(result.inlineRefs)
+        assertEquals(refsJson, finalEmission.inlineReferencesJson)
+        val expectedBytes = rawHtml.toByteArray(Charsets.UTF_8).size.toLong() + expectedClean.toByteArray(Charsets.UTF_8).size.toLong() + refsJson.toByteArray(Charsets.UTF_8).size.toLong()
+        assertEquals(expectedBytes, finalEmission.cachedContentBytes)
 
         // Fila final y preservación de campos no relacionados
         val after = get("e1")!!
@@ -142,6 +149,10 @@ class EmailRepositoryContentContractsTest {
         assertEquals(true, after.pdfMetadataScanned)
         assertEquals(true, after.hasAttachments)
         assertEquals(pdfs, after.toDomain().pdfAttachments)
+        assertEquals("READY", after.contentState)
+        assertEquals("HTML", after.bodyKind)
+        assertEquals(refsJson, after.inlineReferencesJson)
+        assertEquals(expectedBytes, after.cachedContentBytes)
         assertUnrelatedFieldsPreserved(before, after)
     }
 
@@ -150,24 +161,20 @@ class EmailRepositoryContentContractsTest {
     // ═══════════════════════════════════════════════════════════════
 
     @Test
-    fun c2_fetchAndCacheBody_null_body_preserves_body_and_persists_pdf_metadata() = runTest {
+    fun c2_fetchAndCacheBody_empty_result_clears_body_and_persists_pdf_metadata() = runTest {
         val pdfs = listOf(
             PdfAttachmentMetadata("invoice.pdf", "application/pdf", "att-3", 512L, partId = "0.1")
         )
         val oldHtml = """<html><body><p>Old <i>stored</i> body</p></body></html>"""
         val oldClean = EmailHtmlCleaner.clean(oldHtml)
+        val oldRefs = listOf(com.david.mailapp.domain.model.EmailInlineReference("old", "att-old", "image/png"))
 
-        // Fila inicialmente vacía y fila con cuerpo previamente almacenado
-        db.emailDao().upsertAll(
-            listOf(
-                EmailEntity.fromDomain(testEmail(id = "e2-empty"), EmailFolder.Inbox),
-                EmailEntity.fromDomain(
-                    testEmail(id = "e2-stored").copy(body = oldHtml, cleanBody = oldClean),
-                    EmailFolder.Inbox
-                )
-            )
+        val storedEmail = EmailEntity.fromDomain(
+            testEmail(id = "e2-stored").copy(body = oldHtml, cleanBody = oldClean, inlineReferences = oldRefs, contentState = com.david.mailapp.domain.model.EmailContentState.READY, bodyKind = com.david.mailapp.domain.model.EmailBodyKind.HTML),
+            EmailFolder.Inbox
         )
-        val beforeEmpty = get("e2-empty")!!
+
+        db.emailDao().upsertAll(listOf(storedEmail))
         val beforeStored = get("e2-stored")!!
 
         fakeProvider.fetchBodyResult = BodyFetchResult(
@@ -178,33 +185,24 @@ class EmailRepositoryContentContractsTest {
             pdfAttachments = pdfs
         )
 
-        val returnedEmpty = repository.fetchAndCacheBody("e2-empty")
         val returnedStored = repository.fetchAndCacheBody("e2-stored")
 
-        assertSame(fakeProvider.fetchBodyResult, returnedEmpty)
         assertSame(fakeProvider.fetchBodyResult, returnedStored)
-        assertEquals(listOf("e2-empty", "e2-stored"), fakeProvider.receivedFetchBodyIds)
-        assertEquals(
-            listOf("gmail.fetchBody", "room.commit", "gmail.fetchBody", "room.commit"),
-            events
-        )
+        assertEquals(listOf("e2-stored"), fakeProvider.receivedFetchBodyIds)
+        assertEquals(listOf("gmail.fetchBody", "room.commit"), events)
 
-        // La fila vacía se mantiene vacía pero gana metadata PDF
-        val emptyAfter = get("e2-empty")!!
-        assertEquals("", emptyAfter.body)
-        assertEquals("", emptyAfter.cleanBody)
-        assertEquals(true, emptyAfter.pdfMetadataScanned)
-        assertEquals(true, emptyAfter.hasAttachments)
-        assertEquals(pdfs, emptyAfter.toDomain().pdfAttachments)
-        assertUnrelatedFieldsPreserved(beforeEmpty, emptyAfter)
-
-        // La fila con cuerpo conserva body/cleanBody preexistentes y gana metadata PDF
+        // La fila con cuerpo se limpia y gana metadata PDF y el nuevo estado
         val storedAfter = get("e2-stored")!!
-        assertEquals(oldHtml, storedAfter.body)
-        assertEquals(oldClean, storedAfter.cleanBody)
+        assertEquals("", storedAfter.body)
+        assertEquals("", storedAfter.cleanBody)
         assertEquals(true, storedAfter.pdfMetadataScanned)
         assertEquals(true, storedAfter.hasAttachments)
         assertEquals(pdfs, storedAfter.toDomain().pdfAttachments)
+        assertEquals("EMPTY", storedAfter.contentState)
+        assertEquals("UNKNOWN", storedAfter.bodyKind)
+        assertEquals("[]", storedAfter.inlineReferencesJson)
+        assertEquals(2L, storedAfter.cachedContentBytes) // "[]".toByteArray().size
+
         assertUnrelatedFieldsPreserved(beforeStored, storedAfter)
     }
 

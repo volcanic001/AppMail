@@ -163,11 +163,15 @@ interface EmailDao {
      */
     @Query("""
         UPDATE emails SET
-            body = CASE WHEN :body != '' THEN :body ELSE body END,
-            clean_body = CASE WHEN :cleanBody != '' THEN :cleanBody ELSE clean_body END,
+            body = :body,
+            clean_body = :cleanBody,
             pdf_attachments_json = :pdfAttachmentsJson,
             pdf_metadata_scanned = 1,
-            has_attachments = :hasAttachments
+            has_attachments = :hasAttachments,
+            content_state = :contentState,
+            body_kind = :bodyKind,
+            inline_references_json = :inlineReferencesJson,
+            cached_content_bytes = :cachedContentBytes
         WHERE id = :emailId
     """)
     suspend fun updateBodyAndPdfMetadata(
@@ -175,6 +179,10 @@ interface EmailDao {
         body: String,
         cleanBody: String,
         pdfAttachmentsJson: String,
-        hasAttachments: Boolean
+        hasAttachments: Boolean,
+        contentState: String,
+        bodyKind: String,
+        inlineReferencesJson: String,
+        cachedContentBytes: Long
     )
 }
