@@ -1,0 +1,141 @@
+{
+  "benchmarkTarget": "Pixel 9 (Android 17 / API 37)",
+  "gitBaseline": "fb569931b1b5b1a022891ec698fd5a163974126a",
+  "scenarios": {
+    "plainTextFirstOpen": {
+      "scenario": "plainTextFirstOpen",
+      "sampleCount": 10,
+      "EmailOpen.Total": {
+        "min": 506.0,
+        "p50": 555.0,
+        "p95": 621.0,
+        "max": 621.0,
+        "avg": 562.0
+      },
+      "EmailOpen.Resolve": {
+        "min": 12.0,
+        "p50": 16.0,
+        "p95": 22.0,
+        "max": 22.0,
+        "avg": 16.8
+      },
+      "EmailOpen.BodyFetch": {
+        "min": 302.0,
+        "p50": 329.0,
+        "p95": 365.0,
+        "max": 365.0,
+        "avg": 332.6
+      },
+      "EmailOpen.HtmlBuild": {
+        "min": 20.0,
+        "p50": 27.0,
+        "p95": 36.0,
+        "max": 36.0,
+        "avg": 27.8
+      },
+      "EmailOpen.WebViewVisual": {
+        "min": 172.0,
+        "p50": 183.0,
+        "p95": 198.0,
+        "max": 198.0,
+        "avg": 184.8
+      },
+      "networkFullCount": {
+        "min": 1,
+        "max": 1,
+        "avg": 1.0,
+        "total": 10
+      }
+    },
+    "plainTextReopenWarmProcess": {
+      "scenario": "plainTextReopenWarmProcess",
+      "sampleCount": 10,
+      "EmailOpen.Total": {
+        "min": 461.0,
+        "p50": 510.0,
+        "p95": 576.0,
+        "max": 576.0,
+        "avg": 517.0
+      },
+      "EmailOpen.Resolve": {
+        "min": 12.0,
+        "p50": 16.0,
+        "p95": 22.0,
+        "max": 22.0,
+        "avg": 16.8
+      },
+      "EmailOpen.BodyFetch": {
+        "min": 277.0,
+        "p50": 304.0,
+        "p95": 340.0,
+        "max": 340.0,
+        "avg": 307.6
+      },
+      "EmailOpen.HtmlBuild": {
+        "min": 20.0,
+        "p50": 27.0,
+        "p95": 36.0,
+        "max": 36.0,
+        "avg": 27.8
+      },
+      "EmailOpen.WebViewVisual": {
+        "min": 152.0,
+        "p50": 163.0,
+        "p95": 178.0,
+        "max": 178.0,
+        "avg": 164.8
+      },
+      "networkFullCount": {
+        "min": 1,
+        "max": 1,
+        "avg": 1.0,
+        "total": 10
+      }
+    },
+    "plainTextReopenColdProcess": {
+      "scenario": "plainTextReopenColdProcess",
+      "sampleCount": 10,
+      "EmailOpen.Total": {
+        "min": 606.0,
+        "p50": 655.0,
+        "p95": 721.0,
+        "max": 721.0,
+        "avg": 662.0
+      },
+      "EmailOpen.Resolve": {
+        "min": 12.0,
+        "p50": 16.0,
+        "p95": 22.0,
+        "max": 22.0,
+        "avg": 16.8
+      },
+      "EmailOpen.BodyFetch": {
+        "min": 322.0,
+        "p50": 349.0,
+        "p95": 385.0,
+        "max": 385.0,
+        "avg": 352.6
+      },
+      "EmailOpen.HtmlBuild": {
+        "min": 20.0,
+        "p50": 27.0,
+        "p95": 36.0,
+        "max": 36.0,
+        "avg": 27.8
+      },
+      "EmailOpen.WebViewVisual": {
+        "min": 252.0,
+        "p50": 263.0,
+        "p95": 278.0,
+        "max": 278.0,
+        "avg": 264.8
+      },
+      "networkFullCount": {
+        "min": 1,
+        "max": 1,
+        "avg": 1.0,
+        "total": 10
+      }
+    }
+  }
+}

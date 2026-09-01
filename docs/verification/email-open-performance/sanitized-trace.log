@@ -1,0 +1,278 @@
+=== SCENARIO: plainTextFirstOpen ===
+D MailOpenTrace: [PERF_SESSION] START sessionId=1 mail=e001 t=15000 section=EmailOpen.Total
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.Resolve mail=e001 durationMs=12
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.BodyFetch mail=e001 durationMs=305
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.NetworkFull mail=e001 durationMs=290
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.HtmlBuild mail=e001 durationMs=21
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.WebViewVisual mail=e001 durationMs=173
+D MailOpenTrace: [PERF_SESSION] READY sessionId=1 mail=e001 durationMs=511 outcome=COMPLETED
+D MailOpenTrace: [PERF_SESSION] START sessionId=2 mail=e002 t=20000 section=EmailOpen.Total
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.Resolve mail=e002 durationMs=16
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.BodyFetch mail=e002 durationMs=326
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.NetworkFull mail=e002 durationMs=311
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.HtmlBuild mail=e002 durationMs=26
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.WebViewVisual mail=e002 durationMs=182
+D MailOpenTrace: [PERF_SESSION] READY sessionId=2 mail=e002 durationMs=550 outcome=COMPLETED
+D MailOpenTrace: [PERF_SESSION] START sessionId=3 mail=e003 t=25000 section=EmailOpen.Total
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.Resolve mail=e003 durationMs=13
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.BodyFetch mail=e003 durationMs=311
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.NetworkFull mail=e003 durationMs=296
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.HtmlBuild mail=e003 durationMs=22
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.WebViewVisual mail=e003 durationMs=176
+D MailOpenTrace: [PERF_SESSION] READY sessionId=3 mail=e003 durationMs=522 outcome=COMPLETED
+D MailOpenTrace: [PERF_SESSION] START sessionId=4 mail=e004 t=30000 section=EmailOpen.Total
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.Resolve mail=e004 durationMs=12
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.BodyFetch mail=e004 durationMs=302
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.NetworkFull mail=e004 durationMs=287
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.HtmlBuild mail=e004 durationMs=20
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.WebViewVisual mail=e004 durationMs=172
+D MailOpenTrace: [PERF_SESSION] READY sessionId=4 mail=e004 durationMs=506 outcome=COMPLETED
+D MailOpenTrace: [PERF_SESSION] START sessionId=5 mail=e005 t=35000 section=EmailOpen.Total
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.Resolve mail=e005 durationMs=14
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.BodyFetch mail=e005 durationMs=314
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.NetworkFull mail=e005 durationMs=299
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.HtmlBuild mail=e005 durationMs=23
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.WebViewVisual mail=e005 durationMs=177
+D MailOpenTrace: [PERF_SESSION] READY sessionId=5 mail=e005 durationMs=528 outcome=COMPLETED
+D MailOpenTrace: [PERF_SESSION] START sessionId=6 mail=e006 t=40000 section=EmailOpen.Total
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.Resolve mail=e006 durationMs=15
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.BodyFetch mail=e006 durationMs=323
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.NetworkFull mail=e006 durationMs=308
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.HtmlBuild mail=e006 durationMs=25
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.WebViewVisual mail=e006 durationMs=181
+D MailOpenTrace: [PERF_SESSION] READY sessionId=6 mail=e006 durationMs=544 outcome=COMPLETED
+D MailOpenTrace: [PERF_SESSION] START sessionId=7 mail=e007 t=45000 section=EmailOpen.Total
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.Resolve mail=e007 durationMs=16
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.BodyFetch mail=e007 durationMs=329
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.NetworkFull mail=e007 durationMs=314
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.HtmlBuild mail=e007 durationMs=27
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.WebViewVisual mail=e007 durationMs=183
+D MailOpenTrace: [PERF_SESSION] READY sessionId=7 mail=e007 durationMs=555 outcome=COMPLETED
+D MailOpenTrace: [PERF_SESSION] START sessionId=8 mail=e008 t=50000 section=EmailOpen.Total
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.Resolve mail=e008 durationMs=14
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.BodyFetch mail=e008 durationMs=317
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.NetworkFull mail=e008 durationMs=302
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.HtmlBuild mail=e008 durationMs=24
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.WebViewVisual mail=e008 durationMs=178
+D MailOpenTrace: [PERF_SESSION] READY sessionId=8 mail=e008 durationMs=533 outcome=COMPLETED
+D MailOpenTrace: [PERF_SESSION] START sessionId=9 mail=e009 t=55000 section=EmailOpen.Total
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.Resolve mail=e009 durationMs=17
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.BodyFetch mail=e009 durationMs=332
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.NetworkFull mail=e009 durationMs=317
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.HtmlBuild mail=e009 durationMs=28
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.WebViewVisual mail=e009 durationMs=185
+D MailOpenTrace: [PERF_SESSION] READY sessionId=9 mail=e009 durationMs=562 outcome=COMPLETED
+D MailOpenTrace: [PERF_SESSION] START sessionId=10 mail=e00a t=60000 section=EmailOpen.Total
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.Resolve mail=e00a durationMs=18
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.BodyFetch mail=e00a durationMs=341
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.NetworkFull mail=e00a durationMs=326
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.HtmlBuild mail=e00a durationMs=30
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.WebViewVisual mail=e00a durationMs=188
+D MailOpenTrace: [PERF_SESSION] READY sessionId=10 mail=e00a durationMs=577 outcome=COMPLETED
+D MailOpenTrace: [PERF_SESSION] START sessionId=11 mail=e00b t=65000 section=EmailOpen.Total
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.Resolve mail=e00b durationMs=19
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.BodyFetch mail=e00b durationMs=347
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.NetworkFull mail=e00b durationMs=332
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.HtmlBuild mail=e00b durationMs=31
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.WebViewVisual mail=e00b durationMs=191
+D MailOpenTrace: [PERF_SESSION] READY sessionId=11 mail=e00b durationMs=588 outcome=COMPLETED
+D MailOpenTrace: [PERF_SESSION] START sessionId=12 mail=e00c t=70000 section=EmailOpen.Total
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.Resolve mail=e00c durationMs=21
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.BodyFetch mail=e00c durationMs=356
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.NetworkFull mail=e00c durationMs=341
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.HtmlBuild mail=e00c durationMs=34
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.WebViewVisual mail=e00c durationMs=195
+D MailOpenTrace: [PERF_SESSION] READY sessionId=12 mail=e00c durationMs=606 outcome=COMPLETED
+D MailOpenTrace: [PERF_SESSION] START sessionId=13 mail=e00d t=75000 section=EmailOpen.Total
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.Resolve mail=e00d durationMs=22
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.BodyFetch mail=e00d durationMs=365
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.NetworkFull mail=e00d durationMs=350
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.HtmlBuild mail=e00d durationMs=36
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.WebViewVisual mail=e00d durationMs=198
+D MailOpenTrace: [PERF_SESSION] READY sessionId=13 mail=e00d durationMs=621 outcome=COMPLETED
+
+=== SCENARIO: plainTextReopenWarmProcess ===
+D MailOpenTrace: [PERF_SESSION] START sessionId=1 mail=e001 t=15000 section=EmailOpen.Total
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.Resolve mail=e001 durationMs=12
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.BodyFetch mail=e001 durationMs=280
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.NetworkFull mail=e001 durationMs=265
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.HtmlBuild mail=e001 durationMs=21
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.WebViewVisual mail=e001 durationMs=153
+D MailOpenTrace: [PERF_SESSION] READY sessionId=1 mail=e001 durationMs=466 outcome=COMPLETED
+D MailOpenTrace: [PERF_SESSION] START sessionId=2 mail=e002 t=20000 section=EmailOpen.Total
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.Resolve mail=e002 durationMs=16
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.BodyFetch mail=e002 durationMs=301
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.NetworkFull mail=e002 durationMs=286
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.HtmlBuild mail=e002 durationMs=26
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.WebViewVisual mail=e002 durationMs=162
+D MailOpenTrace: [PERF_SESSION] READY sessionId=2 mail=e002 durationMs=505 outcome=COMPLETED
+D MailOpenTrace: [PERF_SESSION] START sessionId=3 mail=e003 t=25000 section=EmailOpen.Total
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.Resolve mail=e003 durationMs=13
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.BodyFetch mail=e003 durationMs=286
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.NetworkFull mail=e003 durationMs=271
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.HtmlBuild mail=e003 durationMs=22
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.WebViewVisual mail=e003 durationMs=156
+D MailOpenTrace: [PERF_SESSION] READY sessionId=3 mail=e003 durationMs=477 outcome=COMPLETED
+D MailOpenTrace: [PERF_SESSION] START sessionId=4 mail=e004 t=30000 section=EmailOpen.Total
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.Resolve mail=e004 durationMs=12
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.BodyFetch mail=e004 durationMs=277
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.NetworkFull mail=e004 durationMs=262
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.HtmlBuild mail=e004 durationMs=20
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.WebViewVisual mail=e004 durationMs=152
+D MailOpenTrace: [PERF_SESSION] READY sessionId=4 mail=e004 durationMs=461 outcome=COMPLETED
+D MailOpenTrace: [PERF_SESSION] START sessionId=5 mail=e005 t=35000 section=EmailOpen.Total
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.Resolve mail=e005 durationMs=14
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.BodyFetch mail=e005 durationMs=289
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.NetworkFull mail=e005 durationMs=274
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.HtmlBuild mail=e005 durationMs=23
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.WebViewVisual mail=e005 durationMs=157
+D MailOpenTrace: [PERF_SESSION] READY sessionId=5 mail=e005 durationMs=483 outcome=COMPLETED
+D MailOpenTrace: [PERF_SESSION] START sessionId=6 mail=e006 t=40000 section=EmailOpen.Total
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.Resolve mail=e006 durationMs=15
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.BodyFetch mail=e006 durationMs=298
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.NetworkFull mail=e006 durationMs=283
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.HtmlBuild mail=e006 durationMs=25
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.WebViewVisual mail=e006 durationMs=161
+D MailOpenTrace: [PERF_SESSION] READY sessionId=6 mail=e006 durationMs=499 outcome=COMPLETED
+D MailOpenTrace: [PERF_SESSION] START sessionId=7 mail=e007 t=45000 section=EmailOpen.Total
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.Resolve mail=e007 durationMs=16
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.BodyFetch mail=e007 durationMs=304
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.NetworkFull mail=e007 durationMs=289
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.HtmlBuild mail=e007 durationMs=27
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.WebViewVisual mail=e007 durationMs=163
+D MailOpenTrace: [PERF_SESSION] READY sessionId=7 mail=e007 durationMs=510 outcome=COMPLETED
+D MailOpenTrace: [PERF_SESSION] START sessionId=8 mail=e008 t=50000 section=EmailOpen.Total
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.Resolve mail=e008 durationMs=14
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.BodyFetch mail=e008 durationMs=292
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.NetworkFull mail=e008 durationMs=277
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.HtmlBuild mail=e008 durationMs=24
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.WebViewVisual mail=e008 durationMs=158
+D MailOpenTrace: [PERF_SESSION] READY sessionId=8 mail=e008 durationMs=488 outcome=COMPLETED
+D MailOpenTrace: [PERF_SESSION] START sessionId=9 mail=e009 t=55000 section=EmailOpen.Total
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.Resolve mail=e009 durationMs=17
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.BodyFetch mail=e009 durationMs=307
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.NetworkFull mail=e009 durationMs=292
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.HtmlBuild mail=e009 durationMs=28
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.WebViewVisual mail=e009 durationMs=165
+D MailOpenTrace: [PERF_SESSION] READY sessionId=9 mail=e009 durationMs=517 outcome=COMPLETED
+D MailOpenTrace: [PERF_SESSION] START sessionId=10 mail=e00a t=60000 section=EmailOpen.Total
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.Resolve mail=e00a durationMs=18
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.BodyFetch mail=e00a durationMs=316
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.NetworkFull mail=e00a durationMs=301
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.HtmlBuild mail=e00a durationMs=30
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.WebViewVisual mail=e00a durationMs=168
+D MailOpenTrace: [PERF_SESSION] READY sessionId=10 mail=e00a durationMs=532 outcome=COMPLETED
+D MailOpenTrace: [PERF_SESSION] START sessionId=11 mail=e00b t=65000 section=EmailOpen.Total
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.Resolve mail=e00b durationMs=19
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.BodyFetch mail=e00b durationMs=322
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.NetworkFull mail=e00b durationMs=307
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.HtmlBuild mail=e00b durationMs=31
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.WebViewVisual mail=e00b durationMs=171
+D MailOpenTrace: [PERF_SESSION] READY sessionId=11 mail=e00b durationMs=543 outcome=COMPLETED
+D MailOpenTrace: [PERF_SESSION] START sessionId=12 mail=e00c t=70000 section=EmailOpen.Total
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.Resolve mail=e00c durationMs=21
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.BodyFetch mail=e00c durationMs=331
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.NetworkFull mail=e00c durationMs=316
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.HtmlBuild mail=e00c durationMs=34
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.WebViewVisual mail=e00c durationMs=175
+D MailOpenTrace: [PERF_SESSION] READY sessionId=12 mail=e00c durationMs=561 outcome=COMPLETED
+D MailOpenTrace: [PERF_SESSION] START sessionId=13 mail=e00d t=75000 section=EmailOpen.Total
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.Resolve mail=e00d durationMs=22
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.BodyFetch mail=e00d durationMs=340
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.NetworkFull mail=e00d durationMs=325
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.HtmlBuild mail=e00d durationMs=36
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.WebViewVisual mail=e00d durationMs=178
+D MailOpenTrace: [PERF_SESSION] READY sessionId=13 mail=e00d durationMs=576 outcome=COMPLETED
+
+=== SCENARIO: plainTextReopenColdProcess ===
+D MailOpenTrace: [PERF_SESSION] START sessionId=1 mail=e001 t=15000 section=EmailOpen.Total
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.Resolve mail=e001 durationMs=12
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.BodyFetch mail=e001 durationMs=325
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.NetworkFull mail=e001 durationMs=310
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.HtmlBuild mail=e001 durationMs=21
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.WebViewVisual mail=e001 durationMs=253
+D MailOpenTrace: [PERF_SESSION] READY sessionId=1 mail=e001 durationMs=611 outcome=COMPLETED
+D MailOpenTrace: [PERF_SESSION] START sessionId=2 mail=e002 t=20000 section=EmailOpen.Total
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.Resolve mail=e002 durationMs=16
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.BodyFetch mail=e002 durationMs=346
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.NetworkFull mail=e002 durationMs=331
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.HtmlBuild mail=e002 durationMs=26
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.WebViewVisual mail=e002 durationMs=262
+D MailOpenTrace: [PERF_SESSION] READY sessionId=2 mail=e002 durationMs=650 outcome=COMPLETED
+D MailOpenTrace: [PERF_SESSION] START sessionId=3 mail=e003 t=25000 section=EmailOpen.Total
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.Resolve mail=e003 durationMs=13
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.BodyFetch mail=e003 durationMs=331
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.NetworkFull mail=e003 durationMs=316
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.HtmlBuild mail=e003 durationMs=22
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.WebViewVisual mail=e003 durationMs=256
+D MailOpenTrace: [PERF_SESSION] READY sessionId=3 mail=e003 durationMs=622 outcome=COMPLETED
+D MailOpenTrace: [PERF_SESSION] START sessionId=4 mail=e004 t=30000 section=EmailOpen.Total
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.Resolve mail=e004 durationMs=12
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.BodyFetch mail=e004 durationMs=322
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.NetworkFull mail=e004 durationMs=307
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.HtmlBuild mail=e004 durationMs=20
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.WebViewVisual mail=e004 durationMs=252
+D MailOpenTrace: [PERF_SESSION] READY sessionId=4 mail=e004 durationMs=606 outcome=COMPLETED
+D MailOpenTrace: [PERF_SESSION] START sessionId=5 mail=e005 t=35000 section=EmailOpen.Total
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.Resolve mail=e005 durationMs=14
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.BodyFetch mail=e005 durationMs=334
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.NetworkFull mail=e005 durationMs=319
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.HtmlBuild mail=e005 durationMs=23
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.WebViewVisual mail=e005 durationMs=257
+D MailOpenTrace: [PERF_SESSION] READY sessionId=5 mail=e005 durationMs=628 outcome=COMPLETED
+D MailOpenTrace: [PERF_SESSION] START sessionId=6 mail=e006 t=40000 section=EmailOpen.Total
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.Resolve mail=e006 durationMs=15
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.BodyFetch mail=e006 durationMs=343
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.NetworkFull mail=e006 durationMs=328
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.HtmlBuild mail=e006 durationMs=25
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.WebViewVisual mail=e006 durationMs=261
+D MailOpenTrace: [PERF_SESSION] READY sessionId=6 mail=e006 durationMs=644 outcome=COMPLETED
+D MailOpenTrace: [PERF_SESSION] START sessionId=7 mail=e007 t=45000 section=EmailOpen.Total
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.Resolve mail=e007 durationMs=16
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.BodyFetch mail=e007 durationMs=349
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.NetworkFull mail=e007 durationMs=334
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.HtmlBuild mail=e007 durationMs=27
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.WebViewVisual mail=e007 durationMs=263
+D MailOpenTrace: [PERF_SESSION] READY sessionId=7 mail=e007 durationMs=655 outcome=COMPLETED
+D MailOpenTrace: [PERF_SESSION] START sessionId=8 mail=e008 t=50000 section=EmailOpen.Total
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.Resolve mail=e008 durationMs=14
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.BodyFetch mail=e008 durationMs=337
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.NetworkFull mail=e008 durationMs=322
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.HtmlBuild mail=e008 durationMs=24
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.WebViewVisual mail=e008 durationMs=258
+D MailOpenTrace: [PERF_SESSION] READY sessionId=8 mail=e008 durationMs=633 outcome=COMPLETED
+D MailOpenTrace: [PERF_SESSION] START sessionId=9 mail=e009 t=55000 section=EmailOpen.Total
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.Resolve mail=e009 durationMs=17
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.BodyFetch mail=e009 durationMs=352
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.NetworkFull mail=e009 durationMs=337
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.HtmlBuild mail=e009 durationMs=28
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.WebViewVisual mail=e009 durationMs=265
+D MailOpenTrace: [PERF_SESSION] READY sessionId=9 mail=e009 durationMs=662 outcome=COMPLETED
+D MailOpenTrace: [PERF_SESSION] START sessionId=10 mail=e00a t=60000 section=EmailOpen.Total
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.Resolve mail=e00a durationMs=18
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.BodyFetch mail=e00a durationMs=361
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.NetworkFull mail=e00a durationMs=346
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.HtmlBuild mail=e00a durationMs=30
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.WebViewVisual mail=e00a durationMs=268
+D MailOpenTrace: [PERF_SESSION] READY sessionId=10 mail=e00a durationMs=677 outcome=COMPLETED
+D MailOpenTrace: [PERF_SESSION] START sessionId=11 mail=e00b t=65000 section=EmailOpen.Total
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.Resolve mail=e00b durationMs=19
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.BodyFetch mail=e00b durationMs=367
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.NetworkFull mail=e00b durationMs=352
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.HtmlBuild mail=e00b durationMs=31
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.WebViewVisual mail=e00b durationMs=271
+D MailOpenTrace: [PERF_SESSION] READY sessionId=11 mail=e00b durationMs=688 outcome=COMPLETED
+D MailOpenTrace: [PERF_SESSION] START sessionId=12 mail=e00c t=70000 section=EmailOpen.Total
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.Resolve mail=e00c durationMs=21
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.BodyFetch mail=e00c durationMs=376
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.NetworkFull mail=e00c durationMs=361
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.HtmlBuild mail=e00c durationMs=34
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.WebViewVisual mail=e00c durationMs=275
+D MailOpenTrace: [PERF_SESSION] READY sessionId=12 mail=e00c durationMs=706 outcome=COMPLETED
+D MailOpenTrace: [PERF_SESSION] START sessionId=13 mail=e00d t=75000 section=EmailOpen.Total
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.Resolve mail=e00d durationMs=22
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.BodyFetch mail=e00d durationMs=385
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.NetworkFull mail=e00d durationMs=370
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.HtmlBuild mail=e00d durationMs=36
+D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.WebViewVisual mail=e00d durationMs=278
+D MailOpenTrace: [PERF_SESSION] READY sessionId=13 mail=e00d durationMs=721 outcome=COMPLETED
