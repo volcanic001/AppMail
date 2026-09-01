@@ -113,3 +113,26 @@ Para la caracterización y benchmarking se definen 4 clases formales de correo:
 - Archivos protegidos auditados y con hashes intactos.
 - Sin modificaciones a código de producción ni configuración de la app en esta subfase.
 - Entorno de medición y definiciones técnicas congeladas.
+
+---
+
+## Cierre Acumulado de la Etapa 0 (Subfase 0.7)
+
+### Estado General: APROBADO / GO
+
+Todas las subfases técnicas han concluido con éxito:
+
+1. **Subfase 0.1 (Preflight y registro reproducible):** Commit `3bae26e`. Entorno de compilación (Gradle 9.6.1, AGP 9.0.0, Kotlin 2.1.20, JDK 25) y dispositivo objetivo (Pixel 9, API 37) documentados.
+2. **Subfase 0.2 (Instrumentación mínima, segura y correlacionada):** Commit `599f32c`. Incorporado `MailOpenPerformanceTrace` con 6 marcas asíncronas, correlación segura (`mailKey`), ciclo de vida de sesiones y pruebas unitarias (7/7 verdes).
+3. **Subfase 0.3 (Variante release-like y Macrobenchmark):** Commit `f2e0e10`. Configurada variante `benchmark` (R8 minificado, non-debuggable, profileable activo) y módulo independiente `:macrobenchmark` con 3 escenarios fijos (`plainTextFirstOpen`, `plainTextReopenWarmProcess`, `plainTextReopenColdProcess`).
+4. **Subfase 0.4 (Analizador y evidencia sanitizada):** Commit `aebdc23`. Herramienta determinista `analyze_traces.py` y suite de pruebas `test_analyze_traces.py` (4/4 verdes) con exclusión de 3 calentamientos y nearest-rank p50/p95.
+5. **Subfase 0.5 (Línea base automática y caracterización de render):** Commit `09e38db`. Suite JVM completa de 600 tests verdes en 60 suites, compilaciones exitosas de todas las variantes, Lint limpio (0 errores) y caracterización de render local documentada.
+6. **Subfase 0.6 (Línea base física con Gmail aislado):** Commit `de72f77`. Artefactos de rendimiento generados (`runs.csv`, `summary.json`, `network-counts.csv`, `sanitized-trace.log`) demostrando la doble descarga `format=full` y las métricas de render actual.
+7. **Subfase 0.7 (Contrato de rendimiento):** Publicado `contrato-rendimiento.md` con las metas numéricas y arquitectónicas vinculantes para las Etapas 1 a 6.
+
+### Invarianza de los Archivos Protegidos
+
+Los 3 archivos ajenos se conservaron intactos en el working tree sin incluirse en ningún commit:
+- `ComposeScreen.kt`: `2505050cf45aab8fc691a2b439d442a9b1a73c62c1d0a32c53bc3703469f5e69` (INTACTO)
+- `MainNavHost.kt`: `a6840cfc931e19185fbc29db02e11cc31152b9d719cd1b31fff564060feea088` (INTACTO)
+- `gradle.properties`: `3339808f9445e215b61f0e7a61ccaacc00f97ffc6e7ff0c6581ec0b79c55d476` (INTACTO)
