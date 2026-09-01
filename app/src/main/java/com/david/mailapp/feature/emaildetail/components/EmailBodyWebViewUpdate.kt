@@ -103,6 +103,10 @@ internal fun updateEmailBodyWebView(
             "WV_LOAD_DATA",
             "loadKey=${document.key} htmlLen=${document.html.length}"
         )
+        com.david.mailapp.core.perf.MailOpenPerformanceTrace.beginSection(
+            com.david.mailapp.core.perf.MailOpenPerformanceTrace.SECTION_WEBVIEW_VISUAL,
+            traceMail
+        )
         webView.loadDataWithBaseURL(
             null,
             document.html,

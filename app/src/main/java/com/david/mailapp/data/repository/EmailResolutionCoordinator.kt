@@ -35,52 +35,56 @@ internal class EmailResolutionCoordinator(
      * not cancel the leader; cancellation of the leader cleans the flight entry and
      * allows a later retry. A new session never joins a flight from a prior session.
      */
-    suspend fun resolveEmailById(emailId: String): EmailResolutionResult {
-        val t0 = RepositoryTrace.now()
+    suspend fun resolveEmailById(emailId: String): EmailResolutionResult =
+        com.david.mailapp.core.perf.MailOpenPerformanceTrace.traceAsyncSection(
+            com.david.mailapp.core.perf.MailOpenPerformanceTrace.SECTION_RESOLVE,
+            emailId
+        ) {
+            val t0 = RepositoryTrace.now()
 
-        if (emailId.isBlank()) {
-            logResolve(emailId, null, t0, "INVALID_ID")
-            return EmailResolutionResult.Failure(EmailResolutionFailureReason.INVALID_ID)
-        }
+            if (emailId.isBlank()) {
+                logResolve(emailId, null, t0, "INVALID_ID")
+                return@traceAsyncSection EmailResolutionResult.Failure(EmailResolutionFailureReason.INVALID_ID)
+            }
 
-        val lease = writeGuard.capture()
-        if (lease == null) {
-            logResolve(emailId, null, t0, "NO_ACTIVE_ACCOUNT")
-            return EmailResolutionResult.Failure(EmailResolutionFailureReason.NO_ACTIVE_ACCOUNT)
-        }
+            val lease = writeGuard.capture()
+            if (lease == null) {
+                logResolve(emailId, null, t0, "NO_ACTIVE_ACCOUNT")
+                return@traceAsyncSection EmailResolutionResult.Failure(EmailResolutionFailureReason.NO_ACTIVE_ACCOUNT)
+            }
 
-        val flightKey = lease.generation to emailId
+            val flightKey = lease.generation to emailId
 
-        // Single-flight: atomically register or join an existing flight
-        val newDeferred = CompletableDeferred<EmailResolutionResult>()
-        val existing = pendingResolutions.putIfAbsent(flightKey, newDeferred)
+            // Single-flight: atomically register or join an existing flight
+            val newDeferred = CompletableDeferred<EmailResolutionResult>()
+            val existing = pendingResolutions.putIfAbsent(flightKey, newDeferred)
 
-        if (existing != null) {
-            // Follower — wait on the leader's deferred (own cancellation does not cancel the leader)
-            logResolve(emailId, null, t0, "JOIN_SINGLE_FLIGHT")
-            return try {
-                existing.await()
+            if (existing != null) {
+                // Follower — wait on the leader's deferred (own cancellation does not cancel the leader)
+                logResolve(emailId, null, t0, "JOIN_SINGLE_FLIGHT")
+                return@traceAsyncSection try {
+                    existing.await()
+                } catch (e: CancellationException) {
+                    throw e
+                }
+            }
+
+            // Leader
+            try {
+                val result = resolveInternal(emailId, lease, t0)
+                newDeferred.complete(result)
+                result
             } catch (e: CancellationException) {
+                newDeferred.cancel(e)
                 throw e
+            } catch (e: Exception) {
+                val failure = EmailResolutionResult.Failure(EmailResolutionFailureReason.INVALID_RESPONSE)
+                newDeferred.complete(failure)
+                failure
+            } finally {
+                pendingResolutions.remove(flightKey, newDeferred)
             }
         }
-
-        // Leader
-        try {
-            val result = resolveInternal(emailId, lease, t0)
-            newDeferred.complete(result)
-            return result
-        } catch (e: CancellationException) {
-            newDeferred.cancel(e)
-            throw e
-        } catch (e: Exception) {
-            val failure = EmailResolutionResult.Failure(EmailResolutionFailureReason.INVALID_RESPONSE)
-            newDeferred.complete(failure)
-            return failure
-        } finally {
-            pendingResolutions.remove(flightKey, newDeferred)
-        }
-    }
 
     private suspend fun resolveInternal(
         emailId: String,

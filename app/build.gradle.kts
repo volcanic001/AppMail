@@ -30,6 +30,8 @@ android {
 
         // OAuth2 redirect URI for Gmail / Outlook
         manifestPlaceholders["appAuthRedirectScheme"] = "com.david.mailapp"
+
+        buildConfigField("boolean", "PERF_TRACE_ENABLED", "false")
     }
 
     buildTypes {
@@ -41,9 +43,11 @@ android {
                 "proguard-rules.pro"
             )
             signingConfig = signingConfigs.getByName("debug")
+            buildConfigField("boolean", "PERF_TRACE_ENABLED", "false")
         }
         debug {
             isMinifyEnabled = false
+            buildConfigField("boolean", "PERF_TRACE_ENABLED", "true")
         }
     }
 
@@ -126,6 +130,9 @@ dependencies {
 
     // Jsoup (HTML cleaning/sanitization)
     implementation(libs.jsoup)
+
+    // Tracing
+    implementation(libs.androidx.tracing)
 
     // Unit testing
     testImplementation(libs.junit)

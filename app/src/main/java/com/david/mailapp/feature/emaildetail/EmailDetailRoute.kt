@@ -53,10 +53,30 @@ internal fun EmailDetailRoute(
         EmailRenderTrace.d(traceMail, "UI", "UI_SCREEN_ENTER")
         onDispose {
             EmailRenderTrace.d(traceMail, "UI", "UI_SCREEN_DISPOSE")
+            com.david.mailapp.core.perf.MailOpenPerformanceTrace.onScreenDisposed(emailId)
         }
     }
 
     LaunchedEffect(uiState) {
+        when (val state = uiState) {
+            is EmailDetailUiState.Ready -> {
+                com.david.mailapp.core.perf.MailOpenPerformanceTrace.onEmailReady(emailId)
+            }
+            is EmailDetailUiState.ResolutionError -> {
+                com.david.mailapp.core.perf.MailOpenPerformanceTrace.onError(
+                    emailId,
+                    "resolution_error_${state.reason.name}"
+                )
+            }
+            is EmailDetailUiState.BodyError -> {
+                com.david.mailapp.core.perf.MailOpenPerformanceTrace.onError(
+                    emailId,
+                    "body_error_${state.reason.name}"
+                )
+            }
+            else -> Unit
+        }
+
         val details = when (val state = uiState) {
             EmailDetailUiState.Loading -> "state=Loading"
             is EmailDetailUiState.ResolutionError ->

@@ -49,7 +49,12 @@ internal fun InboxEmailList(
             }
         } else {
             items(items = state.emails, key = { it.id }) { email ->
-                val onClickRemembered = remember(email.id) { { onEmailClick(email.id) } }
+                val onClickRemembered = remember(email.id) {
+                    {
+                        com.david.mailapp.core.perf.MailOpenPerformanceTrace.onInboxItemClicked(email.id)
+                        onEmailClick(email.id)
+                    }
+                }
                 val onDeleteRemembered = remember(email.id) { { onMoveToTrash(email.id) } }
                 EmailListItem(
                     email = email,

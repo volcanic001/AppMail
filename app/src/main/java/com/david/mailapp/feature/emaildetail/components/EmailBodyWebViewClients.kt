@@ -45,6 +45,10 @@ internal class CustomTabsWebViewClient(
                         "WV_VISUAL_CALLBACK",
                         "loadKey=$loadKey requestId=$requestId"
                     )
+                    com.david.mailapp.core.perf.MailOpenPerformanceTrace.endSection(
+                        com.david.mailapp.core.perf.MailOpenPerformanceTrace.SECTION_WEBVIEW_VISUAL,
+                        traceMail
+                    )
                     onPageReady()
                 }
             }

@@ -18,44 +18,53 @@ internal class EmailContentCoordinator(
 ) {
     /** Fetch the full HTML body along with inline image refs and PDF metadata from the provider,
      * then persist everything atomically to Room. Metadata is persisted even when the body is empty. */
-    suspend fun fetchAndCacheBody(emailId: String): BodyFetchResult? {
-        // DEBUG_PERF
-        val t0 = RepositoryTrace.now()
-        Log.d(RepositoryTrace.MAIL_PERF_TAG, "[REPO_BODY] START emailId=$emailId")
-        val lease = writeGuard.capture() ?: run {
-            Log.d(RepositoryTrace.MAIL_PERF_TAG, "[REPO_BODY] GUARD_INVALIDATED emailId=$emailId")
-            return null
-        }
-        val result = providerFactory()?.fetchBodyWithRefs(emailId) ?: run {
-            Log.d(RepositoryTrace.MAIL_PERF_TAG, "[REPO_BODY] NO_PROVIDER_OR_FAILED emailId=$emailId")
-            return null
-        }
-        val rawBody = result.rawBody.orEmpty()
-        val tFetch = RepositoryTrace.now()
-        Log.d(RepositoryTrace.MAIL_PERF_TAG, "[REPO_BODY] FETCHED emailId=$emailId bodyLen=${rawBody.length} refs=${result.inlineRefs.size} pdfs=${result.pdfAttachments.size} fetchMs=${tFetch - t0}")
-
-        // Clean HTML only when there's a body
-        val cleanBody = if (rawBody.isNotBlank()) {
-            withContext(Dispatchers.Default) {
-                EmailHtmlCleaner.clean(rawBody)
+    suspend fun fetchAndCacheBody(emailId: String): BodyFetchResult? =
+        com.david.mailapp.core.perf.MailOpenPerformanceTrace.traceAsyncSection(
+            com.david.mailapp.core.perf.MailOpenPerformanceTrace.SECTION_BODY_FETCH,
+            emailId
+        ) {
+            // DEBUG_PERF
+            val t0 = RepositoryTrace.now()
+            Log.d(RepositoryTrace.MAIL_PERF_TAG, "[REPO_BODY] START emailId=$emailId")
+            val lease = writeGuard.capture() ?: run {
+                Log.d(RepositoryTrace.MAIL_PERF_TAG, "[REPO_BODY] GUARD_INVALIDATED emailId=$emailId")
+                return@traceAsyncSection null
             }
-        } else ""
+            val result = providerFactory()?.fetchBodyWithRefs(emailId) ?: run {
+                Log.d(RepositoryTrace.MAIL_PERF_TAG, "[REPO_BODY] NO_PROVIDER_OR_FAILED emailId=$emailId")
+                return@traceAsyncSection null
+            }
+            val rawBody = result.rawBody.orEmpty()
+            val tFetch = RepositoryTrace.now()
+            Log.d(RepositoryTrace.MAIL_PERF_TAG, "[REPO_BODY] FETCHED emailId=$emailId bodyLen=${rawBody.length} refs=${result.inlineRefs.size} pdfs=${result.pdfAttachments.size} fetchMs=${tFetch - t0}")
 
-        val pdfJson = PdfAttachmentMetadataCodec.encode(result.pdfAttachments)
-        val hasAtt = result.pdfAttachments.isNotEmpty()
+            // Clean HTML only when there's a body
+            val cleanBody = if (rawBody.isNotBlank()) {
+                com.david.mailapp.core.perf.MailOpenPerformanceTrace.traceSection(
+                    com.david.mailapp.core.perf.MailOpenPerformanceTrace.SECTION_HTML_BUILD,
+                    emailId
+                ) {
+                    withContext(Dispatchers.Default) {
+                        EmailHtmlCleaner.clean(rawBody)
+                    }
+                }
+            } else ""
 
-        writeGuard.commit(lease) {
-            dao.updateBodyAndPdfMetadata(
-                emailId = emailId,
-                body = rawBody,
-                cleanBody = cleanBody,
-                pdfAttachmentsJson = pdfJson,
-                hasAttachments = hasAtt
-            )
+            val pdfJson = PdfAttachmentMetadataCodec.encode(result.pdfAttachments)
+            val hasAtt = result.pdfAttachments.isNotEmpty()
+
+            writeGuard.commit(lease) {
+                dao.updateBodyAndPdfMetadata(
+                    emailId = emailId,
+                    body = rawBody,
+                    cleanBody = cleanBody,
+                    pdfAttachmentsJson = pdfJson,
+                    hasAttachments = hasAtt
+                )
+            }
+            Log.d(RepositoryTrace.MAIL_PERF_TAG, "[REPO_BODY] CACHED emailId=$emailId roomMs=${RepositoryTrace.now() - tFetch} totalMs=${RepositoryTrace.now() - t0}")
+            result
         }
-        Log.d(RepositoryTrace.MAIL_PERF_TAG, "[REPO_BODY] CACHED emailId=$emailId roomMs=${RepositoryTrace.now() - tFetch} totalMs=${RepositoryTrace.now() - t0}")
-        return result
-    }
 
     suspend fun downloadInlineImages(emailId: String, refs: List<InlineImageRef>): Map<String, String> {
         if (refs.isEmpty()) return emptyMap()
