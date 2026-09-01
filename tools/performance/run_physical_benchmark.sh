@@ -13,6 +13,7 @@ REQUIRED_DEVICE_CONTAINS="${REQUIRED_DEVICE_CONTAINS:-}"
 REQUIRED_SDK="${REQUIRED_SDK:-}"
 REFERENCE_LABEL="${REFERENCE_LABEL:-physicalAndroidReference}"
 SCENARIO_NAME="${SCENARIO_NAME:-plainTextFirstOpen}"
+SKIP_INSTALL="${SKIP_INSTALL:-false}"
 
 LOGCAT_PID=""
 MOBILE_DATA_ORIGINAL=""
@@ -152,9 +153,17 @@ APP_APK_SHA=$(shasum -a 256 "$APP_APK" | awk '{print $1}')
 BENCH_APK_SHA=$(shasum -a 256 "$BENCH_APK" | awk '{print $1}')
 
 echo "Installing target APK..."
-"$ADB" -s "$DEVICE_SERIAL" install -r "$APP_APK"
+if [ "$SKIP_INSTALL" = "true" ]; then
+    echo "Skipping target APK install because SKIP_INSTALL=true."
+else
+    "$ADB" -s "$DEVICE_SERIAL" install -r "$APP_APK"
+fi
 echo "Installing benchmark APK..."
-"$ADB" -s "$DEVICE_SERIAL" install -r "$BENCH_APK"
+if [ "$SKIP_INSTALL" = "true" ]; then
+    echo "Skipping benchmark APK install because SKIP_INSTALL=true."
+else
+    "$ADB" -s "$DEVICE_SERIAL" install -r "$BENCH_APK"
+fi
 
 LOGCAT_RAW="$TEMP_DIR/logcat_raw.log"
 "$ADB" -s "$DEVICE_SERIAL" logcat -c
@@ -214,7 +223,8 @@ cat <<EOF > "$OUTPUT_DIR/capture-manifest.json"
   "environment": {
     "physicalDevice": true,
     "wifiEnabled": true,
-    "mobileDataDisabledForCapture": $([ "$MOBILE_DATA_ORIGINAL" = "1" ] && echo "true" || echo "false")
+    "mobileDataDisabledForCapture": $([ "$MOBILE_DATA_ORIGINAL" = "1" ] && echo "true" || echo "false"),
+    "apkInstallSkipped": $([ "$SKIP_INSTALL" = "true" ] && echo "true" || echo "false")
   },
   "build": {
     "targetApkSha256": "$APP_APK_SHA",
