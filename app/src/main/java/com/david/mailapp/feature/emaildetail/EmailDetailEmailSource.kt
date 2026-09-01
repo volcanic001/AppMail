@@ -26,13 +26,16 @@ interface EmailDetailEmailSource {
     suspend fun markAsRead(emailId: String): EmailActionResult
 
     /** Remote body fetch, cached to Room. Returns null on failure. */
-    suspend fun fetchAndCacheBody(emailId: String): BodyFetchResult?
+    suspend fun fetchAndCacheBody(emailId: String): com.david.mailapp.data.repository.EmailContentFetchOutcome?
 
     /** Download inline images given the refs extracted from the body. */
     suspend fun downloadInlineImages(emailId: String, refs: List<com.david.mailapp.domain.model.EmailInlineReference>): Map<String, String>
 
     /** Inject base64 data URIs into the HTML body. */
     suspend fun injectInlineImages(html: String, images: Map<String, String>): String
+
+    /** Record that the content of this email was viewed. */
+    suspend fun recordContentAccess(emailId: String)
 
     /** Check whether a PDF is already cached and valid. */
     suspend fun checkPdfCache(emailId: String, stablePartId: String): PdfDownloadState.Ready?

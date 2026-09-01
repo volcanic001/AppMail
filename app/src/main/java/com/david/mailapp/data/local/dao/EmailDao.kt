@@ -185,4 +185,75 @@ interface EmailDao {
         inlineReferencesJson: String,
         cachedContentBytes: Long
     )
+    
+    // LRU Policy Methods (Subfase 2.3)
+
+    @Query("SELECT SUM(cached_content_bytes) FROM emails WHERE content_state = 'READY'")
+    suspend fun sumReadyContentBytes(): Long?
+
+    @Query("""
+        SELECT * FROM emails 
+        WHERE content_state = 'READY' AND id != :protectedEmailId
+        ORDER BY content_last_access_epoch_ms ASC, id ASC
+    """)
+    suspend fun getLruEvictionCandidates(protectedEmailId: String): List<EmailEntity>
+
+    @Query("""
+        UPDATE emails SET 
+            body = '',
+            clean_body = '',
+            inline_references_json = '[]',
+            cached_content_bytes = 0,
+            content_state = 'NOT_FETCHED',
+            body_kind = 'UNKNOWN',
+            content_last_access_epoch_ms = 0
+        WHERE id = :emailId
+    """)
+    suspend fun clearContent(emailId: String)
+
+    @Query("""
+        UPDATE emails SET 
+            content_last_access_epoch_ms = :newTimestamp
+        WHERE id = :emailId
+    """)
+    suspend fun updateContentLastAccess(emailId: String, newTimestamp: Long)
+
+    @Query("SELECT MAX(content_last_access_epoch_ms) FROM emails")
+    suspend fun getMaxContentLastAccess(): Long?
+
+    @Transaction
+    suspend fun applyLruAndSaveContent(
+        emailId: String,
+        body: String,
+        cleanBody: String,
+        pdfAttachmentsJson: String,
+        hasAttachments: Boolean,
+        contentState: String,
+        bodyKind: String,
+        inlineReferencesJson: String,
+        cachedContentBytes: Long,
+        maxBudgetBytes: Long
+    ) {
+        updateBodyAndPdfMetadata(
+            emailId = emailId,
+            body = body,
+            cleanBody = cleanBody,
+            pdfAttachmentsJson = pdfAttachmentsJson,
+            hasAttachments = hasAttachments,
+            contentState = contentState,
+            bodyKind = bodyKind,
+            inlineReferencesJson = inlineReferencesJson,
+            cachedContentBytes = cachedContentBytes
+        )
+
+        var currentSum = sumReadyContentBytes() ?: 0L
+        if (currentSum > maxBudgetBytes) {
+            val candidates = getLruEvictionCandidates(emailId)
+            for (candidate in candidates) {
+                clearContent(candidate.id)
+                currentSum -= candidate.cachedContentBytes
+                if (currentSum <= maxBudgetBytes) break
+            }
+        }
+    }
 }

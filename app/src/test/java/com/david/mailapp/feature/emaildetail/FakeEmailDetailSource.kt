@@ -52,16 +52,21 @@ class FakeEmailDetailSource(
     }
 
     // ── Body fetch ──────────────────────────────────────────────
-    var bodyFetchResult: BodyFetchResult? = null
+    var bodyFetchResult: com.david.mailapp.data.repository.EmailContentFetchOutcome? = null
     var bodyFetchGate: CompletableDeferred<Unit>? = null
     var onBodyFetch: ((callCount: Int) -> Unit)? = null
     var bodyFetchCallCount = 0
+    var recordAccessCallCount = 0
 
-    override suspend fun fetchAndCacheBody(emailId: String): BodyFetchResult? {
+    override suspend fun fetchAndCacheBody(emailId: String): com.david.mailapp.data.repository.EmailContentFetchOutcome? {
         bodyFetchCallCount++
         bodyFetchGate?.await()
         onBodyFetch?.invoke(bodyFetchCallCount)
         return bodyFetchResult
+    }
+    
+    override suspend fun recordContentAccess(emailId: String) {
+        recordAccessCallCount++
     }
 
     // ── Inline images ───────────────────────────────────────────
@@ -90,7 +95,8 @@ class FakeEmailDetailSource(
             cleanBody: String = "",
             bodyBlank: Boolean = body.isBlank(),
             pdfScanned: Boolean = false,
-            folder: EmailFolder = EmailFolder.Inbox
+            folder: EmailFolder = EmailFolder.Inbox,
+            contentState: com.david.mailapp.domain.model.EmailContentState = if (bodyBlank) com.david.mailapp.domain.model.EmailContentState.NOT_FETCHED else com.david.mailapp.domain.model.EmailContentState.READY
         ): Email = Email(
             id = id, threadId = "t1", from = "a@b.com", fromInitials = "A",
             to = "c@d.com", subject = "S", snippet = "snip", timestamp = 1L,
@@ -98,7 +104,8 @@ class FakeEmailDetailSource(
             labels = emptyList(), folder = folder,
             body = if (bodyBlank && body.isEmpty()) "" else body.ifEmpty { "<html>body</html>" },
             cleanBody = cleanBody,
-            pdfAttachments = emptyList(), pdfMetadataScanned = pdfScanned
+            pdfAttachments = emptyList(), pdfMetadataScanned = pdfScanned,
+            contentState = contentState
         )
     }
 }

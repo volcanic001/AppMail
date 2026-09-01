@@ -258,12 +258,12 @@ class EmailDetailViewModelResolutionTest {
             bodyBlank = false,
             pdfScanned = true
         )
-        source.bodyFetchResult = BodyFetchResult(
+        source.bodyFetchResult = com.david.mailapp.data.repository.EmailContentFetchOutcome.Persisted(BodyFetchResult(
             rawBody = recoveredEmail.body,
             contentState = com.david.mailapp.domain.model.EmailContentState.READY,
             bodyKind = com.david.mailapp.domain.model.EmailBodyKind.HTML,
             inlineRefs = emptyList()
-        )
+        ))
         source.onBodyFetch = { callCount ->
             if (callCount == 2) source.emitRoomEmail(recoveredEmail)
         }
@@ -328,12 +328,12 @@ class EmailDetailViewModelResolutionTest {
         source.resolveResult = EmailResolutionResult.Found(
             FakeEmailDetailSource.sampleEmail(bodyBlank = true)
         )
-        source.bodyFetchResult = BodyFetchResult(
+        source.bodyFetchResult = com.david.mailapp.data.repository.EmailContentFetchOutcome.Persisted(BodyFetchResult(
             rawBody = "",
             contentState = com.david.mailapp.domain.model.EmailContentState.EMPTY,
             bodyKind = com.david.mailapp.domain.model.EmailBodyKind.UNKNOWN,
             inlineRefs = emptyList()
-        )
+        ))
         val vm = createViewModel(source)
 
         val error = vm.uiState.value as EmailDetailUiState.BodyError
@@ -353,7 +353,7 @@ class EmailDetailViewModelResolutionTest {
         source.resolveResult = EmailResolutionResult.Found(
             FakeEmailDetailSource.sampleEmail(bodyBlank = true)
         )
-        source.bodyFetchResult = BodyFetchResult(
+        source.bodyFetchResult = com.david.mailapp.data.repository.EmailContentFetchOutcome.Persisted(BodyFetchResult(
             rawBody = null,
             contentState = com.david.mailapp.domain.model.EmailContentState.EMPTY,
             bodyKind = com.david.mailapp.domain.model.EmailBodyKind.UNKNOWN,
@@ -363,7 +363,7 @@ class EmailDetailViewModelResolutionTest {
                     "doc.pdf", "application/pdf", "att1", 1024L
                 )
             )
-        )
+        ))
         val vm = createViewModel(source)
 
         val error = vm.uiState.value as EmailDetailUiState.BodyError

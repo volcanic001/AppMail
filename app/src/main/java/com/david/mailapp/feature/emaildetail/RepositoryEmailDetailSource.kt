@@ -25,7 +25,7 @@ class RepositoryEmailDetailSource(
     override suspend fun markAsRead(emailId: String): EmailActionResult =
         repository.markAsRead(emailId)
 
-    override suspend fun fetchAndCacheBody(emailId: String): BodyFetchResult? =
+    override suspend fun fetchAndCacheBody(emailId: String): com.david.mailapp.data.repository.EmailContentFetchOutcome? =
         repository.fetchAndCacheBody(emailId)
 
     override suspend fun downloadInlineImages(emailId: String, refs: List<com.david.mailapp.domain.model.EmailInlineReference>): Map<String, String> =
@@ -33,6 +33,10 @@ class RepositoryEmailDetailSource(
 
     override suspend fun injectInlineImages(html: String, images: Map<String, String>): String =
         repository.injectInlineImages(html, images)
+
+    override suspend fun recordContentAccess(emailId: String) {
+        repository.recordContentAccess(emailId)
+    }
 
     override suspend fun checkPdfCache(emailId: String, stablePartId: String): PdfDownloadState.Ready? =
         repository.checkPdfCache(emailId, stablePartId)

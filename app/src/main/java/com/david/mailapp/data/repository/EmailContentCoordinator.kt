@@ -17,12 +17,11 @@ internal class EmailContentCoordinator(
 ) {
     /** Fetch the full HTML body along with inline image refs and PDF metadata from the provider,
      * then persist everything atomically to Room. Metadata is persisted even when the body is empty. */
-    suspend fun fetchAndCacheBody(emailId: String): BodyFetchResult? =
+    suspend fun fetchAndCacheBody(emailId: String): com.david.mailapp.data.repository.EmailContentFetchOutcome? =
         com.david.mailapp.core.perf.MailOpenPerformanceTrace.traceAsyncSection(
             com.david.mailapp.core.perf.MailOpenPerformanceTrace.SECTION_BODY_FETCH,
             emailId
         ) {
-            // DEBUG_PERF
             val t0 = RepositoryTrace.now()
             Log.d(RepositoryTrace.MAIL_PERF_TAG, "[REPO_BODY] START emailId=$emailId")
             val lease = writeGuard.capture() ?: run {
@@ -35,44 +34,74 @@ internal class EmailContentCoordinator(
             }
             val rawBody = result.rawBody.orEmpty()
             val tFetch = RepositoryTrace.now()
-            Log.d(RepositoryTrace.MAIL_PERF_TAG, "[REPO_BODY] FETCHED emailId=$emailId bodyLen=${rawBody.length} refs=${result.inlineRefs.size} pdfs=${result.pdfAttachments.size} fetchMs=${tFetch - t0}")
 
-            // Clean HTML only when there's a body
             val cleanBody = if (rawBody.isNotBlank()) {
-                com.david.mailapp.core.perf.MailOpenPerformanceTrace.traceSection(
-                    com.david.mailapp.core.perf.MailOpenPerformanceTrace.SECTION_HTML_BUILD,
-                    emailId
-                ) {
-                    withContext(Dispatchers.Default) {
-                        EmailHtmlCleaner.clean(rawBody)
-                    }
+                withContext(Dispatchers.Default) {
+                    EmailHtmlCleaner.clean(rawBody)
                 }
             } else ""
 
             val pdfJson = PdfAttachmentMetadataCodec.encode(result.pdfAttachments)
             val hasAtt = result.pdfAttachments.isNotEmpty()
-
-            // Subfase 2.2: Consumir en EmailContentCoordinator los datos ya calculados
             val inlineRefsJson = com.david.mailapp.data.local.converter.InlineContentReferenceCodec.encode(result.inlineRefs)
-            val cachedContentBytes = rawBody.toByteArray(Charsets.UTF_8).size.toLong() +
-                                     cleanBody.toByteArray(Charsets.UTF_8).size.toLong() +
-                                     inlineRefsJson.toByteArray(Charsets.UTF_8).size.toLong()
-
-            writeGuard.commit(lease) {
-                dao.updateBodyAndPdfMetadata(
-                    emailId = emailId,
-                    body = rawBody,
-                    cleanBody = cleanBody,
-                    pdfAttachmentsJson = pdfJson,
-                    hasAttachments = hasAtt,
-                    contentState = result.contentState.name,
-                    bodyKind = result.bodyKind.name,
-                    inlineReferencesJson = inlineRefsJson,
-                    cachedContentBytes = cachedContentBytes
-                )
+            
+            val isRemoteEmpty = result.contentState == com.david.mailapp.domain.model.EmailContentState.EMPTY
+            val cachedContentBytes = if (isRemoteEmpty) 0L else {
+                rawBody.toByteArray(Charsets.UTF_8).size.toLong() +
+                cleanBody.toByteArray(Charsets.UTF_8).size.toLong() +
+                inlineRefsJson.toByteArray(Charsets.UTF_8).size.toLong()
             }
-            Log.d(RepositoryTrace.MAIL_PERF_TAG, "[REPO_BODY] CACHED emailId=$emailId roomMs=${RepositoryTrace.now() - tFetch} totalMs=${RepositoryTrace.now() - t0}")
-            result
+
+            val MAX_BUDGET_BYTES = 52_428_800L
+            val isOversized = cachedContentBytes > MAX_BUDGET_BYTES
+
+            var commitSuccess = false
+            withContext(Dispatchers.IO) {
+                if (isOversized) {
+                    val result = writeGuard.commit(lease) {
+                        dao.updateBodyAndPdfMetadata(
+                            emailId = emailId,
+                            body = "",
+                            cleanBody = "",
+                            pdfAttachmentsJson = pdfJson,
+                            hasAttachments = hasAtt,
+                            contentState = com.david.mailapp.domain.model.EmailContentState.NOT_FETCHED.name,
+                            bodyKind = com.david.mailapp.domain.model.EmailBodyKind.UNKNOWN.name,
+                            inlineReferencesJson = "[]",
+                            cachedContentBytes = 0L
+                        )
+                    }
+                    commitSuccess = result != null
+                } else {
+                    val result = writeGuard.commit(lease) {
+                        dao.applyLruAndSaveContent(
+                            emailId = emailId,
+                            body = rawBody,
+                            cleanBody = cleanBody,
+                            pdfAttachmentsJson = pdfJson,
+                            hasAttachments = hasAtt,
+                            contentState = result.contentState.name,
+                            bodyKind = result.bodyKind.name,
+                            inlineReferencesJson = inlineRefsJson,
+                            cachedContentBytes = cachedContentBytes,
+                            maxBudgetBytes = MAX_BUDGET_BYTES
+                        )
+                    }
+                    commitSuccess = result != null
+                }
+            }
+
+            if (!commitSuccess) {
+                Log.d(RepositoryTrace.MAIL_PERF_TAG, "[REPO_BODY] COMMIT_REJECTED emailId=$emailId")
+                return@traceAsyncSection null
+            }
+
+            Log.d(RepositoryTrace.MAIL_PERF_TAG, "[REPO_BODY] CACHED emailId=$emailId oversized=$isOversized")
+            if (isOversized) {
+                com.david.mailapp.data.repository.EmailContentFetchOutcome.MemoryOnly(result, cleanBody)
+            } else {
+                com.david.mailapp.data.repository.EmailContentFetchOutcome.Persisted(result)
+            }
         }
 
     suspend fun downloadInlineImages(emailId: String, refs: List<com.david.mailapp.domain.model.EmailInlineReference>): Map<String, String> {
@@ -103,5 +132,13 @@ internal class EmailContentCoordinator(
         }
         Log.d(RepositoryTrace.MAIL_PERF_TAG, "[REPO_INJECT] DONE outputLen=${result.length} durationMs=${RepositoryTrace.now() - t0}")
         return result
+    }
+
+    suspend fun recordContentAccess(emailId: String) {
+        withContext(Dispatchers.IO) {
+            val maxAccess = dao.getMaxContentLastAccess() ?: 0L
+            val newTimestamp = maxOf(System.currentTimeMillis(), maxAccess + 1)
+            dao.updateContentLastAccess(emailId, newTimestamp)
+        }
     }
 }

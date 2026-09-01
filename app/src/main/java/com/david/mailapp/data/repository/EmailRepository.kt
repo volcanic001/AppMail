@@ -101,10 +101,17 @@ class EmailRepository(
     suspend fun markAsRead(emailId: String): EmailActionResult =
         actionCoordinator.markAsRead(emailId)
 
-    /** Fetch the full HTML body along with inline image refs and PDF metadata from the provider,
-     * then persist everything atomically to Room. Metadata is persisted even when the body is empty. */
-    suspend fun fetchAndCacheBody(emailId: String): BodyFetchResult? =
+    /** 
+     * Fetch the full HTML body along with inline image refs and PDF metadata from the provider.
+     * Devuelve el resultado remoto (o MemoryOnly) si fue exitoso, o null en caso
+     * de cancelación, pérdida de sesión o fallo de red.
+     */
+    suspend fun fetchAndCacheBody(emailId: String): com.david.mailapp.data.repository.EmailContentFetchOutcome? =
         contentCoordinator.fetchAndCacheBody(emailId)
+
+    suspend fun recordContentAccess(emailId: String) {
+        contentCoordinator.recordContentAccess(emailId)
+    }
 
     suspend fun downloadInlineImages(emailId: String, refs: List<com.david.mailapp.domain.model.EmailInlineReference>): Map<String, String> =
         contentCoordinator.downloadInlineImages(emailId, refs)
