@@ -297,3 +297,23 @@ fun testEmail(
     timestamp = timestamp, isRead = isRead, isStarred = false,
     hasAttachments = false, labels = emptyList(), folder = folder
 )
+
+fun testHeavyEmail(id: String, sizeBytes: Int = 1_000_000): Email {
+    val largeBody = "A".repeat(sizeBytes)
+    return testEmail(id).copy(
+        body = "<html><body>$largeBody</body></html>",
+        cleanBody = largeBody,
+        pdfAttachments = listOf(
+            com.david.mailapp.domain.model.PdfAttachmentMetadata(
+                fileName = "huge_$id.pdf",
+                mimeType = "application/pdf",
+                attachmentId = "att_$id",
+                sizeBytes = 2_000_000L,
+                partId = "1.1"
+            )
+        ),
+        pdfMetadataScanned = true,
+        rfcMessageId = "<$id@heavy.com>",
+        rfcReferences = "<parent@heavy.com>"
+    )
+}

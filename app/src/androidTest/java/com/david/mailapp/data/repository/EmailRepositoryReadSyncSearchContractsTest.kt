@@ -260,6 +260,54 @@ class EmailRepositoryReadSyncSearchContractsTest {
     }
 
     @Test
+    fun refreshInbox_first_page_preserves_heavy_downloaded_data() = runTest {
+        // 1. Insert a locally downloaded heavy email
+        val heavyId = "preservation-1"
+        val originalHeavy = com.david.mailapp.testhelpers.testHeavyEmail(heavyId)
+        database.emailDao().upsertAll(
+            listOf(EmailEntity.fromDomain(originalHeavy, EmailFolder.Inbox))
+        )
+
+        // 2. Mock a refresh from the provider that returns a lightweight version of the same email
+        val lightweightFromProvider = testEmail(heavyId)
+        provider.fetchInboxResult = PaginatedResult(listOf(lightweightFromProvider), null)
+
+        // 3. Perform a full refresh (page 0 -> replaceFolder)
+        repository.refreshInbox(null)
+
+        // 4. Verify that the local database retained the heavy fields via merge
+        val entityInDb = database.emailDao().getEntitiesByFolderSync("inbox").first { it.id == heavyId }
+        assertEquals(originalHeavy.body, entityInDb.body)
+        assertEquals(originalHeavy.cleanBody, entityInDb.cleanBody)
+        assertEquals(true, entityInDb.pdfMetadataScanned)
+        assertEquals(originalHeavy.rfcMessageId, entityInDb.rfcMessageId)
+    }
+
+    @Test
+    fun refreshInbox_pagination_preserves_heavy_downloaded_data() = runTest {
+        // 1. Insert a locally downloaded heavy email
+        val heavyId = "preservation-page2"
+        val originalHeavy = com.david.mailapp.testhelpers.testHeavyEmail(heavyId)
+        database.emailDao().upsertAll(
+            listOf(EmailEntity.fromDomain(originalHeavy, EmailFolder.Inbox))
+        )
+
+        // 2. Mock a paginated refresh from the provider that returns a lightweight version
+        val lightweightFromProvider = testEmail(heavyId)
+        provider.fetchInboxResult = PaginatedResult(listOf(lightweightFromProvider), "page3")
+
+        // 3. Perform a paginated refresh (page > 0 -> upsertPreservingBodies)
+        repository.refreshInbox("page2")
+
+        // 4. Verify that the local database retained the heavy fields via merge
+        val entityInDb = database.emailDao().getEntitiesByFolderSync("inbox").first { it.id == heavyId }
+        assertEquals(originalHeavy.body, entityInDb.body)
+        assertEquals(originalHeavy.cleanBody, entityInDb.cleanBody)
+        assertEquals(true, entityInDb.pdfMetadataScanned)
+        assertEquals(originalHeavy.rfcMessageId, entityInDb.rfcMessageId)
+    }
+
+    @Test
     fun refresh_without_lease_returns_empty_without_provider_or_room_changes() = runTest {
         seedBaselineFolders()
         val inactiveGuard = FakeSessionWriteGuard().apply { captureResult = null }
