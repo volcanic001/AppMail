@@ -203,20 +203,22 @@ class GmailProvider(
             val tExtract1 = perfNow()
             Log.d(PERF_TAG, "[BODY_FETCH] EXTRACT_DONE emailId=$emailId extractMs=${tExtract1 - tExtract0} bodyLen=${rawBody?.length ?: 0} totalMs=${tExtract1 - t0}")
 
-            val inlineImages = payload.collectInlineImages()
-            val inlineRefs = inlineImages.map {
-                com.david.mailapp.domain.model.EmailInlineReference(
-                    contentId = it.contentId,
-                    attachmentId = it.attachmentId,
-                    mimeType = it.mimeType
-                )
+            val contentState = if (rawBody.isNullOrBlank()) com.david.mailapp.domain.model.EmailContentState.EMPTY else com.david.mailapp.domain.model.EmailContentState.READY
+            val inlineRefs = if (contentState == com.david.mailapp.domain.model.EmailContentState.READY) {
+                payload.collectInlineImages().map {
+                    com.david.mailapp.domain.model.EmailInlineReference(
+                        contentId = it.contentId,
+                        attachmentId = it.attachmentId,
+                        mimeType = it.mimeType
+                    )
+                }
+            } else {
+                emptyList()
             }
             Log.d(PERF_TAG, "[BODY_FETCH] INLINE_REFS_FOUND count=${inlineRefs.size} emailId=$emailId")
 
             val pdfAttachments = payload.collectPdfAttachments()
             Log.d(PERF_TAG, "[BODY_FETCH] PDF_ATTACHMENTS_FOUND count=${pdfAttachments.size} emailId=$emailId")
-
-            val contentState = if (rawBody.isNullOrBlank()) com.david.mailapp.domain.model.EmailContentState.EMPTY else com.david.mailapp.domain.model.EmailContentState.READY
 
             BodyFetchResult(rawBody = rawBody, contentState = contentState, bodyKind = bodyKind, inlineRefs = inlineRefs, pdfAttachments = pdfAttachments)
         } catch (e: CancellationException) {

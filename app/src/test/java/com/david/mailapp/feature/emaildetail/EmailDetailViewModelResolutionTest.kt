@@ -260,6 +260,8 @@ class EmailDetailViewModelResolutionTest {
         )
         source.bodyFetchResult = BodyFetchResult(
             rawBody = recoveredEmail.body,
+            contentState = com.david.mailapp.domain.model.EmailContentState.READY,
+            bodyKind = com.david.mailapp.domain.model.EmailBodyKind.HTML,
             inlineRefs = emptyList()
         )
         source.onBodyFetch = { callCount ->
@@ -328,6 +330,8 @@ class EmailDetailViewModelResolutionTest {
         )
         source.bodyFetchResult = BodyFetchResult(
             rawBody = "",
+            contentState = com.david.mailapp.domain.model.EmailContentState.EMPTY,
+            bodyKind = com.david.mailapp.domain.model.EmailBodyKind.UNKNOWN,
             inlineRefs = emptyList()
         )
         val vm = createViewModel(source)
@@ -351,6 +355,8 @@ class EmailDetailViewModelResolutionTest {
         )
         source.bodyFetchResult = BodyFetchResult(
             rawBody = null,
+            contentState = com.david.mailapp.domain.model.EmailContentState.EMPTY,
+            bodyKind = com.david.mailapp.domain.model.EmailBodyKind.UNKNOWN,
             inlineRefs = emptyList(),
             pdfAttachments = listOf(
                 com.david.mailapp.domain.model.PdfAttachmentMetadata(

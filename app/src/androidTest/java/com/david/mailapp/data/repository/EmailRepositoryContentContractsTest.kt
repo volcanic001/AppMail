@@ -113,6 +113,8 @@ class EmailRepositoryContentContractsTest {
 
         val result = BodyFetchResult(
             rawBody = rawHtml,
+            contentState = com.david.mailapp.domain.model.EmailContentState.READY,
+            bodyKind = com.david.mailapp.domain.model.EmailBodyKind.HTML,
             inlineRefs = listOf(com.david.mailapp.domain.model.EmailInlineReference("cid:img1", "att-img-1", "image/png")),
             pdfAttachments = pdfs
         )
@@ -169,7 +171,11 @@ class EmailRepositoryContentContractsTest {
         val beforeStored = get("e2-stored")!!
 
         fakeProvider.fetchBodyResult = BodyFetchResult(
-            rawBody = null, inlineRefs = emptyList(), pdfAttachments = pdfs
+            rawBody = null,
+            contentState = com.david.mailapp.domain.model.EmailContentState.EMPTY,
+            bodyKind = com.david.mailapp.domain.model.EmailBodyKind.UNKNOWN,
+            inlineRefs = emptyList(),
+            pdfAttachments = pdfs
         )
 
         val returnedEmpty = repository.fetchAndCacheBody("e2-empty")
@@ -232,7 +238,11 @@ class EmailRepositoryContentContractsTest {
         assertEquals(listOf(oldMeta), before.toDomain().pdfAttachments)
 
         fakeProvider.fetchBodyResult = BodyFetchResult(
-            rawBody = newHtml, inlineRefs = emptyList(), pdfAttachments = emptyList()
+            rawBody = newHtml,
+            contentState = com.david.mailapp.domain.model.EmailContentState.READY,
+            bodyKind = com.david.mailapp.domain.model.EmailBodyKind.HTML,
+            inlineRefs = emptyList(),
+            pdfAttachments = emptyList()
         )
 
         val returned = repository.fetchAndCacheBody("e3")
@@ -402,6 +412,8 @@ class EmailRepositoryContentContractsTest {
         fakeProvider.fetchBodyStarted = CompletableDeferred()
         val oldResult = BodyFetchResult(
             rawBody = "<html><body><p>old session body</p></body></html>",
+            contentState = com.david.mailapp.domain.model.EmailContentState.READY,
+            bodyKind = com.david.mailapp.domain.model.EmailBodyKind.HTML,
             inlineRefs = emptyList(),
             pdfAttachments = listOf(PdfAttachmentMetadata("old.pdf", "application/pdf", "att-old", 100L))
         )
@@ -467,6 +479,8 @@ class EmailRepositoryContentContractsTest {
         fakeWriteGuard.commitError = sentinel
         fakeProvider.fetchBodyResult = BodyFetchResult(
             rawBody = "<html><body><p>new remote body</p></body></html>",
+            contentState = com.david.mailapp.domain.model.EmailContentState.READY,
+            bodyKind = com.david.mailapp.domain.model.EmailBodyKind.HTML,
             inlineRefs = emptyList(),
             pdfAttachments = emptyList()
         )

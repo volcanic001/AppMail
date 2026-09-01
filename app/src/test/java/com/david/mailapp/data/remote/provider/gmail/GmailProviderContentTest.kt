@@ -1,7 +1,9 @@
 package com.david.mailapp.data.remote.provider.gmail
 
+import com.david.mailapp.data.remote.provider.BodyFetchResult
 import com.david.mailapp.domain.model.EmailBodyKind
 import com.david.mailapp.domain.model.EmailContentState
+import com.david.mailapp.domain.model.EmailInlineReference
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -13,6 +15,7 @@ import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
+import org.junit.Assert.fail
 import org.junit.Test
 
 class GmailProviderContentTest {
@@ -51,10 +54,10 @@ class GmailProviderContentTest {
             }
         }
         """.trimIndent()
-        
+
         val provider = createProvider(response)
         val result = provider.fetchBodyWithRefs("1")
-        
+
         assertEquals(EmailContentState.READY, result?.contentState)
         assertEquals(EmailBodyKind.HTML, result?.bodyKind)
         assertEquals("<html>body</html>", result?.rawBody)
@@ -78,10 +81,10 @@ class GmailProviderContentTest {
             }
         }
         """.trimIndent()
-        
+
         val provider = createProvider(response)
         val result = provider.fetchBodyWithRefs("2")
-        
+
         assertEquals(EmailContentState.READY, result?.contentState)
         assertEquals(EmailBodyKind.PLAIN_TEXT, result?.bodyKind)
         assertEquals("<pre style=\"white-space: pre-wrap; font-family: inherit; margin: 0;\">hello &amp;boy</pre>", result?.rawBody)
@@ -99,12 +102,54 @@ class GmailProviderContentTest {
             }
         }
         """.trimIndent()
-        
+
         val provider = createProvider(response)
         val result = provider.fetchBodyWithRefs("3")
-        
+
         assertEquals(EmailContentState.EMPTY, result?.contentState)
         assertEquals(EmailBodyKind.UNKNOWN, result?.bodyKind)
         assertEquals(true, result?.rawBody.isNullOrBlank())
+    }
+
+    @Test
+    fun `BodyFetchResult rejects inconsistent content contracts`() {
+        assertInvalidResult {
+            BodyFetchResult(
+                rawBody = "<p>body</p>",
+                contentState = EmailContentState.EMPTY,
+                bodyKind = EmailBodyKind.UNKNOWN
+            )
+        }
+        assertInvalidResult {
+            BodyFetchResult(
+                rawBody = "",
+                contentState = EmailContentState.READY,
+                bodyKind = EmailBodyKind.HTML
+            )
+        }
+        assertInvalidResult {
+            BodyFetchResult(
+                rawBody = null,
+                contentState = EmailContentState.EMPTY,
+                bodyKind = EmailBodyKind.UNKNOWN,
+                inlineRefs = listOf(EmailInlineReference("cid", "attachment", "image/png"))
+            )
+        }
+        assertInvalidResult {
+            BodyFetchResult(
+                rawBody = null,
+                contentState = EmailContentState.NOT_FETCHED,
+                bodyKind = EmailBodyKind.UNKNOWN
+            )
+        }
+    }
+
+    private fun assertInvalidResult(block: () -> Unit) {
+        try {
+            block()
+            fail("Expected an invalid content contract to be rejected")
+        } catch (_: IllegalArgumentException) {
+            // Expected.
+        }
     }
 }

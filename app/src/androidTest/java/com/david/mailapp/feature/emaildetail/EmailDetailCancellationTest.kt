@@ -103,6 +103,8 @@ class EmailDetailCancellationTest {
         val bodyWithCid = "<html><body><img src=\"cid:image-1\"></body></html>"
         provider.fetchBodyResult = BodyFetchResult(
             rawBody = bodyWithCid,
+            contentState = com.david.mailapp.domain.model.EmailContentState.READY,
+            bodyKind = com.david.mailapp.domain.model.EmailBodyKind.HTML,
             inlineRefs = listOf(
                 com.david.mailapp.domain.model.EmailInlineReference(
                     contentId = "image-1",
@@ -151,6 +153,8 @@ class EmailDetailCancellationTest {
         provider.fetchBodyDeferred = bodyGate
         provider.fetchBodyResult = BodyFetchResult(
             rawBody = "Fetched Body",
+            contentState = com.david.mailapp.domain.model.EmailContentState.READY,
+            bodyKind = com.david.mailapp.domain.model.EmailBodyKind.PLAIN_TEXT,
             inlineRefs = emptyList(),
             pdfAttachments = emptyList()
         )
@@ -185,6 +189,8 @@ class EmailDetailCancellationTest {
 
         provider.fetchBodyResult = BodyFetchResult(
             rawBody = bodyWithCid,
+            contentState = com.david.mailapp.domain.model.EmailContentState.READY,
+            bodyKind = com.david.mailapp.domain.model.EmailBodyKind.HTML,
             inlineRefs = listOf(
                 com.david.mailapp.domain.model.EmailInlineReference(
                     contentId = "image-1",
@@ -290,6 +296,8 @@ class EmailDetailCancellationTest {
         provider.ignoreCancellationFetchBody = true
         provider.fetchBodyResult = BodyFetchResult(
             rawBody = "Fetched Body Late",
+            contentState = com.david.mailapp.domain.model.EmailContentState.READY,
+            bodyKind = com.david.mailapp.domain.model.EmailBodyKind.PLAIN_TEXT,
             inlineRefs = emptyList(),
             pdfAttachments = emptyList()
         )

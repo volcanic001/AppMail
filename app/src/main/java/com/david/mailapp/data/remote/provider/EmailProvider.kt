@@ -86,11 +86,32 @@ interface EmailProvider {
 /** Result of fetching the email body, containing both raw body and inline image references. */
 data class BodyFetchResult(
     val rawBody: String?,
-    val contentState: com.david.mailapp.domain.model.EmailContentState = com.david.mailapp.domain.model.EmailContentState.EMPTY,
-    val bodyKind: com.david.mailapp.domain.model.EmailBodyKind = com.david.mailapp.domain.model.EmailBodyKind.UNKNOWN,
+    val contentState: com.david.mailapp.domain.model.EmailContentState,
+    val bodyKind: com.david.mailapp.domain.model.EmailBodyKind,
     val inlineRefs: List<com.david.mailapp.domain.model.EmailInlineReference> = emptyList(),
     val pdfAttachments: List<PdfAttachmentMetadata> = emptyList()
-)
+) {
+    init {
+        when (contentState) {
+            com.david.mailapp.domain.model.EmailContentState.READY -> {
+                require(!rawBody.isNullOrBlank()) { "READY content requires a non-blank body" }
+                require(bodyKind != com.david.mailapp.domain.model.EmailBodyKind.UNKNOWN) {
+                    "READY content requires a known body kind"
+                }
+            }
+            com.david.mailapp.domain.model.EmailContentState.EMPTY -> {
+                require(rawBody.isNullOrBlank()) { "EMPTY content cannot include a body" }
+                require(bodyKind == com.david.mailapp.domain.model.EmailBodyKind.UNKNOWN) {
+                    "EMPTY content must use UNKNOWN body kind"
+                }
+                require(inlineRefs.isEmpty()) { "EMPTY content cannot include inline references" }
+            }
+            com.david.mailapp.domain.model.EmailContentState.NOT_FETCHED -> {
+                require(false) { "BodyFetchResult cannot represent NOT_FETCHED content" }
+            }
+        }
+    }
+}
 
 /**
  * Typed outcome of [EmailProvider.fetchEmailById].

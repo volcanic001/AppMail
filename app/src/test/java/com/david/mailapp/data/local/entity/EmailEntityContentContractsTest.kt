@@ -15,10 +15,10 @@ class EmailEntityContentContractsTest {
         val domain = com.david.mailapp.feature.emaildetail.FakeEmailDetailSource.sampleEmail("1")
         assertEquals(EmailContentState.NOT_FETCHED, domain.contentState)
         assertEquals(EmailBodyKind.UNKNOWN, domain.bodyKind)
-        
+
         val entity = EmailEntity.fromDomain(domain, EmailFolder.Inbox)
         val restored = entity.toDomain()
-        
+
         assertEquals(EmailContentState.NOT_FETCHED, restored.contentState)
         assertEquals(EmailBodyKind.UNKNOWN, restored.bodyKind)
         assertEquals(0, restored.inlineReferences.size)
@@ -34,10 +34,10 @@ class EmailEntityContentContractsTest {
             cachedContentBytes = 500L,
             contentLastAccessEpochMs = 12345L
         )
-        
+
         val entity = EmailEntity.fromDomain(domain, EmailFolder.Inbox)
         val restored = entity.toDomain()
-        
+
         assertEquals(EmailContentState.READY, restored.contentState)
         assertEquals(EmailBodyKind.HTML, restored.bodyKind)
         assertEquals("cid1", restored.inlineReferences[0].contentId)
@@ -52,14 +52,14 @@ class EmailEntityContentContractsTest {
             bodyKind = EmailBodyKind.UNKNOWN,
             cachedContentBytes = 0L
         )
-        
+
         val entity = EmailEntity.fromDomain(domain, EmailFolder.Inbox)
         val restored = entity.toDomain()
-        
+
         assertEquals(EmailContentState.EMPTY, restored.contentState)
         assertEquals(EmailBodyKind.UNKNOWN, restored.bodyKind)
     }
-    
+
     @Test
     fun `InlineContentReferenceCodec handles empty and invalid JSON`() {
         assertEquals(emptyList<EmailInlineReference>(), InlineContentReferenceCodec.decode(""))
