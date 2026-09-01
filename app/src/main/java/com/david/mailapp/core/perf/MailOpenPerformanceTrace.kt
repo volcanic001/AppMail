@@ -4,14 +4,15 @@ import android.os.SystemClock
 import android.util.Log
 import androidx.tracing.Trace
 import com.david.mailapp.BuildConfig
+import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * Internal, privacy-safe performance contract for tracking the critical email open path.
+ * Privacy-safe, physically valid performance contract for tracking email open latency.
  *
- * Emits Android async trace sections (visible to Macrobenchmark via TraceSectionMetric)
- * and structured logcat records when enabled. No-op in pure release builds.
+ * Correlates the active email open session with monotonic session IDs and cookies.
+ * All logging and tracing use exclusively the 16-hex truncated SHA-256 of the email ID (mailKey).
  */
 internal object MailOpenPerformanceTrace {
     const val TAG = "MailOpenTrace"
@@ -23,189 +24,274 @@ internal object MailOpenPerformanceTrace {
     const val SECTION_WEBVIEW_VISUAL = "EmailOpen.WebViewVisual"
     const val SECTION_NETWORK_FULL = "EmailOpen.NetworkFull"
 
-    /** Controls whether tracing and logging are active. Defaults to BuildConfig flags. */
+    /** Active capture identifier (UTC timestamp or run ID). */
+    var captureId: String = "local"
+
+    /** Controls whether tracing and logging are active. */
     var isEnabled: Boolean = BuildConfig.DEBUG || BuildConfig.PERF_TRACE_ENABLED
 
     private val sessionCounter = AtomicInteger(1)
+    private val cookieCounter = AtomicInteger(1)
 
-    /** Open session representation. */
     data class ActiveSession(
         val sessionId: Int,
         val mailKey: String,
         val startTimeMs: Long,
-        var isReady: Boolean = false
+        val totalCookie: Int,
+        var networkFullCount: Int = 0,
+        var networkFullDurationMs: Long = 0L,
+        var isCompleted: Boolean = false,
+        var isAborted: Boolean = false
     )
 
     @Volatile
     private var currentSession: ActiveSession? = null
 
-    private val openSectionCookies = ConcurrentHashMap<String, Int>()
+    private val activeSectionCookies = ConcurrentHashMap<String, Int>()
 
-    /** Generates a privacy-safe truncated hexadecimal hash key for a given email id. */
-    fun mailKey(emailId: String): String =
-        if (emailId.isBlank()) "none" else emailId.hashCode().toUInt().toString(16)
+    /**
+     * Canonical mailKey: SHA-256 of emailId truncated to 16 hexadecimal characters.
+     * Guaranteed deterministic, one-way, and never leaks raw Gmail IDs.
+     */
+    fun mailKey(emailId: String): String {
+        if (emailId.isBlank()) return "none"
+        val md = MessageDigest.getInstance("SHA-256")
+        val digest = md.digest(emailId.toByteArray(Charsets.UTF_8))
+        return digest.take(8).joinToString("") { "%02x".format(it) }
+    }
 
     fun now(): Long = SystemClock.elapsedRealtime()
 
+    fun getActiveSession(): ActiveSession? = currentSession
+
     /**
-     * Called when a user taps an email item in Inbox list.
-     * Replaces any existing uncompleted session and starts a new [SECTION_TOTAL] trace section.
+     * Triggered when a user taps an email in Inbox.
+     * Starts [SECTION_TOTAL] and aborts any previous active session as replaced.
      */
     @Synchronized
     fun onInboxItemClicked(emailId: String): Int {
         if (!isEnabled) return 0
 
         val previous = currentSession
-        if (previous != null && !previous.isReady) {
-            endAsyncSectionInternal(SECTION_TOTAL, previous.mailKey, previous.sessionId)
+        if (previous != null && !previous.isCompleted && !previous.isAborted) {
+            previous.isAborted = true
+            endAsyncSectionInternal(SECTION_TOTAL, previous.mailKey, previous.totalCookie)
+            val dur = now() - previous.startTimeMs
             Log.d(
                 TAG,
-                "[PERF_SESSION] REPLACED sessionId=${previous.sessionId} mail=${previous.mailKey} " +
-                    "durationMs=${now() - previous.startTimeMs} outcome=REPLACED"
+                "[PERF_SESSION] captureId=$captureId sessionId=${previous.sessionId} mail=${previous.mailKey} " +
+                    "section=$SECTION_TOTAL reason=replaced_by_new_tap durationMs=$dur outcome=ABORTED"
             )
         }
 
         val sessionId = sessionCounter.getAndIncrement()
+        val totalCookie = cookieCounter.getAndIncrement()
         val key = mailKey(emailId)
         val startTime = now()
-        currentSession = ActiveSession(sessionId = sessionId, mailKey = key, startTimeMs = startTime)
 
-        beginAsyncSectionInternal(SECTION_TOTAL, key, sessionId)
+        currentSession = ActiveSession(
+            sessionId = sessionId,
+            mailKey = key,
+            startTimeMs = startTime,
+            totalCookie = totalCookie
+        )
+
+        beginAsyncSectionInternal(SECTION_TOTAL, key, totalCookie)
         Log.d(
             TAG,
-            "[PERF_SESSION] START sessionId=$sessionId mail=$key t=$startTime section=$SECTION_TOTAL"
+            "[PERF_SESSION] captureId=$captureId sessionId=$sessionId mail=$key section=$SECTION_TOTAL event=START"
         )
         return sessionId
     }
 
     /**
-     * Called when email content reaches the visual ready state (first legible frame).
+     * Closes [SECTION_TOTAL] as COMPLETED when WebView visual state callback completes
+     * and the loading overlay is fully dismissed.
      */
     @Synchronized
-    fun onEmailReady(emailId: String) {
+    fun onVisualReady(keyOrId: String) {
         if (!isEnabled) return
 
-        val key = mailKey(emailId)
+        val key = resolveKey(keyOrId)
         val session = currentSession
-        if (session != null && session.mailKey == key && !session.isReady) {
-            session.isReady = true
-            val duration = now() - session.startTimeMs
-            endAsyncSectionInternal(SECTION_TOTAL, key, session.sessionId)
+        if (session != null && session.mailKey == key && !session.isCompleted && !session.isAborted) {
+            session.isCompleted = true
+            val dur = now() - session.startTimeMs
+            endAsyncSectionInternal(SECTION_TOTAL, key, session.totalCookie)
             Log.d(
                 TAG,
-                "[PERF_SESSION] READY sessionId=${session.sessionId} mail=$key " +
-                    "durationMs=$duration outcome=COMPLETED"
+                "[PERF_SESSION] captureId=$captureId sessionId=${session.sessionId} mail=$key " +
+                    "section=$SECTION_TOTAL durationMs=$dur outcome=COMPLETED"
             )
         }
     }
 
     /**
-     * Called when an error occurs during resolution or body preparation.
+     * Aborts the session upon resolution or body error.
      */
     @Synchronized
-    fun onError(emailId: String, reason: String) {
+    fun onError(keyOrId: String, reason: String) {
         if (!isEnabled) return
 
-        val key = mailKey(emailId)
+        val key = resolveKey(keyOrId)
         val session = currentSession
-        if (session != null && session.mailKey == key && !session.isReady) {
-            session.isReady = true
-            val duration = now() - session.startTimeMs
-            endAsyncSectionInternal(SECTION_TOTAL, key, session.sessionId)
+        if (session != null && session.mailKey == key && !session.isCompleted && !session.isAborted) {
+            session.isAborted = true
+            val dur = now() - session.startTimeMs
+            endAsyncSectionInternal(SECTION_TOTAL, key, session.totalCookie)
             Log.d(
                 TAG,
-                "[PERF_SESSION] ABORTED sessionId=${session.sessionId} mail=$key " +
-                    "reason=$reason durationMs=$duration outcome=ABORTED"
+                "[PERF_SESSION] captureId=$captureId sessionId=${session.sessionId} mail=$key " +
+                    "section=$SECTION_TOTAL reason=$reason durationMs=$dur outcome=ABORTED"
             )
         }
     }
 
     /**
-     * Called when EmailDetail screen is disposed. If the session has not reached ready, it is aborted.
+     * Aborts the session if screen is disposed before visual ready.
      */
     @Synchronized
-    fun onScreenDisposed(emailId: String) {
+    fun onScreenDisposed(keyOrId: String) {
         if (!isEnabled) return
 
-        val key = mailKey(emailId)
+        val key = resolveKey(keyOrId)
         val session = currentSession
-        if (session != null && session.mailKey == key && !session.isReady) {
-            session.isReady = true
-            val duration = now() - session.startTimeMs
-            endAsyncSectionInternal(SECTION_TOTAL, key, session.sessionId)
+        if (session != null && session.mailKey == key && !session.isCompleted && !session.isAborted) {
+            session.isAborted = true
+            val dur = now() - session.startTimeMs
+            endAsyncSectionInternal(SECTION_TOTAL, key, session.totalCookie)
             Log.d(
                 TAG,
-                "[PERF_SESSION] ABORTED sessionId=${session.sessionId} mail=$key " +
-                    "reason=screen_disposed durationMs=$duration outcome=ABORTED"
+                "[PERF_SESSION] captureId=$captureId sessionId=${session.sessionId} mail=$key " +
+                    "section=$SECTION_TOTAL reason=screen_disposed durationMs=$dur outcome=ABORTED"
             )
         }
     }
 
     /**
-     * Starts an async trace section for a given section name and emailId.
+     * Starts an async section with a monotonic cookie unique to the active session.
      */
-    fun beginSection(section: String, emailId: String): Int {
+    fun beginSection(section: String, keyOrId: String): Int {
         if (!isEnabled) return 0
-        val key = mailKey(emailId)
-        val cookie = (key.hashCode() xor section.hashCode()).toInt()
-        val sectionKey = "$section:$key"
-        openSectionCookies[sectionKey] = cookie
+        val key = resolveKey(keyOrId)
+        val session = currentSession
+        if (session == null || session.mailKey != key || session.isCompleted || session.isAborted) {
+            return 0
+        }
+        val cookie = cookieCounter.getAndIncrement()
+        val indexKey = "${session.sessionId}:$section"
+        activeSectionCookies[indexKey] = cookie
         beginAsyncSectionInternal(section, key, cookie)
         return cookie
     }
 
     /**
-     * Ends an async trace section for a given section name and emailId.
+     * Ends an async section for the active session.
      */
-    fun endSection(section: String, emailId: String, cookie: Int? = null) {
+    fun endSection(section: String, keyOrId: String, cookie: Int? = null) {
         if (!isEnabled) return
-        val key = mailKey(emailId)
-        val sectionKey = "$section:$key"
-        val resolvedCookie = cookie ?: openSectionCookies.remove(sectionKey)
-            ?: (key.hashCode() xor section.hashCode()).toInt()
+        val key = resolveKey(keyOrId)
+        val session = currentSession
+        if (session == null || session.mailKey != key || session.isCompleted || session.isAborted) {
+            return
+        }
+        val indexKey = "${session.sessionId}:$section"
+        val resolvedCookie = cookie ?: activeSectionCookies.remove(indexKey) ?: return
         endAsyncSectionInternal(section, key, resolvedCookie)
     }
 
-    inline fun <T> traceSection(section: String, emailId: String, block: () -> T): T {
-        if (!isEnabled) return block()
-        val key = mailKey(emailId)
-        val cookie = (key.hashCode() xor section.hashCode()).toInt()
+    inline fun <T> traceSection(section: String, keyOrId: String, block: () -> T): T {
+        val key = resolveKey(keyOrId)
+        val session = currentSession
+        val isTarget = isEnabled && session != null && session.mailKey == key && !session.isCompleted && !session.isAborted
+        if (!isTarget) return block()
+
+        val cookie = cookieCounter.getAndIncrement()
         val t0 = now()
         beginAsyncSectionInternal(section, key, cookie)
         return try {
             block()
         } finally {
+            val dur = now() - t0
             endAsyncSectionInternal(section, key, cookie)
-            val duration = now() - t0
-            Log.d(TAG, "[TRACE_SECTION] section=$section mail=$key durationMs=$duration")
+            Log.d(
+                TAG,
+                "[TRACE_SECTION] captureId=$captureId sessionId=${session?.sessionId} mail=$key section=$section durationMs=$dur"
+            )
         }
     }
 
     suspend inline fun <T> traceAsyncSection(
         section: String,
-        emailId: String,
+        keyOrId: String,
         crossinline block: suspend () -> T
     ): T {
-        if (!isEnabled) return block()
-        val key = mailKey(emailId)
-        val cookie = (key.hashCode() xor section.hashCode()).toInt()
+        val key = resolveKey(keyOrId)
+        val session = currentSession
+        val isTarget = isEnabled && session != null && session.mailKey == key && !session.isCompleted && !session.isAborted
+        if (!isTarget) return block()
+
+        val cookie = cookieCounter.getAndIncrement()
         val t0 = now()
         beginAsyncSectionInternal(section, key, cookie)
         return try {
             block()
         } finally {
+            val dur = now() - t0
             endAsyncSectionInternal(section, key, cookie)
-            val duration = now() - t0
-            Log.d(TAG, "[TRACE_SECTION] section=$section mail=$key durationMs=$duration")
+            Log.d(
+                TAG,
+                "[TRACE_SECTION] captureId=$captureId sessionId=${session?.sessionId} mail=$key section=$section durationMs=$dur"
+            )
         }
     }
+
+    /**
+     * Records an HTTP format=full request strictly if it belongs to the active opening session.
+     */
+    suspend inline fun <T> traceNetworkFull(
+        emailId: String,
+        crossinline block: suspend () -> T
+    ): T {
+        val key = mailKey(emailId)
+        val session = currentSession
+        val isTarget = isEnabled && session != null && session.mailKey == key && !session.isCompleted && !session.isAborted
+        if (!isTarget) return block()
+
+        val cookie = cookieCounter.getAndIncrement()
+        val t0 = now()
+        beginAsyncSectionInternal(SECTION_NETWORK_FULL, key, cookie)
+        return try {
+            block()
+        } finally {
+            val dur = now() - t0
+            endAsyncSectionInternal(SECTION_NETWORK_FULL, key, cookie)
+            synchronized(this) {
+                if (session.mailKey == key && !session.isCompleted && !session.isAborted) {
+                    session.networkFullCount++
+                    session.networkFullDurationMs += dur
+                    Log.d(
+                        TAG,
+                        "[TRACE_SECTION] captureId=$captureId sessionId=${session.sessionId} mail=$key section=$SECTION_NETWORK_FULL durationMs=$dur"
+                    )
+                }
+            }
+        }
+    }
+
+    @PublishedApi
+    internal fun resolveKey(keyOrId: String): String =
+        if (keyOrId.length == 16 && keyOrId.all { it.isDigit() || it in 'a'..'f' }) {
+            keyOrId
+        } else {
+            mailKey(keyOrId)
+        }
 
     @PublishedApi
     internal fun beginAsyncSectionInternal(section: String, mailKey: String, cookie: Int) {
         try {
             Trace.beginAsyncSection(section, cookie)
         } catch (_: Throwable) {}
-        Log.d(TAG, "[TRACE_START] section=$section mail=$mailKey cookie=$cookie t=${now()}")
     }
 
     @PublishedApi
@@ -213,14 +299,14 @@ internal object MailOpenPerformanceTrace {
         try {
             Trace.endAsyncSection(section, cookie)
         } catch (_: Throwable) {}
-        Log.d(TAG, "[TRACE_END] section=$section mail=$mailKey cookie=$cookie t=${now()}")
     }
 
-    /** Reset state (primarily for tests). */
     @Synchronized
     fun resetForTesting() {
         currentSession = null
-        openSectionCookies.clear()
+        activeSectionCookies.clear()
         sessionCounter.set(1)
+        cookieCounter.set(1)
+        captureId = "local"
     }
 }

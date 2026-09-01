@@ -106,8 +106,7 @@ internal suspend fun fetchWithRetry(
 ): DetailResult {
     for (attempt in 0 until maxAttempts) {
         try {
-            val response: HttpResponse = com.david.mailapp.core.perf.MailOpenPerformanceTrace.traceAsyncSection(
-                com.david.mailapp.core.perf.MailOpenPerformanceTrace.SECTION_NETWORK_FULL,
+            val response: HttpResponse = com.david.mailapp.core.perf.MailOpenPerformanceTrace.traceNetworkFull(
                 messageId
             ) {
                 client.get("users/me/messages/$messageId") {

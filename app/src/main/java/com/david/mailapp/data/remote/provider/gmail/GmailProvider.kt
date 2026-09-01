@@ -85,8 +85,7 @@ class GmailProvider(
             attempt++
             Log.d(LOOKUP_TAG, "[LOOKUP] ATTEMPT id=$emailId attempt=$attempt")
             try {
-                val response: HttpResponse = com.david.mailapp.core.perf.MailOpenPerformanceTrace.traceAsyncSection(
-                    com.david.mailapp.core.perf.MailOpenPerformanceTrace.SECTION_NETWORK_FULL,
+                val response: HttpResponse = com.david.mailapp.core.perf.MailOpenPerformanceTrace.traceNetworkFull(
                     emailId
                 ) {
                     client.get("users/me/messages/$emailId") {
@@ -183,8 +182,7 @@ class GmailProvider(
         val t0 = perfNow()
         Log.d(PERF_TAG, "[BODY_FETCH] START emailId=$emailId")
         return try {
-            val response: MessageResponse = com.david.mailapp.core.perf.MailOpenPerformanceTrace.traceAsyncSection(
-                com.david.mailapp.core.perf.MailOpenPerformanceTrace.SECTION_NETWORK_FULL,
+            val response: MessageResponse = com.david.mailapp.core.perf.MailOpenPerformanceTrace.traceNetworkFull(
                 emailId
             ) {
                 client.get("users/me/messages/$emailId") {

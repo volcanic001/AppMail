@@ -8,7 +8,8 @@ import com.david.mailapp.BuildConfig
 internal object EmailRenderTrace {
     const val TAG = "MailRenderTrace"
 
-    fun mailKey(emailId: String): String = emailId.hashCode().toUInt().toString(16)
+    fun mailKey(emailId: String): String =
+        com.david.mailapp.core.perf.MailOpenPerformanceTrace.mailKey(emailId)
 
     fun bodyKey(body: String?): String = body?.hashCode()?.toUInt()?.toString(16) ?: "none"
 

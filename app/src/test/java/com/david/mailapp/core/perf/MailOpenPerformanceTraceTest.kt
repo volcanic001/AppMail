@@ -5,6 +5,8 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -24,20 +26,27 @@ class MailOpenPerformanceTraceTest {
     }
 
     @Test
-    fun mailKey_isDeterministicHexAndDoesNotLeakRawId() {
+    fun mailKey_isDeterministic16HexCharactersAndNeverLeaksRawId() {
         val rawId1 = "18d1a2b3c4d5e6f7"
-        val rawId2 = "user.sensitive+test@gmail.com"
+        val rawId2 = "sensitive.user+token123@gmail.com"
 
         val key1 = MailOpenPerformanceTrace.mailKey(rawId1)
         val key2 = MailOpenPerformanceTrace.mailKey(rawId2)
 
-        // Deterministic
+        // Must be exactly 16 hex characters
+        assertEquals(16, key1.length)
+        assertEquals(16, key2.length)
+        assertTrue(key1.all { it.isDigit() || it in 'a'..'f' })
+        assertTrue(key2.all { it.isDigit() || it in 'a'..'f' })
+
+        // Same ID produces the same mailKey
         assertEquals(key1, MailOpenPerformanceTrace.mailKey(rawId1))
         assertNotEquals(key1, key2)
 
-        // Does not contain raw email or ID
+        // Raw ID, tokens and emails are never leaked in key
         assertFalse(key1.contains(rawId1))
         assertFalse(key2.contains("sensitive"))
+        assertFalse(key2.contains("token"))
         assertFalse(key2.contains("@"))
 
         // Blank returns "none"
@@ -46,76 +55,181 @@ class MailOpenPerformanceTraceTest {
     }
 
     @Test
-    fun sessionLifecycle_normalFlowCompletesSuccessfully() {
-        val emailId = "msg_001"
-        val sessionId = MailOpenPerformanceTrace.onInboxItemClicked(emailId)
-        assertTrue(sessionId > 0)
+    fun foreignNetworkRequest_duringActiveSession_doesNotIncrementNetworkFull() = runBlocking {
+        val activeEmailId = "active_email_123"
+        val foreignEmailId = "foreign_background_sync_456"
 
-        // Trigger Ready
-        MailOpenPerformanceTrace.onEmailReady(emailId)
+        MailOpenPerformanceTrace.onInboxItemClicked(activeEmailId)
+        val session = MailOpenPerformanceTrace.getActiveSession()
+        assertNotNull(session)
+        assertEquals(0, session!!.networkFullCount)
 
-        // Subsequent ready for different id does not fail
-        MailOpenPerformanceTrace.onEmailReady("other_msg")
+        // Execute network request for a FOREIGN email
+        val foreignResult = MailOpenPerformanceTrace.traceNetworkFull(foreignEmailId) {
+            "foreign_body_downloaded"
+        }
+        assertEquals("foreign_body_downloaded", foreignResult)
+
+        // NetworkFullCount for active session must STILL be 0
+        assertEquals(0, session.networkFullCount)
+
+        // Now execute network request for the ACTIVE email
+        val activeResult = MailOpenPerformanceTrace.traceNetworkFull(activeEmailId) {
+            "active_body_downloaded"
+        }
+        assertEquals("active_body_downloaded", activeResult)
+
+        // NetworkFullCount for active session must now be 1
+        assertEquals(1, session.networkFullCount)
     }
 
     @Test
-    fun sessionLifecycle_duplicateTapReplacesPreviousSession() {
-        val emailId1 = "msg_001"
-        val emailId2 = "msg_002"
+    fun sessionLifecycle_visualReadyClosesSessionAndIgnoresDuplicateCallbacks() {
+        val emailId = "target_msg_789"
+        val mailKey = MailOpenPerformanceTrace.mailKey(emailId)
 
-        val session1 = MailOpenPerformanceTrace.onInboxItemClicked(emailId1)
-        val session2 = MailOpenPerformanceTrace.onInboxItemClicked(emailId2)
-
-        assertTrue(session2 > session1)
-
-        // Ready on session 2
-        MailOpenPerformanceTrace.onEmailReady(emailId2)
-    }
-
-    @Test
-    fun sessionLifecycle_errorAndDisposeAbortSession() {
-        val emailId = "msg_error"
         MailOpenPerformanceTrace.onInboxItemClicked(emailId)
-        MailOpenPerformanceTrace.onError(emailId, "timeout")
+        val session = MailOpenPerformanceTrace.getActiveSession()
+        assertNotNull(session)
+        assertFalse(session!!.isCompleted)
+        assertFalse(session.isAborted)
 
-        val emailId2 = "msg_dispose"
-        MailOpenPerformanceTrace.onInboxItemClicked(emailId2)
-        MailOpenPerformanceTrace.onScreenDisposed(emailId2)
+        // Visual ready callback completes session
+        MailOpenPerformanceTrace.onVisualReady(mailKey)
+        assertTrue(session.isCompleted)
+        assertFalse(session.isAborted)
+
+        // Duplicate visual callback is safely ignored and does not throw or double complete
+        MailOpenPerformanceTrace.onVisualReady(mailKey)
+        assertTrue(session.isCompleted)
     }
 
     @Test
-    fun traceSection_executesAndReturnsValue() {
-        val emailId = "msg_trace"
-        val result = MailOpenPerformanceTrace.traceSection(
+    fun sessionLifecycle_errorAbortsSession() {
+        val emailId = "error_msg_001"
+        val mailKey = MailOpenPerformanceTrace.mailKey(emailId)
+
+        MailOpenPerformanceTrace.onInboxItemClicked(emailId)
+        val session = MailOpenPerformanceTrace.getActiveSession()
+        assertNotNull(session)
+
+        MailOpenPerformanceTrace.onError(mailKey, "resolution_error_NOT_FOUND")
+        assertTrue(session!!.isAborted)
+        assertFalse(session.isCompleted)
+
+        // Subsequent ready after abort is ignored
+        MailOpenPerformanceTrace.onVisualReady(mailKey)
+        assertFalse(session.isCompleted)
+    }
+
+    @Test
+    fun sessionLifecycle_screenDisposedBeforeVisualReadyAbortsSession() {
+        val emailId = "back_pressed_msg"
+        val mailKey = MailOpenPerformanceTrace.mailKey(emailId)
+
+        MailOpenPerformanceTrace.onInboxItemClicked(emailId)
+        val session = MailOpenPerformanceTrace.getActiveSession()
+        assertNotNull(session)
+
+        // User navigated back or screen disposed before visual callback
+        MailOpenPerformanceTrace.onScreenDisposed(mailKey)
+        assertTrue(session!!.isAborted)
+        assertFalse(session.isCompleted)
+    }
+
+    @Test
+    fun sessionLifecycle_duplicateTapAbortsPreviousSessionAsReplaced() {
+        val emailId1 = "email_first"
+        val emailId2 = "email_second"
+
+        val s1Id = MailOpenPerformanceTrace.onInboxItemClicked(emailId1)
+        val session1 = MailOpenPerformanceTrace.getActiveSession()
+        assertNotNull(session1)
+        assertEquals(s1Id, session1!!.sessionId)
+
+        // User taps another email before first one finished loading
+        val s2Id = MailOpenPerformanceTrace.onInboxItemClicked(emailId2)
+        val session2 = MailOpenPerformanceTrace.getActiveSession()
+        assertNotNull(session2)
+
+        assertTrue(session1.isAborted)
+        assertFalse(session1.isCompleted)
+        assertEquals(s2Id, session2!!.sessionId)
+        assertNotEquals(s1Id, s2Id)
+    }
+
+    @Test
+    fun activeSession_allSectionsShareSessionIdAndMailKey() = runBlocking {
+        val emailId = "coherent_session_msg"
+        val mailKey = MailOpenPerformanceTrace.mailKey(emailId)
+
+        val sId = MailOpenPerformanceTrace.onInboxItemClicked(emailId)
+        val session = MailOpenPerformanceTrace.getActiveSession()
+        assertNotNull(session)
+        assertEquals(sId, session!!.sessionId)
+        assertEquals(mailKey, session.mailKey)
+
+        // Resolve section
+        val resolveRes = MailOpenPerformanceTrace.traceAsyncSection(
             MailOpenPerformanceTrace.SECTION_RESOLVE,
-            emailId
+            mailKey
         ) {
-            42
+            "resolved"
         }
-        assertEquals(42, result)
+        assertEquals("resolved", resolveRes)
+
+        // Body fetch section
+        val bodyRes = MailOpenPerformanceTrace.traceAsyncSection(
+            MailOpenPerformanceTrace.SECTION_BODY_FETCH,
+            mailKey
+        ) {
+            "body"
+        }
+        assertEquals("body", bodyRes)
+
+        // Html build section
+        val htmlRes = MailOpenPerformanceTrace.traceSection(
+            MailOpenPerformanceTrace.SECTION_HTML_BUILD,
+            mailKey
+        ) {
+            "clean_html"
+        }
+        assertEquals("clean_html", htmlRes)
+
+        // WebView visual section
+        val cookie = MailOpenPerformanceTrace.beginSection(
+            MailOpenPerformanceTrace.SECTION_WEBVIEW_VISUAL,
+            mailKey
+        )
+        assertTrue(cookie > 0)
+        MailOpenPerformanceTrace.endSection(
+            MailOpenPerformanceTrace.SECTION_WEBVIEW_VISUAL,
+            mailKey,
+            cookie
+        )
+
+        // NetworkFull section
+        MailOpenPerformanceTrace.traceNetworkFull(emailId) {
+            "full_payload"
+        }
+        assertEquals(1, session.networkFullCount)
+
+        // Visual ready completes session
+        MailOpenPerformanceTrace.onVisualReady(mailKey)
+        assertTrue(session.isCompleted)
+        assertFalse(session.isAborted)
     }
 
     @Test
-    fun traceAsyncSection_executesAndReturnsValue() = runBlocking {
-        val emailId = "msg_trace_async"
-        val result = MailOpenPerformanceTrace.traceAsyncSection(
-            MailOpenPerformanceTrace.SECTION_NETWORK_FULL,
-            emailId
-        ) {
-            "network_response_ok"
-        }
-        assertEquals("network_response_ok", result)
-    }
-
-    @Test
-    fun disabledTrace_isNoOp() {
+    fun disabledTrace_isCompletelyNoOp() = runBlocking {
         MailOpenPerformanceTrace.isEnabled = false
 
         val sessionId = MailOpenPerformanceTrace.onInboxItemClicked("msg_disabled")
         assertEquals(0, sessionId)
+        assertNull(MailOpenPerformanceTrace.getActiveSession())
 
-        MailOpenPerformanceTrace.onEmailReady("msg_disabled")
-        MailOpenPerformanceTrace.onError("msg_disabled", "error")
+        MailOpenPerformanceTrace.onVisualReady("msg_disabled")
+        MailOpenPerformanceTrace.onError("msg_disabled", "err")
         MailOpenPerformanceTrace.onScreenDisposed("msg_disabled")
 
         val cookie = MailOpenPerformanceTrace.beginSection(
@@ -124,5 +238,8 @@ class MailOpenPerformanceTraceTest {
         )
         assertEquals(0, cookie)
         MailOpenPerformanceTrace.endSection(MailOpenPerformanceTrace.SECTION_RESOLVE, "msg_disabled")
+
+        val netRes = MailOpenPerformanceTrace.traceNetworkFull("msg_disabled") { "ok" }
+        assertEquals("ok", netRes)
     }
 }

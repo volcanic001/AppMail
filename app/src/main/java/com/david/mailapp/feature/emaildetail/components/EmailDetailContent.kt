@@ -21,8 +21,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import com.david.mailapp.BuildConfig
 import com.david.mailapp.data.pdf.PdfDownloadState
 import com.david.mailapp.domain.model.Email
 import com.david.mailapp.domain.model.PdfAttachmentMetadata
@@ -96,6 +98,9 @@ internal fun EmailDetailContent(
             if (showLoader) "UI_LOADER_SHOWN" else "UI_LOADER_HIDDEN",
             "reason=$reason bodyKey=$bodyKey"
         )
+        if (!showLoader) {
+            com.david.mailapp.core.perf.MailOpenPerformanceTrace.onVisualReady(traceMail)
+        }
         withFrameNanos { frameTimeNanos ->
             EmailRenderTrace.d(
                 traceMail,
@@ -166,6 +171,12 @@ internal fun EmailDetailContent(
                     color = MaterialTheme.colorScheme.primary
                 )
             }
+        } else if (BuildConfig.PERF_TRACE_ENABLED) {
+            Box(
+                modifier = Modifier
+                    .size(1.dp)
+                    .testTag("email_detail_visual_ready")
+            )
         }
         }
 
