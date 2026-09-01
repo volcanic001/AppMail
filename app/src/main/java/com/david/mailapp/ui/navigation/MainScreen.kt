@@ -23,12 +23,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
+import com.david.mailapp.BuildConfig
 import com.david.mailapp.feature.compose.ComposeMode
 import com.david.mailapp.ui.components.ComposeFab
 import com.david.mailapp.ui.theme.ColorPalette
@@ -101,6 +104,7 @@ fun MainScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .semantics { testTagsAsResourceId = BuildConfig.PERF_TRACE_ENABLED }
                 .background(MaterialTheme.colorScheme.background)
         ) {
             // ── Content area ─────────────────────────────────
