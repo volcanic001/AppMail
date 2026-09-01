@@ -7,7 +7,6 @@ import com.david.mailapp.data.local.MailDatabase
 import com.david.mailapp.data.local.entity.EmailEntity
 import com.david.mailapp.data.pdf.PdfCacheManager
 import com.david.mailapp.data.remote.provider.BodyFetchResult
-import com.david.mailapp.data.remote.provider.InlineImageRef
 import com.david.mailapp.domain.model.Email
 import com.david.mailapp.domain.model.EmailFolder
 import com.david.mailapp.domain.model.PdfAttachmentMetadata
@@ -114,7 +113,7 @@ class EmailRepositoryContentContractsTest {
 
         val result = BodyFetchResult(
             rawBody = rawHtml,
-            inlineRefs = listOf(InlineImageRef("cid:img1", "att-img-1", "image/png")),
+            inlineRefs = listOf(com.david.mailapp.domain.model.EmailInlineReference("cid:img1", "att-img-1", "image/png")),
             pdfAttachments = pdfs
         )
         fakeProvider.fetchBodyResult = result
@@ -516,9 +515,9 @@ class EmailRepositoryContentContractsTest {
     @Test
     fun c12_downloadInlineImages_delegates_exact_refs_order_and_returns_same_map() = runTest {
         val refs = listOf(
-            InlineImageRef("img1", "att-1", "image/png"),
-            InlineImageRef("img2", "att-2", "image/jpeg"),
-            InlineImageRef("img3", "att-3", "image/gif")
+            com.david.mailapp.domain.model.EmailInlineReference("img1", "att-1", "image/png"),
+            com.david.mailapp.domain.model.EmailInlineReference("img2", "att-2", "image/jpeg"),
+            com.david.mailapp.domain.model.EmailInlineReference("img3", "att-3", "image/gif")
         )
         val map = linkedMapOf(
             "img1" to "data:image/png;base64,AAA",
@@ -545,7 +544,7 @@ class EmailRepositoryContentContractsTest {
         )
 
         val returned = repositoryWithoutProvider.downloadInlineImages(
-            "e13", listOf(InlineImageRef("img1", "att-1", "image/png"))
+            "e13", listOf(com.david.mailapp.domain.model.EmailInlineReference("img1", "att-1", "image/png"))
         )
 
         assertTrue(returned.isEmpty())
@@ -562,7 +561,7 @@ class EmailRepositoryContentContractsTest {
 
         val thrown = try {
             repository.downloadInlineImages(
-                "e14", listOf(InlineImageRef("img1", "att-1", "image/png"))
+                "e14", listOf(com.david.mailapp.domain.model.EmailInlineReference("img1", "att-1", "image/png"))
             )
             null
         } catch (e: IOException) {
@@ -583,7 +582,7 @@ class EmailRepositoryContentContractsTest {
 
         val thrown = try {
             repository.downloadInlineImages(
-                "e15", listOf(InlineImageRef("img1", "att-1", "image/png"))
+                "e15", listOf(com.david.mailapp.domain.model.EmailInlineReference("img1", "att-1", "image/png"))
             )
             null
         } catch (cancelled: CancellationException) {

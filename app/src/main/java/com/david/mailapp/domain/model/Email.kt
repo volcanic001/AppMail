@@ -32,7 +32,14 @@ data class Email(
     val pdfAttachments: List<PdfAttachmentMetadata> = emptyList(),
     val pdfMetadataScanned: Boolean = false,
     val rfcMessageId: String? = null,
-    val rfcReferences: String? = null
+    val rfcReferences: String? = null,
+
+    // Explicit content contract
+    val contentState: EmailContentState = EmailContentState.NOT_FETCHED,
+    val bodyKind: EmailBodyKind = EmailBodyKind.UNKNOWN,
+    val inlineReferences: List<EmailInlineReference> = emptyList(),
+    val cachedContentBytes: Long = 0L,
+    val contentLastAccessEpochMs: Long = 0L
 )
 
 @Stable

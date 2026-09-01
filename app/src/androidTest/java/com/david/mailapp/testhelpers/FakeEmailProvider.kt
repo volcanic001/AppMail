@@ -3,7 +3,6 @@ package com.david.mailapp.testhelpers
 import com.david.mailapp.data.remote.provider.BodyFetchResult
 import com.david.mailapp.data.remote.provider.EmailLookupResult
 import com.david.mailapp.data.remote.provider.EmailProvider
-import com.david.mailapp.data.remote.provider.InlineImageRef
 import com.david.mailapp.data.remote.provider.ReplyContext
 import com.david.mailapp.domain.model.Email
 import com.david.mailapp.domain.model.EmailFolder
@@ -89,7 +88,7 @@ class FakeEmailProvider : EmailProvider {
     val receivedSearchRequests = mutableListOf<Pair<String, String?>>()
     val receivedFetchEmailByIdIds = mutableListOf<String>()
     val receivedFetchBodyIds = mutableListOf<String>()
-    val receivedInlineImageRequests = mutableListOf<Pair<String, List<InlineImageRef>>>()
+    val receivedInlineImageRequests = mutableListOf<Pair<String, List<com.david.mailapp.domain.model.EmailInlineReference>>>()
     val receivedDownloadAttachmentRequests = mutableListOf<Pair<String, String>>()
     val receivedSendRequests = mutableListOf<SendRequest>()
 
@@ -219,7 +218,7 @@ class FakeEmailProvider : EmailProvider {
         return fetchBodyResult
     }
 
-    override suspend fun downloadInlineImages(emailId: String, refs: List<InlineImageRef>): Map<String, String> {
+    override suspend fun downloadInlineImages(emailId: String, refs: List<com.david.mailapp.domain.model.EmailInlineReference>): Map<String, String> {
         inlineImagesCalls++
         receivedInlineImageRequests += emailId to refs
         val deferred = downloadInlineImagesDeferred

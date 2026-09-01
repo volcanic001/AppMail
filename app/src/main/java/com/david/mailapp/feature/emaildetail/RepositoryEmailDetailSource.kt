@@ -3,7 +3,6 @@ package com.david.mailapp.feature.emaildetail
 import com.david.mailapp.core.localization.UiErrorReason
 import com.david.mailapp.data.pdf.PdfDownloadState
 import com.david.mailapp.data.remote.provider.BodyFetchResult
-import com.david.mailapp.data.remote.provider.InlineImageRef
 import com.david.mailapp.data.repository.EmailActionResult
 import com.david.mailapp.data.repository.EmailRepository
 import com.david.mailapp.data.repository.EmailResolutionResult
@@ -29,7 +28,7 @@ class RepositoryEmailDetailSource(
     override suspend fun fetchAndCacheBody(emailId: String): BodyFetchResult? =
         repository.fetchAndCacheBody(emailId)
 
-    override suspend fun downloadInlineImages(emailId: String, refs: List<InlineImageRef>): Map<String, String> =
+    override suspend fun downloadInlineImages(emailId: String, refs: List<com.david.mailapp.domain.model.EmailInlineReference>): Map<String, String> =
         repository.downloadInlineImages(emailId, refs)
 
     override suspend fun injectInlineImages(html: String, images: Map<String, String>): String =

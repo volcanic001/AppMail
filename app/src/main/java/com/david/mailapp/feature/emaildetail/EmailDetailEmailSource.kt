@@ -2,7 +2,6 @@ package com.david.mailapp.feature.emaildetail
 
 import com.david.mailapp.data.pdf.PdfDownloadState
 import com.david.mailapp.data.remote.provider.BodyFetchResult
-import com.david.mailapp.data.remote.provider.InlineImageRef
 import com.david.mailapp.data.repository.EmailActionResult
 import com.david.mailapp.data.repository.EmailResolutionResult
 import com.david.mailapp.domain.model.Email
@@ -30,7 +29,7 @@ interface EmailDetailEmailSource {
     suspend fun fetchAndCacheBody(emailId: String): BodyFetchResult?
 
     /** Download inline images given the refs extracted from the body. */
-    suspend fun downloadInlineImages(emailId: String, refs: List<InlineImageRef>): Map<String, String>
+    suspend fun downloadInlineImages(emailId: String, refs: List<com.david.mailapp.domain.model.EmailInlineReference>): Map<String, String>
 
     /** Inject base64 data URIs into the HTML body. */
     suspend fun injectInlineImages(html: String, images: Map<String, String>): String

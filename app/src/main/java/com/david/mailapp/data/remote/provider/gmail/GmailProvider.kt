@@ -7,7 +7,6 @@ import com.david.mailapp.data.remote.provider.BodyFetchResult
 import com.david.mailapp.data.remote.provider.EmailLookupFailureReason
 import com.david.mailapp.data.remote.provider.EmailLookupResult
 import com.david.mailapp.data.remote.provider.EmailProvider
-import com.david.mailapp.data.remote.provider.InlineImageRef
 import com.david.mailapp.data.remote.provider.ReplyContext
 import com.david.mailapp.domain.model.Email
 import com.david.mailapp.domain.model.EmailFolder
@@ -198,13 +197,15 @@ class GmailProvider(
             }
 
             val tExtract0 = perfNow()
-            val rawBody = extractHtmlBody(payload)
+            val extracted = extractBodyAndKind(payload)
+            val rawBody = extracted?.first
+            val bodyKind = extracted?.second ?: com.david.mailapp.domain.model.EmailBodyKind.UNKNOWN
             val tExtract1 = perfNow()
             Log.d(PERF_TAG, "[BODY_FETCH] EXTRACT_DONE emailId=$emailId extractMs=${tExtract1 - tExtract0} bodyLen=${rawBody?.length ?: 0} totalMs=${tExtract1 - t0}")
 
             val inlineImages = payload.collectInlineImages()
             val inlineRefs = inlineImages.map {
-                InlineImageRef(
+                com.david.mailapp.domain.model.EmailInlineReference(
                     contentId = it.contentId,
                     attachmentId = it.attachmentId,
                     mimeType = it.mimeType
@@ -215,10 +216,13 @@ class GmailProvider(
             val pdfAttachments = payload.collectPdfAttachments()
             Log.d(PERF_TAG, "[BODY_FETCH] PDF_ATTACHMENTS_FOUND count=${pdfAttachments.size} emailId=$emailId")
 
-            BodyFetchResult(rawBody = rawBody, inlineRefs = inlineRefs, pdfAttachments = pdfAttachments)
+            val contentState = if (rawBody.isNullOrBlank()) com.david.mailapp.domain.model.EmailContentState.EMPTY else com.david.mailapp.domain.model.EmailContentState.READY
+
+            BodyFetchResult(rawBody = rawBody, contentState = contentState, bodyKind = bodyKind, inlineRefs = inlineRefs, pdfAttachments = pdfAttachments)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
+            println("GMAIL ERROR: ${e.message}")
             Log.d(PERF_TAG, "[BODY_FETCH] ERROR emailId=$emailId durationMs=${perfNow() - t0} error=${e.javaClass.simpleName}: ${e.message}")
             null
         }
@@ -226,7 +230,7 @@ class GmailProvider(
 
     override suspend fun downloadInlineImages(
         emailId: String,
-        refs: List<InlineImageRef>
+        refs: List<com.david.mailapp.domain.model.EmailInlineReference>
     ): Map<String, String> {
         // DEBUG_PERF
         Log.d(PERF_TAG, "[INLINE_DOWNLOAD] START imageCount=${refs.size} emailId=$emailId")
@@ -294,7 +298,7 @@ class GmailProvider(
      * - Prefers mimeType == "text/html"; falls back to text/plain.
      * - Decodes Gmail's URL-safe base64 data to UTF-8.
      */
-    private fun extractHtmlBody(payload: Payload): String? {
+    private fun extractBodyAndKind(payload: Payload): Pair<String, com.david.mailapp.domain.model.EmailBodyKind>? {
         // DEBUG_PERF
         Log.d(PERF_TAG, "[EXTRACT_BODY] START")
         // First, prefer text/html anywhere in the tree
@@ -306,7 +310,7 @@ class GmailProvider(
             val decoded = rawData?.let { decodeBase64Url(it) }
             Log.d(PERF_TAG, "[EXTRACT_BODY] HTML_DECODED decodedLen=${decoded?.length ?: 0} decodeMs=${perfNow() - t0}")
             if (!decoded.isNullOrBlank()) {
-                return decoded
+                return decoded to com.david.mailapp.domain.model.EmailBodyKind.HTML
             }
         } else {
             Log.d(PERF_TAG, "[EXTRACT_BODY] NO_HTML_PART fallback=text/plain")
@@ -325,7 +329,7 @@ class GmailProvider(
                     .replace("&", "&amp;")
                     .replace("<", "&lt;")
                     .replace(">", "&gt;")
-                return "<pre style=\"white-space: pre-wrap; font-family: inherit; margin: 0;\">$escaped</pre>"
+                return "<pre style=\"white-space: pre-wrap; font-family: inherit; margin: 0;\">$escaped</pre>" to com.david.mailapp.domain.model.EmailBodyKind.PLAIN_TEXT
             }
         } else {
             Log.d(PERF_TAG, "[EXTRACT_BODY] NO_PLAIN_PART result=null")
@@ -354,7 +358,7 @@ class GmailProvider(
         // DEBUG_PERF
         val t0 = perfNow()
         val clean = data.filter { !it.isWhitespace() }
-        val bytes = android.util.Base64.decode(clean, android.util.Base64.URL_SAFE)
+        val bytes = java.util.Base64.getUrlDecoder().decode(clean)
         val result = String(bytes, Charsets.UTF_8)
         Log.d(PERF_TAG, "[DECODE_B64URL] inputLen=${data.length} cleanLen=${clean.length} outputLen=${result.length} durationMs=${perfNow() - t0}")
         return result

@@ -6,7 +6,6 @@ import com.david.mailapp.data.local.converter.PdfAttachmentMetadataCodec
 import com.david.mailapp.data.local.dao.EmailDao
 import com.david.mailapp.data.remote.provider.BodyFetchResult
 import com.david.mailapp.data.remote.provider.EmailProvider
-import com.david.mailapp.data.remote.provider.InlineImageRef
 import com.david.mailapp.feature.emaildetail.components.EmailHtmlCleaner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -53,6 +52,13 @@ internal class EmailContentCoordinator(
             val pdfJson = PdfAttachmentMetadataCodec.encode(result.pdfAttachments)
             val hasAtt = result.pdfAttachments.isNotEmpty()
 
+            // Subfase 2.1: El cálculo de bytes usa UTF-8 de body, cleanBody y JSON de referencias.
+            // La persistencia real y la actualización de acceso (contentLastAccessEpochMs) quedan para 2.2/2.3
+            val inlineRefsJson = com.david.mailapp.data.local.converter.InlineContentReferenceCodec.encode(result.inlineRefs)
+            val cachedContentBytes = rawBody.toByteArray(Charsets.UTF_8).size.toLong() +
+                                     cleanBody.toByteArray(Charsets.UTF_8).size.toLong() +
+                                     inlineRefsJson.toByteArray(Charsets.UTF_8).size.toLong()
+
             writeGuard.commit(lease) {
                 dao.updateBodyAndPdfMetadata(
                     emailId = emailId,
@@ -66,7 +72,7 @@ internal class EmailContentCoordinator(
             result
         }
 
-    suspend fun downloadInlineImages(emailId: String, refs: List<InlineImageRef>): Map<String, String> {
+    suspend fun downloadInlineImages(emailId: String, refs: List<com.david.mailapp.domain.model.EmailInlineReference>): Map<String, String> {
         if (refs.isEmpty()) return emptyMap()
         // DEBUG_PERF
         val t0 = RepositoryTrace.now()

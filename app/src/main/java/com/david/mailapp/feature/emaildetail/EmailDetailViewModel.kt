@@ -6,7 +6,6 @@ import androidx.lifecycle.viewModelScope
 import com.david.mailapp.core.localization.UiErrorReason
 import com.david.mailapp.data.pdf.PdfDownloadFailure
 import com.david.mailapp.data.pdf.PdfDownloadState
-import com.david.mailapp.data.remote.provider.InlineImageRef
 import com.david.mailapp.data.repository.EmailResolutionFailureReason
 import com.david.mailapp.data.repository.EmailResolutionResult
 import com.david.mailapp.domain.model.Email
@@ -55,7 +54,7 @@ class EmailDetailViewModel(
     private var isFetchingRemoteBody = false
     private var isFetchingInlineImages = false
     private var cachedInlineImages: Map<String, String>? = null
-    private var cachedInlineRefs: List<InlineImageRef>? = null
+    private var cachedInlineRefs: List<com.david.mailapp.domain.model.EmailInlineReference>? = null
     private var delivered = false
     private val traceMail = EmailRenderTrace.mailKey(emailId)
 

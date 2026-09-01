@@ -11,7 +11,6 @@ import com.david.mailapp.data.local.entity.EmailEntity
 import com.david.mailapp.data.pdf.PdfCacheManager
 import com.david.mailapp.data.pdf.PdfDownloadState
 import com.david.mailapp.data.remote.provider.BodyFetchResult
-import com.david.mailapp.data.remote.provider.InlineImageRef
 import com.david.mailapp.data.repository.EmailRepository
 import com.david.mailapp.domain.model.EmailFolder
 import com.david.mailapp.domain.model.PdfAttachmentMetadata
@@ -105,7 +104,7 @@ class EmailDetailCancellationTest {
         provider.fetchBodyResult = BodyFetchResult(
             rawBody = bodyWithCid,
             inlineRefs = listOf(
-                InlineImageRef(
+                com.david.mailapp.domain.model.EmailInlineReference(
                     contentId = "image-1",
                     attachmentId = "attachment-1",
                     mimeType = "image/png"
@@ -187,7 +186,7 @@ class EmailDetailCancellationTest {
         provider.fetchBodyResult = BodyFetchResult(
             rawBody = bodyWithCid,
             inlineRefs = listOf(
-                InlineImageRef(
+                com.david.mailapp.domain.model.EmailInlineReference(
                     contentId = "image-1",
                     attachmentId = "attachment-1",
                     mimeType = "image/png"

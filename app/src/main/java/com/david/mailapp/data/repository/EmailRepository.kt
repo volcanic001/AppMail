@@ -6,7 +6,6 @@ import com.david.mailapp.data.pdf.PdfDownloadState
 import com.david.mailapp.data.remote.provider.BodyFetchResult
 import com.david.mailapp.data.remote.provider.EmailProvider
 import com.david.mailapp.data.remote.provider.ReplyContext
-import com.david.mailapp.data.remote.provider.InlineImageRef
 import com.david.mailapp.domain.model.Email
 import com.david.mailapp.domain.model.PaginatedResult
 import com.david.mailapp.domain.model.PdfAttachmentMetadata
@@ -107,7 +106,7 @@ class EmailRepository(
     suspend fun fetchAndCacheBody(emailId: String): BodyFetchResult? =
         contentCoordinator.fetchAndCacheBody(emailId)
 
-    suspend fun downloadInlineImages(emailId: String, refs: List<InlineImageRef>): Map<String, String> =
+    suspend fun downloadInlineImages(emailId: String, refs: List<com.david.mailapp.domain.model.EmailInlineReference>): Map<String, String> =
         contentCoordinator.downloadInlineImages(emailId, refs)
 
     fun injectInlineImages(html: String, inlineImages: Map<String, String>): String =

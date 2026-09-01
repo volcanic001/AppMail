@@ -56,7 +56,7 @@ interface EmailProvider {
      * Download inline images given their references from [fetchBodyWithRefs].
      * Returns a map of CID -> Base64 Data URI.
      */
-    suspend fun downloadInlineImages(emailId: String, refs: List<InlineImageRef>): Map<String, String>
+    suspend fun downloadInlineImages(emailId: String, refs: List<com.david.mailapp.domain.model.EmailInlineReference>): Map<String, String>
 
     /** Obtiene la dirección de email del usuario autenticado. */
     suspend fun getUserEmail(): String?
@@ -83,17 +83,12 @@ interface EmailProvider {
     )
 }
 
-/** Reference to an inline image found in the email payload during initial body fetch. */
-data class InlineImageRef(
-    val contentId: String,
-    val attachmentId: String,
-    val mimeType: String
-)
-
 /** Result of fetching the email body, containing both raw body and inline image references. */
 data class BodyFetchResult(
     val rawBody: String?,
-    val inlineRefs: List<InlineImageRef>,
+    val contentState: com.david.mailapp.domain.model.EmailContentState = com.david.mailapp.domain.model.EmailContentState.EMPTY,
+    val bodyKind: com.david.mailapp.domain.model.EmailBodyKind = com.david.mailapp.domain.model.EmailBodyKind.UNKNOWN,
+    val inlineRefs: List<com.david.mailapp.domain.model.EmailInlineReference> = emptyList(),
     val pdfAttachments: List<PdfAttachmentMetadata> = emptyList()
 )
 

@@ -1,6 +1,5 @@
 package com.david.mailapp.data.remote.provider.gmail
 
-import com.david.mailapp.data.remote.provider.InlineImageRef
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -81,7 +80,7 @@ class GmailProviderCancellationTest {
         }
         val provider = GmailProvider(c)
 
-        val ref = InlineImageRef(contentId = "cid", attachmentId = "att1", mimeType = "image/png")
+        val ref = com.david.mailapp.domain.model.EmailInlineReference(contentId = "cid", attachmentId = "att1", mimeType = "image/png")
         try {
             provider.downloadInlineImages("msg_1", listOf(ref))
             fail("Expected CancellationException to propagate")
@@ -96,7 +95,7 @@ class GmailProviderCancellationTest {
             throw RuntimeException("ordinary-error")
         }
         val provider = GmailProvider(c)
-        val ref = InlineImageRef(contentId = "cid", attachmentId = "att1", mimeType = "image/png")
+        val ref = com.david.mailapp.domain.model.EmailInlineReference(contentId = "cid", attachmentId = "att1", mimeType = "image/png")
         val result = provider.downloadInlineImages("msg_1", listOf(ref))
         assertTrue("Ordinary errors should skip the image (empty map)", result.isEmpty())
     }

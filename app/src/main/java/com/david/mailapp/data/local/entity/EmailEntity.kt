@@ -40,8 +40,20 @@ data class EmailEntity(
     @ColumnInfo(name = "rfc_references")
     val rfcReferences: String? = null
 ) {
+    @androidx.room.Ignore
+    var contentState: com.david.mailapp.domain.model.EmailContentState = com.david.mailapp.domain.model.EmailContentState.NOT_FETCHED
+    @androidx.room.Ignore
+    var bodyKind: com.david.mailapp.domain.model.EmailBodyKind = com.david.mailapp.domain.model.EmailBodyKind.UNKNOWN
+    @androidx.room.Ignore
+    var inlineReferencesJson: String = "[]"
+    @androidx.room.Ignore
+    var cachedContentBytes: Long = 0L
+    @androidx.room.Ignore
+    var contentLastAccessEpochMs: Long = 0L
+
     fun toDomain(): Email {
         val pdfAttachments = PdfAttachmentMetadataCodec.decode(pdfAttachmentsJson)
+        val inlineRefs = com.david.mailapp.data.local.converter.InlineContentReferenceCodec.decode(inlineReferencesJson)
         return Email(
             id = id,
             threadId = threadId,
@@ -61,31 +73,44 @@ data class EmailEntity(
             pdfAttachments = pdfAttachments,
             pdfMetadataScanned = pdfMetadataScanned,
             rfcMessageId = rfcMessageId,
-            rfcReferences = rfcReferences
+            rfcReferences = rfcReferences,
+            contentState = contentState,
+            bodyKind = bodyKind,
+            inlineReferences = inlineRefs,
+            cachedContentBytes = cachedContentBytes,
+            contentLastAccessEpochMs = contentLastAccessEpochMs
         )
     }
 
     companion object {
-        fun fromDomain(email: Email, folder: EmailFolder): EmailEntity = EmailEntity(
-            id = email.id,
-            threadId = email.threadId,
-            from = email.from,
-            fromInitials = email.fromInitials,
-            to = email.to,
-            subject = email.subject,
-            snippet = email.snippet,
-            timestamp = email.timestamp,
-            isRead = email.isRead,
-            isStarred = email.isStarred,
-            hasAttachments = email.pdfAttachments.isNotEmpty(),
-            labels = email.labels.joinToString(","),
-            folder = folder.name.lowercase(),
-            body = email.body,
-            cleanBody = email.cleanBody,
-            pdfAttachmentsJson = PdfAttachmentMetadataCodec.encode(email.pdfAttachments),
-            pdfMetadataScanned = email.pdfMetadataScanned,
-            rfcMessageId = email.rfcMessageId,
-            rfcReferences = email.rfcReferences
-        )
+        fun fromDomain(email: Email, folder: EmailFolder): EmailEntity {
+            val entity = EmailEntity(
+                id = email.id,
+                threadId = email.threadId,
+                from = email.from,
+                fromInitials = email.fromInitials,
+                to = email.to,
+                subject = email.subject,
+                snippet = email.snippet,
+                timestamp = email.timestamp,
+                isRead = email.isRead,
+                isStarred = email.isStarred,
+                hasAttachments = email.pdfAttachments.isNotEmpty(),
+                labels = email.labels.joinToString(","),
+                folder = folder.name.lowercase(),
+                body = email.body,
+                cleanBody = email.cleanBody,
+                pdfAttachmentsJson = PdfAttachmentMetadataCodec.encode(email.pdfAttachments),
+                pdfMetadataScanned = email.pdfMetadataScanned,
+                rfcMessageId = email.rfcMessageId,
+                rfcReferences = email.rfcReferences
+            )
+            entity.contentState = email.contentState
+            entity.bodyKind = email.bodyKind
+            entity.inlineReferencesJson = com.david.mailapp.data.local.converter.InlineContentReferenceCodec.encode(email.inlineReferences)
+            entity.cachedContentBytes = email.cachedContentBytes
+            entity.contentLastAccessEpochMs = email.contentLastAccessEpochMs
+            return entity
+        }
     }
 }
