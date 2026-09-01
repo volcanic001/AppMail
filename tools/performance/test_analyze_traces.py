@@ -1,15 +1,12 @@
 #!/usr/bin/env python3
 """
 Unit tests for analyze_traces.py.
+Synthetic fixtures used strictly for testing the parser and mathematical functions.
 """
 
 import unittest
-import tempfile
-import os
-import json
 from analyze_traces import (
     nearest_rank_percentile,
-    calculate_metric_stats,
     check_sanitization,
     TraceLogParser,
     process_benchmark_data,
@@ -33,27 +30,27 @@ class TestAnalyzeTraces(unittest.TestCase):
         self.assertIsNotNone(check_sanitization("query: access_token=xyz123456"))
         self.assertIsNotNone(check_sanitization("code=4/0AbCdEfGh123"))
 
-        # Clean line
-        self.assertIsNone(check_sanitization("MailOpenTrace: mail=1a2b3c4d section=EmailOpen.Total durationMs=120"))
-        # Neutral fixture email allowed
+        # Clean line with valid 16-hex mailKey
+        self.assertIsNone(check_sanitization("MailOpenTrace: mail=1a2b3c4d5e6f7a8b section=EmailOpen.Total durationMs=120"))
+        # Neutral fixture email allowed in test harness
         self.assertIsNone(check_sanitization("From: user@example.com"))
 
-    def test_parser_and_warmup_exclusion(self):
+    def test_parser_and_warmup_exclusion_with_valid_capture_id(self):
         sample_log_lines = []
+        cap_id = "20260831T220000Z"
         # Generate 3 warmups + 10 measured = 13 sessions
         for i in range(1, 14):
-            mail_hex = f"a{i:02x}"
-            t_start = 1000 * i
+            mail_hex = f"1a2b3c4d5e6f7a{i:02x}"
             dur = 200 + i * 10
-            sample_log_lines.append(f"D MailOpenTrace: [PERF_SESSION] START sessionId={i} mail={mail_hex} t={t_start} section=EmailOpen.Total")
-            sample_log_lines.append(f"D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.Resolve mail={mail_hex} durationMs={20 + i}")
-            sample_log_lines.append(f"D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.BodyFetch mail={mail_hex} durationMs={100 + i}")
-            sample_log_lines.append(f"D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.NetworkFull mail={mail_hex} durationMs={90 + i}")
-            sample_log_lines.append(f"D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.HtmlBuild mail={mail_hex} durationMs={15 + i}")
-            sample_log_lines.append(f"D MailOpenTrace: [TRACE_SECTION] section=EmailOpen.WebViewVisual mail={mail_hex} durationMs={50 + i}")
-            sample_log_lines.append(f"D MailOpenTrace: [PERF_SESSION] READY sessionId={i} mail={mail_hex} durationMs={dur} outcome=COMPLETED")
+            sample_log_lines.append(f"D MailOpenTrace: [PERF_SESSION] captureId={cap_id} sessionId={i} mail={mail_hex} section=EmailOpen.Total event=START")
+            sample_log_lines.append(f"D MailOpenTrace: [TRACE_SECTION] captureId={cap_id} sessionId={i} mail={mail_hex} section=EmailOpen.Resolve durationMs={20 + i}")
+            sample_log_lines.append(f"D MailOpenTrace: [TRACE_SECTION] captureId={cap_id} sessionId={i} mail={mail_hex} section=EmailOpen.BodyFetch durationMs={100 + i}")
+            sample_log_lines.append(f"D MailOpenTrace: [TRACE_SECTION] captureId={cap_id} sessionId={i} mail={mail_hex} section=EmailOpen.NetworkFull durationMs={90 + i}")
+            sample_log_lines.append(f"D MailOpenTrace: [TRACE_SECTION] captureId={cap_id} sessionId={i} mail={mail_hex} section=EmailOpen.HtmlBuild durationMs={15 + i}")
+            sample_log_lines.append(f"D MailOpenTrace: [TRACE_SECTION] captureId={cap_id} sessionId={i} mail={mail_hex} section=EmailOpen.WebViewVisual durationMs={50 + i}")
+            sample_log_lines.append(f"D MailOpenTrace: [PERF_SESSION] captureId={cap_id} sessionId={i} mail={mail_hex} section=EmailOpen.Total durationMs={dur} outcome=COMPLETED")
 
-        parser = TraceLogParser()
+        parser = TraceLogParser(expected_capture_id=cap_id)
         sessions = parser.parse_lines(sample_log_lines)
         self.assertEqual(len(sessions), 13)
 
@@ -62,29 +59,48 @@ class TestAnalyzeTraces(unittest.TestCase):
         self.assertEqual(summary["sampleCount"], 10)
 
         # First measured run should be session 4 (warmups 1, 2, 3 excluded)
-        self.assertEqual(runs[0]["mailKey"], "a04")
+        self.assertEqual(runs[0]["mailKey"], "1a2b3c4d5e6f7a04")
         self.assertEqual(runs[0]["totalMs"], 240.0)
         self.assertEqual(runs[0]["networkFullCount"], 1)
 
         # p50 of measured runs: durations are 240, 250, 260, 270, 280, 290, 300, 310, 320, 330
         # sorted index 4 (5th item) is 280.0
         self.assertEqual(summary["EmailOpen.Total"]["p50"], 280.0)
-        # p95 (10th item) is 330.0
         self.assertEqual(summary["EmailOpen.Total"]["p95"], 330.0)
 
         md = generate_markdown_summary(summary)
         self.assertIn("EmailOpen.Total", md)
-        self.assertIn("p95", md)
+        self.assertIn("PostHttpToLegible", md)
 
-    def test_parser_fails_on_insufficient_samples(self):
-        sample_log_lines = [
-            "D MailOpenTrace: [PERF_SESSION] START sessionId=1 mail=a01 t=100 section=EmailOpen.Total",
-            "D MailOpenTrace: [PERF_SESSION] READY sessionId=1 mail=a01 durationMs=150 outcome=COMPLETED"
+    def test_parser_fails_on_mismatched_capture_id(self):
+        lines = [
+            "D MailOpenTrace: [PERF_SESSION] captureId=WRONG_ID sessionId=1 mail=1a2b3c4d5e6f7a01 section=EmailOpen.Total event=START"
         ]
-        parser = TraceLogParser()
+        parser = TraceLogParser(expected_capture_id="EXPECTED_ID")
+        with self.assertRaises(ValueError) as ctx:
+            parser.parse_lines(lines)
+        self.assertIn("Mismatched captureId", str(ctx.exception))
+
+    def test_parser_fails_on_aborted_measured_iteration(self):
+        sample_log_lines = []
+        cap_id = "20260831T220000Z"
+        for i in range(1, 14):
+            mail_hex = f"1a2b3c4d5e6f7a{i:02x}"
+            sample_log_lines.append(f"D MailOpenTrace: [PERF_SESSION] captureId={cap_id} sessionId={i} mail={mail_hex} section=EmailOpen.Total event=START")
+            sample_log_lines.append(f"D MailOpenTrace: [TRACE_SECTION] captureId={cap_id} sessionId={i} mail={mail_hex} section=EmailOpen.Resolve durationMs=20")
+            sample_log_lines.append(f"D MailOpenTrace: [TRACE_SECTION] captureId={cap_id} sessionId={i} mail={mail_hex} section=EmailOpen.HtmlBuild durationMs=15")
+            sample_log_lines.append(f"D MailOpenTrace: [TRACE_SECTION] captureId={cap_id} sessionId={i} mail={mail_hex} section=EmailOpen.WebViewVisual durationMs=50")
+            if i == 5:
+                # Iteration 5 (measured sample 2) aborted
+                sample_log_lines.append(f"D MailOpenTrace: [PERF_SESSION] captureId={cap_id} sessionId={i} mail={mail_hex} section=EmailOpen.Total reason=screen_disposed durationMs=100 outcome=ABORTED")
+            else:
+                sample_log_lines.append(f"D MailOpenTrace: [PERF_SESSION] captureId={cap_id} sessionId={i} mail={mail_hex} section=EmailOpen.Total durationMs=200 outcome=COMPLETED")
+
+        parser = TraceLogParser(expected_capture_id=cap_id)
         sessions = parser.parse_lines(sample_log_lines)
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ValueError) as ctx:
             process_benchmark_data(sessions, "testScenario")
+        self.assertIn("was aborted", str(ctx.exception))
 
 if __name__ == "__main__":
     unittest.main()

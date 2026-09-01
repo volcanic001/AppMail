@@ -4,7 +4,6 @@ import androidx.benchmark.macro.CompilationMode
 import androidx.benchmark.macro.ExperimentalMetricApi
 import androidx.benchmark.macro.FrameTimingMetric
 import androidx.benchmark.macro.MacrobenchmarkScope
-import androidx.benchmark.macro.StartupMode
 import androidx.benchmark.macro.TraceSectionMetric
 import androidx.benchmark.macro.junit4.MacrobenchmarkRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -41,6 +40,7 @@ class EmailOpenMacrobenchmark {
     /**
      * Scenario 1: First opening of 10 distinct plain text emails.
      * Iterations = 13 (3 warmups excluded + 10 measured samples).
+     * startupMode = null.
      */
     @Test
     fun benchmark_01_plainTextFirstOpen() {
@@ -49,12 +49,10 @@ class EmailOpenMacrobenchmark {
             packageName = targetPackage,
             metrics = standardMetrics,
             compilationMode = CompilationMode.DEFAULT,
-            startupMode = StartupMode.COLD,
+            startupMode = null,
             iterations = 13,
             setupBlock = {
-                pressHome()
-                startActivityAndWait()
-                device.wait(Until.hasObject(By.res("inbox_list")), 10_000)
+                ensureInboxVisible(isColdRestart = false)
             }
         ) {
             val emailIndex = String.format("%02d", (iterationIndex % 10) + 1)
@@ -65,13 +63,14 @@ class EmailOpenMacrobenchmark {
             }
             iterationIndex++
 
-            openEmailAndAwaitReady(subjectPrefix)
+            measureOpenEmailToVisualReady(subjectPrefix)
         }
     }
 
     /**
      * Scenario 2: Reopening plain text emails with warm process (app kept alive).
      * Iterations = 13 (3 warmups excluded + 10 measured samples).
+     * startupMode = null.
      */
     @Test
     fun benchmark_02_plainTextReopenWarmProcess() {
@@ -80,12 +79,10 @@ class EmailOpenMacrobenchmark {
             packageName = targetPackage,
             metrics = standardMetrics,
             compilationMode = CompilationMode.DEFAULT,
-            startupMode = StartupMode.WARM,
+            startupMode = null,
             iterations = 13,
             setupBlock = {
-                pressHome()
-                startActivityAndWait()
-                device.wait(Until.hasObject(By.res("inbox_list")), 10_000)
+                ensureInboxVisible(isColdRestart = false)
             }
         ) {
             val emailIndex = String.format("%02d", (iterationIndex % 10) + 1)
@@ -96,13 +93,14 @@ class EmailOpenMacrobenchmark {
             }
             iterationIndex++
 
-            openEmailAndAwaitReady(subjectPrefix)
+            measureOpenEmailToVisualReady(subjectPrefix)
         }
     }
 
     /**
      * Scenario 3: Reopening plain text emails with cold process (process killed before each reopening).
      * Iterations = 13 (3 warmups excluded + 10 measured samples).
+     * startupMode = null. SetupBlock kills the process, relaunches, and waits for Inbox list before measuring.
      */
     @Test
     fun benchmark_03_plainTextReopenColdProcess() {
@@ -111,12 +109,10 @@ class EmailOpenMacrobenchmark {
             packageName = targetPackage,
             metrics = standardMetrics,
             compilationMode = CompilationMode.DEFAULT,
-            startupMode = StartupMode.COLD,
+            startupMode = null,
             iterations = 13,
             setupBlock = {
-                pressHome()
-                startActivityAndWait()
-                device.wait(Until.hasObject(By.res("inbox_list")), 10_000)
+                ensureInboxVisible(isColdRestart = true)
             }
         ) {
             val emailIndex = String.format("%02d", (iterationIndex % 10) + 1)
@@ -127,26 +123,50 @@ class EmailOpenMacrobenchmark {
             }
             iterationIndex++
 
-            openEmailAndAwaitReady(subjectPrefix)
+            measureOpenEmailToVisualReady(subjectPrefix)
         }
     }
 
-    private fun MacrobenchmarkScope.openEmailAndAwaitReady(subjectPrefix: String) {
+    private fun MacrobenchmarkScope.ensureInboxVisible(isColdRestart: Boolean) {
+        if (isColdRestart) {
+            device.executeShellCommand("am force-stop $targetPackage")
+            pressHome()
+            startActivityAndWait()
+            val inboxFound = device.wait(Until.hasObject(By.res("inbox_list")), 15_000)
+            if (!inboxFound) {
+                throw AssertionError("Inbox list was not found after cold restart of $targetPackage")
+            }
+        } else {
+            val hasInbox = device.hasObject(By.res("inbox_list"))
+            if (!hasInbox) {
+                // If detail is still mounted, press back to return to Inbox
+                device.pressBack()
+                val returnOk = device.wait(Until.hasObject(By.res("inbox_list")), 5_000)
+                if (!returnOk) {
+                    pressHome()
+                    startActivityAndWait()
+                    device.wait(Until.hasObject(By.res("inbox_list")), 10_000)
+                        ?: throw AssertionError("Inbox list was not found in setupBlock")
+                }
+            }
+        }
+    }
+
+    private fun MacrobenchmarkScope.measureOpenEmailToVisualReady(subjectPrefix: String) {
         val emailItem = device.wait(
             Until.findObject(By.textContains(subjectPrefix)),
             5_000
-        ) ?: device.findObject(By.res("inbox_list"))?.children?.firstOrNull()
+        ) ?: throw AssertionError("Fixture email with subject containing '$subjectPrefix' was not found in Inbox")
 
-        emailItem?.click()
+        emailItem.click()
 
-        // Wait for detail screen content to be rendered (either WebView or detail subject)
-        device.wait(Until.hasObject(By.textContains(subjectPrefix)), 10_000)
-
-        // Wait until top progress indicator / loader is gone
-        device.wait(Until.gone(By.res("inbox_next_page_loader")), 5_000)
-
-        // Return to inbox for the next iteration
-        device.pressBack()
-        device.wait(Until.hasObject(By.res("inbox_list")), 5_000)
+        // Wait strictly for the visual ready marker (rendered after WebView visual callback + loader dismissed)
+        val visualReady = device.wait(
+            Until.hasObject(By.res("email_detail_visual_ready")),
+            15_000
+        )
+        if (!visualReady) {
+            throw AssertionError("Visual ready marker 'email_detail_visual_ready' was not found within 15s for fixture: $subjectPrefix")
+        }
     }
 }
