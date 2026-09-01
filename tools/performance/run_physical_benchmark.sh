@@ -14,6 +14,12 @@ REQUIRED_SDK="${REQUIRED_SDK:-}"
 REFERENCE_LABEL="${REFERENCE_LABEL:-physicalAndroidReference}"
 SCENARIO_NAME="${SCENARIO_NAME:-plainTextFirstOpen}"
 SKIP_INSTALL="${SKIP_INSTALL:-false}"
+SKIP_TARGET_INSTALL="${SKIP_TARGET_INSTALL:-$SKIP_INSTALL}"
+SKIP_BENCHMARK_INSTALL="${SKIP_BENCHMARK_INSTALL:-false}"
+RUN_MACROBENCHMARK_PREFLIGHT="${RUN_MACROBENCHMARK_PREFLIGHT:-true}"
+PREFLIGHT_ONLY="${PREFLIGHT_ONLY:-false}"
+MACROBENCHMARK_PREFLIGHT_TIMEOUT_SECONDS="${MACROBENCHMARK_PREFLIGHT_TIMEOUT_SECONDS:-90}"
+MACROBENCHMARK_CAPTURE_TIMEOUT_SECONDS="${MACROBENCHMARK_CAPTURE_TIMEOUT_SECONDS:-900}"
 
 LOGCAT_PID=""
 MOBILE_DATA_ORIGINAL=""
@@ -28,6 +34,44 @@ cleanup() {
     fi
 }
 trap cleanup EXIT
+
+run_instrumentation_with_timeout() {
+    local class_name="$1"
+    local timeout_seconds="$2"
+    local output_file="$3"
+    local description="$4"
+
+    : > "$output_file"
+    "$ADB" -s "$DEVICE_SERIAL" shell am instrument -w -r \
+        -e class "$class_name" \
+        -e androidx.benchmark.suppressErrors "LOW-BATTERY,DEBUGGABLE" \
+        com.david.macrobenchmark/androidx.test.runner.AndroidJUnitRunner \
+        > "$output_file" &
+
+    local instrumentation_pid=$!
+    local start_epoch
+    start_epoch=$(date +%s)
+
+    while kill -0 "$instrumentation_pid" 2>/dev/null; do
+        local now_epoch
+        now_epoch=$(date +%s)
+        if [ $((now_epoch - start_epoch)) -ge "$timeout_seconds" ]; then
+            echo "ERROR: $description timed out after ${timeout_seconds}s."
+            kill "$instrumentation_pid" 2>/dev/null || true
+            sleep 1
+            kill -9 "$instrumentation_pid" 2>/dev/null || true
+            wait "$instrumentation_pid" 2>/dev/null || true
+            cat "$output_file"
+            return 124
+        fi
+        sleep 2
+    done
+
+    local exit_code=0
+    wait "$instrumentation_pid" || exit_code=$?
+    cat "$output_file"
+    return "$exit_code"
+}
 
 echo "=== [PREFLIGHT] Checking physical device connected via ADB ==="
 DEVICE_LIST=$("$ADB" devices | awk 'NR > 1 && $2 == "device" { print $1 }')
@@ -153,16 +197,40 @@ APP_APK_SHA=$(shasum -a 256 "$APP_APK" | awk '{print $1}')
 BENCH_APK_SHA=$(shasum -a 256 "$BENCH_APK" | awk '{print $1}')
 
 echo "Installing target APK..."
-if [ "$SKIP_INSTALL" = "true" ]; then
-    echo "Skipping target APK install because SKIP_INSTALL=true."
+if [ "$SKIP_TARGET_INSTALL" = "true" ]; then
+    echo "Skipping target APK install because SKIP_TARGET_INSTALL=true."
 else
     "$ADB" -s "$DEVICE_SERIAL" install -r "$APP_APK"
 fi
 echo "Installing benchmark APK..."
-if [ "$SKIP_INSTALL" = "true" ]; then
-    echo "Skipping benchmark APK install because SKIP_INSTALL=true."
+if [ "$SKIP_BENCHMARK_INSTALL" = "true" ]; then
+    echo "Skipping benchmark APK install because SKIP_BENCHMARK_INSTALL=true."
 else
     "$ADB" -s "$DEVICE_SERIAL" install -r "$BENCH_APK"
+fi
+
+if [ "$RUN_MACROBENCHMARK_PREFLIGHT" = "true" ]; then
+    echo "=== [PREFLIGHT] Validating Macrobenchmark/Perfetto compatibility ==="
+    PREFLIGHT_OUTPUT="$TEMP_DIR/macrobenchmark_perfetto_preflight_output.txt"
+    if ! run_instrumentation_with_timeout \
+        "com.david.macrobenchmark.MacrobenchmarkPerfettoPreflight" \
+        "$MACROBENCHMARK_PREFLIGHT_TIMEOUT_SECONDS" \
+        "$PREFLIGHT_OUTPUT" \
+        "Macrobenchmark/Perfetto preflight"; then
+        echo "ERROR: Macrobenchmark/Perfetto preflight failed; refusing full capture on this device."
+        exit 6
+    fi
+
+    if grep -qE 'FAILURES!!!|INSTRUMENTATION_CODE: -1|INSTRUMENTATION_STATUS_CODE: -2' "$PREFLIGHT_OUTPUT"; then
+        echo "ERROR: Macrobenchmark/Perfetto preflight reported instrumentation failure."
+        exit 6
+    fi
+
+    if [ "$PREFLIGHT_ONLY" = "true" ]; then
+        echo "=== [SUCCESS] Macrobenchmark/Perfetto preflight completed successfully ==="
+        echo "Preflight output: $PREFLIGHT_OUTPUT"
+        exit 0
+    fi
 fi
 
 LOGCAT_RAW="$TEMP_DIR/logcat_raw.log"
@@ -172,11 +240,11 @@ LOGCAT_PID=$!
 
 echo "=== [EXECUTION] Running Macrobenchmark suite on physical reference device ==="
 INSTRUMENTATION_OUTPUT="$TEMP_DIR/instrumentation_output.txt"
-"$ADB" -s "$DEVICE_SERIAL" shell am instrument -w -r \
-    -e class com.david.macrobenchmark.EmailOpenMacrobenchmark \
-    -e androidx.benchmark.suppressErrors "LOW-BATTERY,DEBUGGABLE" \
-    com.david.macrobenchmark/androidx.test.runner.AndroidJUnitRunner \
-    | tee "$INSTRUMENTATION_OUTPUT"
+run_instrumentation_with_timeout \
+    "com.david.macrobenchmark.EmailOpenMacrobenchmark" \
+    "$MACROBENCHMARK_CAPTURE_TIMEOUT_SECONDS" \
+    "$INSTRUMENTATION_OUTPUT" \
+    "Email-open Macrobenchmark capture"
 
 if grep -qE 'FAILURES!!!|INSTRUMENTATION_CODE: -1|INSTRUMENTATION_STATUS_CODE: -2' "$INSTRUMENTATION_OUTPUT"; then
     echo "ERROR: Macrobenchmark instrumentation failed; refusing to analyze an incomplete capture."
@@ -224,7 +292,11 @@ cat <<EOF > "$OUTPUT_DIR/capture-manifest.json"
     "physicalDevice": true,
     "wifiEnabled": true,
     "mobileDataDisabledForCapture": $([ "$MOBILE_DATA_ORIGINAL" = "1" ] && echo "true" || echo "false"),
-    "apkInstallSkipped": $([ "$SKIP_INSTALL" = "true" ] && echo "true" || echo "false")
+    "apkInstallSkipped": $([ "$SKIP_TARGET_INSTALL" = "true" ] && [ "$SKIP_BENCHMARK_INSTALL" = "true" ] && echo "true" || echo "false"),
+    "targetApkInstallSkipped": $([ "$SKIP_TARGET_INSTALL" = "true" ] && echo "true" || echo "false"),
+    "benchmarkApkInstallSkipped": $([ "$SKIP_BENCHMARK_INSTALL" = "true" ] && echo "true" || echo "false"),
+    "macrobenchmarkPerfettoPreflight": $([ "$RUN_MACROBENCHMARK_PREFLIGHT" = "true" ] && echo "true" || echo "false"),
+    "preflightOnly": false
   },
   "build": {
     "targetApkSha256": "$APP_APK_SHA",

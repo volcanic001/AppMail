@@ -131,6 +131,9 @@ Para la caracterización y benchmarking se definen 4 clases formales de correo:
 - **Subfase 0R.5:** Recontratación metodológica aplicada. La línea base oficial puede capturarse en un dispositivo Android físico alternativo siempre que el manifest registre modelo, API, build fingerprint, motivo de sustitución y alcance comparativo. La línea base resultante es válida para comparación intra-dispositivo y no debe presentarse como métrica representativa de Pixel 9.
 - **Subfase 0R.6:** Intento de captura física en Huawei `JLN-LX3` / Android 12 / API 31. El dispositivo pasa preflight `atrace/tracefs`, batería, térmico y red, pero AndroidX Macrobenchmark/Perfetto queda bloqueado al iniciar `benchmark_01_plainTextFirstOpen` y no produce artefactos finales (`runs.csv`, `summary.json`, traces o reportes). Tras limpiar procesos huérfanos de `trace_processor_shell` y repetir sin reinstalar APKs (`SKIP_INSTALL=true`), el bloqueo se reproduce. El Huawei queda registrado como control diagnóstico, no como dispositivo válido de cierre.
 - **Documento de soporte 0R.6:** `diagnostico-macrobenchmark-huawei-jln-lx3.md`.
+- **Subfase 0R.7:** Infraestructura defensiva agregada. `MacrobenchmarkPerfettoPreflight` valida con una sola iteración y `startupMode = null` que AndroidX Macrobenchmark puede iniciar Perfetto y procesar métricas antes de ejecutar la captura completa. `run_physical_benchmark.sh` integra este gate con timeout y modo `PREFLIGHT_ONLY=true`.
+- **Resultado 0R.7 en Huawei:** el preflight falla rápido con `Perfetto unexpected exit code, output = EXITCODE=1`, confirmando que el dispositivo pasa `atrace/tracefs` pero no es compatible con la ruta Macrobenchmark/Perfetto requerida. Este resultado evita capturas largas bloqueadas y no cierra Etapa 0.
+- **Documento de soporte 0R.7:** `diagnostico-preflight-macrobenchmark-perfetto.md`.
 
 ### Invarianza de los Archivos Protegidos
 
