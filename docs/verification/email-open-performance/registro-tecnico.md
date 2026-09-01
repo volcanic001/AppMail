@@ -124,6 +124,9 @@ Para la caracterización y benchmarking se definen 4 clases formales de correo:
 - **Subfase 0.6:** El commit histórico `de72f77` fue formalmente invalidado mediante `invalidacion-linea-base-sintetica.md` al determinarse que sus artefactos provenían de un generador simulado (`generate_baseline_data.py`).
 - **Subfase 0.7:** El contrato definitivo queda condicionado a la ejecución física auténtica en Google Pixel 9 (API 37).
 - **Proceso activo:** Ejecución del ciclo de corrección 0R (0R.1 a 0R.4) para medición real con trazabilidad física comprobable.
+- **Bloqueo externo actual:** El Pixel 9 GrapheneOS `tokay` / Android 17 / API 37 / build `CP2A.260805.005/2026081301` no expone los nodos ftrace requeridos por `atrace` (`trace_marker`, `events`, `tracing_on`, `trace`) pese a tener `tracefs` montado en `/sys/kernel/tracing`.
+- **Control diagnóstico:** Un segundo dispositivo Android (`JLN-LX3`, API 31) sí expone `trace_marker` y permite `atrace --list_categories`, por lo que se descarta un fallo general del host, ADB o platform-tools. Este control no reemplaza la medición obligatoria en Pixel 9.
+- **Documento de soporte:** `diagnostico-tracefs-pixel9-grapheneos.md`.
 
 ### Invarianza de los Archivos Protegidos
 

@@ -40,8 +40,12 @@ if [ "$SDK" != "37" ]; then
 fi
 
 # 2. Validate battery level >= 50%
-BATTERY_LEVEL=$("$ADB" -s "$DEVICE_SERIAL" shell dumpsys battery | grep "level:" | awk '{print $2}' | tr -d '\r\n')
+BATTERY_LEVEL=$("$ADB" -s "$DEVICE_SERIAL" shell dumpsys battery | awk '/^[[:space:]]*level:[[:space:]]*/ { print $2; exit }' | tr -d '\r\n')
 echo "Battery level: ${BATTERY_LEVEL}%"
+if ! [[ "$BATTERY_LEVEL" =~ ^[0-9]+$ ]]; then
+    echo "ERROR: Unable to parse battery level from device output ('$BATTERY_LEVEL')."
+    exit 3
+fi
 if [ "$BATTERY_LEVEL" -lt 50 ]; then
     echo "ERROR: Battery level is below 50% ($BATTERY_LEVEL%). Connect charger and retry."
     exit 3
@@ -102,11 +106,17 @@ trap "kill -9 $LOGCAT_PID 2>/dev/null || true" EXIT
 
 # 8. Execute Macrobenchmark suite
 echo "=== [EXECUTION] Running Macrobenchmark suite on Pixel 9 ==="
+INSTRUMENTATION_OUTPUT="$TEMP_DIR/instrumentation_output.txt"
 "$ADB" -s "$DEVICE_SERIAL" shell am instrument -w -r \
     -e class com.david.macrobenchmark.EmailOpenMacrobenchmark \
     -e androidx.benchmark.suppressErrors "EMULATOR,LOW-BATTERY,DEBUGGABLE" \
     com.david.macrobenchmark/androidx.test.runner.AndroidJUnitRunner \
-    | tee "$TEMP_DIR/instrumentation_output.txt"
+    | tee "$INSTRUMENTATION_OUTPUT"
+
+if grep -qE 'FAILURES!!!|INSTRUMENTATION_CODE: -1|INSTRUMENTATION_STATUS_CODE: -2' "$INSTRUMENTATION_OUTPUT"; then
+    echo "ERROR: Macrobenchmark instrumentation failed; refusing to analyze an incomplete capture."
+    exit 6
+fi
 
 # Stop logcat capture
 kill -9 $LOGCAT_PID 2>/dev/null || true
