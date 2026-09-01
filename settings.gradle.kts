@@ -28,3 +28,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "MailApp"
 include(":app")
+include(":macrobenchmark")

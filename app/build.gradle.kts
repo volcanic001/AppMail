@@ -49,6 +49,13 @@ android {
             isMinifyEnabled = false
             buildConfigField("boolean", "PERF_TRACE_ENABLED", "true")
         }
+        create("benchmark") {
+            initWith(getByName("release"))
+            matchingFallbacks += listOf("release")
+            signingConfig = signingConfigs.getByName("debug")
+            isDebuggable = false
+            buildConfigField("boolean", "PERF_TRACE_ENABLED", "true")
+        }
     }
 
     compileOptions {
@@ -133,6 +140,7 @@ dependencies {
 
     // Tracing
     implementation(libs.androidx.tracing)
+    implementation(libs.androidx.profileinstaller)
 
     // Unit testing
     testImplementation(libs.junit)

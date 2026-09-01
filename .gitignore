@@ -2,6 +2,9 @@
 /.idea/
 /build/
 /app/build/
+/macrobenchmark/build/
+build/
+**/build/
 local.properties
 *.iml
 .DS_Store
