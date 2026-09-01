@@ -20,4 +20,28 @@ data class EmailSummaryProjection(
     @ColumnInfo(name = "has_attachments") val hasAttachments: Boolean,
     val labels: String,
     val folder: String
-)
+) {
+    fun toDomain(): com.david.mailapp.domain.model.Email {
+        return com.david.mailapp.domain.model.Email(
+            id = id,
+            threadId = threadId,
+            from = from,
+            fromInitials = fromInitials,
+            to = to,
+            subject = subject,
+            snippet = snippet,
+            timestamp = timestamp,
+            isRead = isRead,
+            isStarred = isStarred,
+            hasAttachments = hasAttachments,
+            labels = labels.split(",").filter { it.isNotBlank() },
+            folder = com.david.mailapp.domain.model.EmailFolder.valueOf(folder.replaceFirstChar { it.uppercase() }),
+            body = "",
+            cleanBody = "",
+            pdfAttachments = emptyList(),
+            pdfMetadataScanned = false,
+            rfcMessageId = null,
+            rfcReferences = null
+        )
+    }
+}

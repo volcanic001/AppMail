@@ -28,14 +28,14 @@ internal class EmailMailboxCoordinator(
     // ── Reactive reads ───────────────────────────────────────────
 
     fun getInbox(): Flow<List<Email>> {
-        return dao.getByFolder("inbox").map { entities ->
-            entities.map { it.toDomain() }
+        return dao.observeSummariesByFolder("inbox").map { projections ->
+            projections.map { it.toDomain() }
         }
     }
 
     fun getTrash(): Flow<List<Email>> {
-        return dao.getByFolder("trash").map { entities ->
-            entities.map { it.toDomain() }
+        return dao.observeSummariesByFolder("trash").map { projections ->
+            projections.map { it.toDomain() }
         }
     }
 

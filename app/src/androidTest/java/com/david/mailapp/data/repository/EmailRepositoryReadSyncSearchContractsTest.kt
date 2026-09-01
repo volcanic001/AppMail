@@ -31,6 +31,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -63,6 +64,43 @@ class EmailRepositoryReadSyncSearchContractsTest {
     fun tearDown() {
         database.close()
         cacheDir.deleteRecursively()
+    }
+
+    @Test
+    fun getInbox_and_getTrash_emit_lightweight_models_while_getEmailById_emits_full_model() = runTest {
+        val email = testEmail("heavy-1", timestamp = 1_000L).copy(
+            body = "<html>large body</html>",
+            cleanBody = "large body",
+            pdfAttachments = listOf(PdfAttachmentMetadata("file.pdf", "application/pdf", "att1", 100L)),
+            pdfMetadataScanned = true,
+            rfcMessageId = "<msg1@test>",
+            rfcReferences = "<ref1@test>"
+        )
+
+        database.emailDao().upsertAll(listOf(EmailEntity.fromDomain(email, EmailFolder.Inbox)))
+
+        val inboxItem = repository.getInbox().first().first()
+        assertEquals("heavy-1", inboxItem.id)
+        assertEquals("", inboxItem.body)
+        assertEquals("", inboxItem.cleanBody)
+        assertTrue(inboxItem.pdfAttachments.isEmpty())
+        assertFalse(inboxItem.pdfMetadataScanned)
+        assertNull(inboxItem.rfcMessageId)
+        assertNull(inboxItem.rfcReferences)
+
+        val fullItem = repository.getEmailById("heavy-1").first()!!
+        assertEquals("heavy-1", fullItem.id)
+        assertEquals("<html>large body</html>", fullItem.body)
+        assertEquals("large body", fullItem.cleanBody)
+        assertEquals(1, fullItem.pdfAttachments.size)
+        assertTrue(fullItem.pdfMetadataScanned)
+        assertEquals("<msg1@test>", fullItem.rfcMessageId)
+
+        database.emailDao().moveToFolder("heavy-1", "trash")
+        val trashItem = repository.getTrash().first().first()
+        assertEquals("heavy-1", trashItem.id)
+        assertEquals("", trashItem.body)
+        assertTrue(trashItem.pdfAttachments.isEmpty())
     }
 
     @Test
@@ -183,7 +221,7 @@ class EmailRepositoryReadSyncSearchContractsTest {
     }
 
     @Test
-    fun read_apis_map_complete_rich_entity_to_domain_model() = runTest {
+    fun getEmailById_maps_complete_rich_entity_to_domain_model() = runTest {
         val expected = testEmail(
             id = "rich",
             from = "Sender Name <sender@example.com>",
@@ -218,7 +256,6 @@ class EmailRepositoryReadSyncSearchContractsTest {
         )
 
         assertEquals(expected, repository.getEmailById("rich").first())
-        assertEquals(listOf(expected), repository.getInbox().first())
         assertNoProviderAccess()
     }
 
