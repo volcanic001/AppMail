@@ -126,9 +126,11 @@ Para la caracterización y benchmarking se definen 4 clases formales de correo:
 - **Subfase 0.7:** El contrato definitivo queda condicionado a la ejecución física auténtica en un dispositivo Android real con `atrace`/`tracefs` funcional.
 - **Proceso activo:** Ejecución del ciclo de corrección 0R (0R.1 a 0R.4) para medición real con trazabilidad física comprobable.
 - **Bloqueo externo actual:** El Pixel 9 GrapheneOS `tokay` / Android 17 / API 37 / build `CP2A.260805.005/2026081301` no expone los nodos ftrace requeridos por `atrace` (`trace_marker`, `events`, `tracing_on`, `trace`) pese a tener `tracefs` montado en `/sys/kernel/tracing`.
-- **Control diagnóstico:** Un segundo dispositivo Android (`JLN-LX3`, API 31) sí expone `trace_marker` y permite `atrace --list_categories`, por lo que se descarta un fallo general del host, ADB o platform-tools. Este control no reemplaza la medición obligatoria en Pixel 9.
+- **Control diagnóstico de `atrace/tracefs`:** Un segundo dispositivo Android (`JLN-LX3`, API 31) sí expone `trace_marker` y permite `atrace --list_categories`, por lo que se descarta un fallo general del host, ADB o platform-tools.
 - **Documento de soporte:** `diagnostico-tracefs-pixel9-grapheneos.md`.
 - **Subfase 0R.5:** Recontratación metodológica aplicada. La línea base oficial puede capturarse en un dispositivo Android físico alternativo siempre que el manifest registre modelo, API, build fingerprint, motivo de sustitución y alcance comparativo. La línea base resultante es válida para comparación intra-dispositivo y no debe presentarse como métrica representativa de Pixel 9.
+- **Subfase 0R.6:** Intento de captura física en Huawei `JLN-LX3` / Android 12 / API 31. El dispositivo pasa preflight `atrace/tracefs`, batería, térmico y red, pero AndroidX Macrobenchmark/Perfetto queda bloqueado al iniciar `benchmark_01_plainTextFirstOpen` y no produce artefactos finales (`runs.csv`, `summary.json`, traces o reportes). Tras limpiar procesos huérfanos de `trace_processor_shell` y repetir sin reinstalar APKs (`SKIP_INSTALL=true`), el bloqueo se reproduce. El Huawei queda registrado como control diagnóstico, no como dispositivo válido de cierre.
+- **Documento de soporte 0R.6:** `diagnostico-macrobenchmark-huawei-jln-lx3.md`.
 
 ### Invarianza de los Archivos Protegidos
 
