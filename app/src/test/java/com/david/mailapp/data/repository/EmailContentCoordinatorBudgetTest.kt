@@ -38,14 +38,13 @@ class EmailContentCoordinatorBudgetTest {
         override suspend fun getEntitiesByIdsSync(ids: List<String>): List<EmailEntity> = emptyList()
         override suspend fun replaceFolder(folder: String, emails: List<EmailEntity>) {}
         override suspend fun upsertWithMerge(entity: EmailEntity): EmailEntity = entity
-        override suspend fun upsertPreservingBodies(emails: List<EmailEntity>) {}
-        override suspend fun updateBody(emailId: String, body: String) {}
-        override suspend fun updateCleanBody(emailId: String, cleanBody: String) {}
+        override suspend fun upsertPreservingCachedContent(emails: List<EmailEntity>) {}
         override suspend fun sumReadyContentBytes(): Long? = 0L
         override suspend fun getLruEvictionCandidates(protectedEmailId: String): List<EmailEntity> = emptyList()
         override suspend fun clearContent(emailId: String) {}
         override suspend fun updateContentLastAccess(emailId: String, newTimestamp: Long) {}
         override suspend fun getMaxContentLastAccess(): Long? = 0L
+        override suspend fun recordContentAccess(emailId: String) {}
 
         override suspend fun updateBodyAndPdfMetadata(
             emailId: String,

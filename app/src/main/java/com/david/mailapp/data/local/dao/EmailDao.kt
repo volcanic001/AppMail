@@ -23,8 +23,48 @@ import kotlinx.coroutines.flow.Flow
  *   - If both are unscanned → use incoming (noop — both have defaults).
  */
 internal fun mergeWithExisting(incoming: EmailEntity, existing: EmailEntity): EmailEntity {
-    val body = if (incoming.body.isBlank() && existing.body.isNotBlank()) existing.body else incoming.body
-    val cleanBody = if (incoming.cleanBody.isBlank() && existing.cleanBody.isNotBlank()) existing.cleanBody else incoming.cleanBody
+    // 1. Content Unit
+    val existingState = existing.contentState
+    val incomingState = incoming.contentState
+
+    val mergedBody: String
+    val mergedCleanBody: String
+    val mergedState: String
+    val mergedKind: String
+    val mergedRefs: String
+    val mergedBytes: Long
+    val mergedAccess: Long
+
+    when {
+        incomingState == "NOT_FETCHED" && (existingState == "READY" || existingState == "EMPTY") -> {
+            mergedBody = existing.body
+            mergedCleanBody = existing.cleanBody
+            mergedState = existing.contentState
+            mergedKind = existing.bodyKind
+            mergedRefs = existing.inlineReferencesJson
+            mergedBytes = existing.cachedContentBytes
+            mergedAccess = existing.contentLastAccessEpochMs
+        }
+        incomingState == "READY" && existingState == "READY" -> {
+            mergedBody = incoming.body
+            mergedCleanBody = incoming.cleanBody
+            mergedState = incoming.contentState
+            mergedKind = incoming.bodyKind
+            mergedRefs = incoming.inlineReferencesJson
+            mergedBytes = incoming.cachedContentBytes
+            mergedAccess = existing.contentLastAccessEpochMs
+        }
+        else -> {
+            mergedBody = incoming.body
+            mergedCleanBody = incoming.cleanBody
+            mergedState = incoming.contentState
+            mergedKind = incoming.bodyKind
+            mergedRefs = incoming.inlineReferencesJson
+            mergedBytes = incoming.cachedContentBytes
+            mergedAccess = if (incomingState == "READY") incoming.contentLastAccessEpochMs else 0L
+        }
+    }
+
     val rfcMessageId = incoming.rfcMessageId ?: existing.rfcMessageId
     val rfcReferences = incoming.rfcReferences ?: existing.rfcReferences
 
@@ -35,8 +75,13 @@ internal fun mergeWithExisting(incoming: EmailEntity, existing: EmailEntity): Em
     }
 
     return incoming.copy(
-        body = body,
-        cleanBody = cleanBody,
+        body = mergedBody,
+        cleanBody = mergedCleanBody,
+        contentState = mergedState,
+        bodyKind = mergedKind,
+        inlineReferencesJson = mergedRefs,
+        cachedContentBytes = mergedBytes,
+        contentLastAccessEpochMs = mergedAccess,
         pdfAttachmentsJson = pdfJson,
         pdfMetadataScanned = pdfScanned,
         hasAttachments = hasAtt,
@@ -136,7 +181,7 @@ interface EmailDao {
      * data (HTML bodies, PDF metadata).
      */
     @Transaction
-    suspend fun upsertPreservingBodies(emails: List<EmailEntity>) {
+    suspend fun upsertPreservingCachedContent(emails: List<EmailEntity>) {
         if (emails.isEmpty()) return
         val preserved = emails.chunked(500).flatMap { chunk ->
             val existing = getEntitiesByIdsSync(chunk.map { it.id }).associateBy { it.id }
@@ -147,14 +192,6 @@ interface EmailDao {
         }
         upsertAll(preserved)
     }
-
-    /** Persist the fetched HTML body and clean body. */
-    @Query("UPDATE emails SET body = :body WHERE id = :emailId")
-    suspend fun updateBody(emailId: String, body: String)
-
-    /** Persist the Jsoup-cleaned HTML body for a message. */
-    @Query("UPDATE emails SET clean_body = :cleanBody WHERE id = :emailId")
-    suspend fun updateCleanBody(emailId: String, cleanBody: String)
 
     /**
      * Atomically persist the fetched body, cleaned body, and PDF metadata
@@ -211,15 +248,7 @@ interface EmailDao {
     """)
     suspend fun clearContent(emailId: String)
 
-    @Query("""
-        UPDATE emails SET 
-            content_last_access_epoch_ms = :newTimestamp
-        WHERE id = :emailId
-    """)
-    suspend fun updateContentLastAccess(emailId: String, newTimestamp: Long)
 
-    @Query("SELECT MAX(content_last_access_epoch_ms) FROM emails")
-    suspend fun getMaxContentLastAccess(): Long?
 
     @Transaction
     suspend fun applyLruAndSaveContent(
@@ -255,5 +284,18 @@ interface EmailDao {
                 if (currentSum <= maxBudgetBytes) break
             }
         }
+    }
+
+    @Query("SELECT MAX(content_last_access_epoch_ms) FROM emails")
+    suspend fun getMaxContentLastAccess(): Long?
+
+    @Query("UPDATE emails SET content_last_access_epoch_ms = :newTimestamp WHERE id = :emailId AND content_state = 'READY'")
+    suspend fun updateContentLastAccess(emailId: String, newTimestamp: Long)
+
+    @Transaction
+    suspend fun recordContentAccess(emailId: String) {
+        val maxAccess = getMaxContentLastAccess() ?: 0L
+        val newTimestamp = maxOf(System.currentTimeMillis(), maxAccess + 1)
+        updateContentLastAccess(emailId, newTimestamp)
     }
 }

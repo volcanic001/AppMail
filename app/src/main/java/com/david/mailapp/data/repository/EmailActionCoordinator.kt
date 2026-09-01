@@ -152,7 +152,7 @@ internal class EmailActionCoordinator(
             if (result.isComplete) {
                 dao.replaceFolder(folder, entities)
             } else {
-                dao.upsertPreservingBodies(entities)
+                dao.upsertPreservingCachedContent(entities)
             }
         }
     }

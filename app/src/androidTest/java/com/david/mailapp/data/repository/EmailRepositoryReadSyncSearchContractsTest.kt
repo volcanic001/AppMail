@@ -296,7 +296,7 @@ class EmailRepositoryReadSyncSearchContractsTest {
         val lightweightFromProvider = testEmail(heavyId)
         provider.fetchInboxResult = PaginatedResult(listOf(lightweightFromProvider), "page3")
 
-        // 3. Perform a paginated refresh (page > 0 -> upsertPreservingBodies)
+        // 3. Perform a paginated refresh (page > 0 -> upsertPreservingCachedContent)
         repository.refreshInbox("page2")
 
         // 4. Verify that the local database retained the heavy fields via merge

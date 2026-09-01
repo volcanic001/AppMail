@@ -66,7 +66,7 @@ internal class EmailMailboxCoordinator(
                 if (pageToken == null && result.isComplete) {
                     dao.replaceFolder("inbox", entities)
                 } else {
-                    dao.upsertPreservingBodies(entities)
+                    dao.upsertPreservingCachedContent(entities)
                 }
             }
         }
@@ -94,7 +94,7 @@ internal class EmailMailboxCoordinator(
                 if (pageToken == null && result.isComplete) {
                     dao.replaceFolder("trash", entities)
                 } else {
-                    dao.upsertPreservingBodies(entities)
+                    dao.upsertPreservingCachedContent(entities)
                 }
             }
         }

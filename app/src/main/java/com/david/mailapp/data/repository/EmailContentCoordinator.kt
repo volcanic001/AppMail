@@ -136,9 +136,10 @@ internal class EmailContentCoordinator(
 
     suspend fun recordContentAccess(emailId: String) {
         withContext(Dispatchers.IO) {
-            val maxAccess = dao.getMaxContentLastAccess() ?: 0L
-            val newTimestamp = maxOf(System.currentTimeMillis(), maxAccess + 1)
-            dao.updateContentLastAccess(emailId, newTimestamp)
+            val lease = writeGuard.capture() ?: return@withContext
+            writeGuard.commit(lease) {
+                dao.recordContentAccess(emailId)
+            }
         }
     }
 }
