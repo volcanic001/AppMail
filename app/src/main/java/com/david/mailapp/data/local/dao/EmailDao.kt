@@ -52,6 +52,15 @@ interface EmailDao {
     @Query("SELECT * FROM emails WHERE folder = :folder ORDER BY timestamp DESC")
     fun getByFolder(folder: String): Flow<List<EmailEntity>>
 
+    /** Observe lightweight summaries of emails in a folder, newest first. */
+    @Query("""
+        SELECT id, thread_id, sender, sender_initials, recipient_to, subject, snippet, timestamp, is_read, is_starred, has_attachments, labels, folder
+        FROM emails
+        WHERE folder = :folder
+        ORDER BY timestamp DESC
+    """)
+    fun observeSummariesByFolder(folder: String): Flow<List<com.david.mailapp.data.local.entity.EmailSummaryProjection>>
+
     /** Get a single email by ID. */
     @Query("SELECT * FROM emails WHERE id = :emailId LIMIT 1")
     fun getById(emailId: String): Flow<EmailEntity?>
