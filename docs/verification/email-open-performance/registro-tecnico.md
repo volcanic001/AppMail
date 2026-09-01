@@ -42,7 +42,8 @@ Estos archivos contienen modificaciones del usuario en el espacio de trabajo loc
 - **JDK/JBR:** `25.0.2` (JetBrains s.r.o. 25.0.2+-15348964-b329.117) en `/Applications/Android Studio.app/Contents/jbr/Contents/Home`
 - **SDK Android:** Compile SDK 36, Target SDK 36, Min SDK 26
 - **Namespace / Application ID:** `com.david.mailapp`
-- **Dispositivo objetivo de medición física:** Google Pixel 9 (device `tokay`, Android 17 / API 37)
+- **Dispositivo objetivo de medición física:** dispositivo físico Android de referencia con `atrace`/`tracefs` funcional.
+- **Dispositivo inicialmente previsto:** Google Pixel 9 (device `tokay`, Android 17 / API 37), descartado temporalmente para captura por bloqueo externo documentado de `tracefs`.
 - **Condiciones físicas de prueba:** Wi-Fi exclusivo, datos móviles apagados, batería ≥ 50%, estado térmico nominal/ligero.
 
 ---
@@ -122,11 +123,12 @@ Para la caracterización y benchmarking se definen 4 clases formales de correo:
 
 - **Subfase 0.1 a 0.5:** Infraestructura, instrumentación, módulo Macrobenchmark, suite JVM (600 tests verdes) y analizador determinista validados y aprobados.
 - **Subfase 0.6:** El commit histórico `de72f77` fue formalmente invalidado mediante `invalidacion-linea-base-sintetica.md` al determinarse que sus artefactos provenían de un generador simulado (`generate_baseline_data.py`).
-- **Subfase 0.7:** El contrato definitivo queda condicionado a la ejecución física auténtica en Google Pixel 9 (API 37).
+- **Subfase 0.7:** El contrato definitivo queda condicionado a la ejecución física auténtica en un dispositivo Android real con `atrace`/`tracefs` funcional.
 - **Proceso activo:** Ejecución del ciclo de corrección 0R (0R.1 a 0R.4) para medición real con trazabilidad física comprobable.
 - **Bloqueo externo actual:** El Pixel 9 GrapheneOS `tokay` / Android 17 / API 37 / build `CP2A.260805.005/2026081301` no expone los nodos ftrace requeridos por `atrace` (`trace_marker`, `events`, `tracing_on`, `trace`) pese a tener `tracefs` montado en `/sys/kernel/tracing`.
 - **Control diagnóstico:** Un segundo dispositivo Android (`JLN-LX3`, API 31) sí expone `trace_marker` y permite `atrace --list_categories`, por lo que se descarta un fallo general del host, ADB o platform-tools. Este control no reemplaza la medición obligatoria en Pixel 9.
 - **Documento de soporte:** `diagnostico-tracefs-pixel9-grapheneos.md`.
+- **Subfase 0R.5:** Recontratación metodológica aplicada. La línea base oficial puede capturarse en un dispositivo Android físico alternativo siempre que el manifest registre modelo, API, build fingerprint, motivo de sustitución y alcance comparativo. La línea base resultante es válida para comparación intra-dispositivo y no debe presentarse como métrica representativa de Pixel 9.
 
 ### Invarianza de los Archivos Protegidos
 
