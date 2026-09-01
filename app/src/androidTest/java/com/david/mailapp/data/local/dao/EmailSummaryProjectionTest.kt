@@ -5,11 +5,11 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.david.mailapp.data.local.MailDatabase
 import com.david.mailapp.data.local.entity.EmailEntity
+import com.david.mailapp.data.local.entity.EmailSummaryProjection
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -38,7 +38,7 @@ class EmailSummaryProjectionTest {
     fun observeSummariesByFolder_returnsOnlyLightweightFieldsAndIsolatesFolders() = runTest {
         val largeHtmlBody = "<html><body>" + "A".repeat(5000) + "</body></html>"
         val largeCleanBody = "A".repeat(5000)
-        
+
         val inboxEmail1 = EmailEntity(
             id = "msg1",
             threadId = "thread1",
@@ -105,22 +105,51 @@ class EmailSummaryProjectionTest {
             rfcReferences = null
         )
 
-        dao.upsertAll(listOf(inboxEmail1, inboxEmail2, trashEmail))
+        val otherEmail = EmailEntity(
+            id = "msg4",
+            threadId = "thread4",
+            from = "other@test.com",
+            fromInitials = "O",
+            to = "me@test.com",
+            subject = "Other Subject",
+            snippet = "Other",
+            timestamp = 1800L,
+            isRead = true,
+            isStarred = false,
+            hasAttachments = false,
+            labels = "",
+            folder = "other",
+            body = "Other body",
+            cleanBody = "Other body",
+            pdfAttachmentsJson = "[]",
+            pdfMetadataScanned = false,
+            rfcMessageId = null,
+            rfcReferences = null
+        )
+
+        dao.upsertAll(listOf(inboxEmail1, inboxEmail2, trashEmail, otherEmail))
 
         val inboxSummaries = dao.observeSummariesByFolder("inbox").first()
-        
-        // Verifies folder isolation
-        assertEquals(2, inboxSummaries.size)
+        val trashSummaries = dao.observeSummariesByFolder("trash").first()
+        val otherSummaries = dao.observeSummariesByFolder("other").first()
 
-        // Verifies descending order by timestamp
-        val first = inboxSummaries[0]
-        val second = inboxSummaries[1]
-        assertEquals("msg2", first.id)
-        assertEquals(2000L, first.timestamp)
-        assertEquals("msg1", second.id)
-        assertEquals(1000L, second.timestamp)
+        // Verifies folder isolation and descending order by timestamp
+        assertEquals(2, inboxSummaries.size)
+        assertEquals("msg2", inboxSummaries[0].id)
+        assertEquals("msg1", inboxSummaries[1].id)
+
+        assertEquals(1, trashSummaries.size)
+        assertEquals("msg3", trashSummaries[0].id)
+
+        assertEquals(1, otherSummaries.size)
+        assertEquals("msg4", otherSummaries[0].id)
+
+        // Verify otherEmail does not appear in inbox or trash lists
+        assertEquals(false, inboxSummaries.any { it.id == "msg4" })
+        assertEquals(false, trashSummaries.any { it.id == "msg4" })
 
         // Verifies mapping of all 13 fields (checking second item 'msg1' which has true flags)
+        val second = inboxSummaries[1]
         assertEquals("msg1", second.id)
         assertEquals("thread1", second.threadId)
         assertEquals("sender@test.com", second.from)
@@ -134,16 +163,22 @@ class EmailSummaryProjectionTest {
         assertEquals(true, second.hasAttachments)
         assertEquals("IMPORTANT", second.labels)
         assertEquals("inbox", second.folder)
+    }
 
-        // Compile-time check: First and second shouldn't have any body, cleanBody, pdfAttachmentsJson properties
-        // We ensure structurally the fields don't exist by verifying the projection doesn't declare them.
-        val declaredFields = com.david.mailapp.data.local.entity.EmailSummaryProjection::class.java.declaredFields.map { it.name }
-        assertTrue(declaredFields.contains("id"))
-        assertTrue(!declaredFields.contains("body"))
-        assertTrue(!declaredFields.contains("cleanBody"))
-        assertTrue(!declaredFields.contains("pdfAttachmentsJson"))
-        assertTrue(!declaredFields.contains("pdfMetadataScanned"))
-        assertTrue(!declaredFields.contains("rfcMessageId"))
-        assertTrue(!declaredFields.contains("rfcReferences"))
+    @Test
+    fun projectionContainsExactlyThirteenAllowedFields() {
+        // Reflection check to ensure the exact set of properties matches the 13 allowed fields.
+        // This validates simultaneously that no heavy fields exist and no required fields are missing.
+        val allowedFields = setOf(
+            "id", "threadId", "from", "fromInitials", "to", "subject", "snippet",
+            "timestamp", "isRead", "isStarred", "hasAttachments", "labels", "folder"
+        )
+
+        val actualFields = EmailSummaryProjection::class.java.declaredFields
+            .filter { !it.isSynthetic && !it.name.startsWith("\$") } // Filter out compiler/jacoco/compose synthetic fields
+            .map { it.name }
+            .toSet()
+
+        assertEquals(allowedFields, actualFields)
     }
 }
