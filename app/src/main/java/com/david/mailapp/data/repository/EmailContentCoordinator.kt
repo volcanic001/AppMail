@@ -61,8 +61,7 @@ internal class EmailContentCoordinator(
                 inlineRefsJson.toByteArray(Charsets.UTF_8).size.toLong()
             }
 
-            val MAX_BUDGET_BYTES = 52_428_800L
-            val isOversized = cachedContentBytes > MAX_BUDGET_BYTES
+            val isOversized = cachedContentBytes > EMAIL_CONTENT_CACHE_BUDGET_BYTES
 
             var commitSuccess = false
             withContext(Dispatchers.IO) {
@@ -93,7 +92,7 @@ internal class EmailContentCoordinator(
                             bodyKind = remote.bodyKind.name,
                             inlineReferencesJson = inlineRefsJson,
                             cachedContentBytes = cachedContentBytes,
-                            maxBudgetBytes = MAX_BUDGET_BYTES
+                            maxBudgetBytes = EMAIL_CONTENT_CACHE_BUDGET_BYTES
                         )
                     }
                     commitSuccess = commit != null

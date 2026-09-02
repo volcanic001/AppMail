@@ -128,4 +128,18 @@ class EmailDaoLruTest {
         assertEquals(EmailContentState.READY.name, e3Updated.contentState)
         assertEquals(10_000_000L, e3Updated.cachedContentBytes)
     }
+
+    @Test
+    fun enforceContentBudget_evictsGloballyByAccessThenId() = runTest {
+        insertEmail("b", bytes = 20_000_000L, accessEpoch = 0L)
+        insertEmail("a", bytes = 20_000_000L, accessEpoch = 0L)
+        insertEmail("recent", bytes = 20_000_000L, accessEpoch = 10L)
+
+        dao.enforceContentBudget(52_428_800L)
+
+        assertEquals(EmailContentState.NOT_FETCHED.name, dao.getByIdOnce("a")!!.contentState)
+        assertEquals(EmailContentState.READY.name, dao.getByIdOnce("b")!!.contentState)
+        assertEquals(EmailContentState.READY.name, dao.getByIdOnce("recent")!!.contentState)
+        assertEquals(40_000_000L, dao.sumReadyContentBytes())
+    }
 }

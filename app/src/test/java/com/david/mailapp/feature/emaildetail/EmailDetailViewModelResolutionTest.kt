@@ -151,6 +151,7 @@ class EmailDetailViewModelResolutionTest {
         val vm = createViewModel(source)
 
         assertTrue(vm.uiState.value is EmailDetailUiState.Ready)
+        assertEquals("cached complete content requires no body request", 0, source.bodyFetchCallCount)
     }
 
     @Test

@@ -6,7 +6,12 @@ import com.david.mailapp.data.local.MailDatabase
 import com.david.mailapp.data.local.entity.EmailEntity
 import com.david.mailapp.data.pdf.PdfCacheManager
 import com.david.mailapp.domain.model.EmailFolder
+import com.david.mailapp.domain.model.EmailBodyKind
+import com.david.mailapp.domain.model.EmailContentState
+import com.david.mailapp.domain.model.EmailInlineReference
 import com.david.mailapp.domain.model.PaginatedResult
+import com.david.mailapp.domain.model.PdfAttachmentMetadata
+import com.david.mailapp.feature.emaildetail.components.EmailHtmlCleaner
 import com.david.mailapp.testhelpers.FakeEmailProvider
 import com.david.mailapp.testhelpers.FakeSessionWriteGuard
 import com.david.mailapp.testhelpers.testEmail
@@ -47,6 +52,94 @@ class SafeRefreshContractsTest {
 
     private suspend fun seedTrash(emails: List<com.david.mailapp.domain.model.Email>) {
         db.emailDao().upsertAll(emails.map { EmailEntity.fromDomain(it, EmailFolder.Trash) })
+    }
+
+    @Test
+    fun full_plain_text_sync_persists_ready_content_without_individual_fetch() = runTest {
+        val body = "first line\nsecond line"
+        provider.fetchInboxResult = PaginatedResult(
+            listOf(
+                testEmail("plain-sync").copy(
+                    body = body,
+                    pdfMetadataScanned = true,
+                    contentState = EmailContentState.READY,
+                    bodyKind = EmailBodyKind.PLAIN_TEXT
+                )
+            ),
+            null,
+            isComplete = true
+        )
+
+        repository.refreshInbox(null)
+
+        val saved = db.emailDao().getByIdOnce("plain-sync")!!
+        assertEquals(body, saved.body)
+        assertEquals(body, saved.cleanBody)
+        assertEquals(EmailContentState.READY.name, saved.contentState)
+        assertEquals(EmailBodyKind.PLAIN_TEXT.name, saved.bodyKind)
+        assertTrue(saved.cachedContentBytes > 0L)
+        assertEquals(0, provider.fetchEmailByIdCalls)
+    }
+
+    @Test
+    fun full_html_sync_persists_clean_body_cid_and_pdf() = runTest {
+        val raw = """<p style="color:red">body<img src="cid:image-1"></p>"""
+        val refs = listOf(EmailInlineReference("image-1", "attachment-1", "image/png"))
+        val pdf = PdfAttachmentMetadata("report.pdf", "application/pdf", "pdf-1", 100L, "part-1")
+        provider.fetchInboxResult = PaginatedResult(
+            listOf(
+                testEmail("html-sync").copy(
+                    body = raw,
+                    pdfAttachments = listOf(pdf),
+                    pdfMetadataScanned = true,
+                    contentState = EmailContentState.READY,
+                    bodyKind = EmailBodyKind.HTML,
+                    inlineReferences = refs
+                )
+            ),
+            null,
+            isComplete = true
+        )
+
+        repository.refreshInbox(null)
+
+        val saved = db.emailDao().getByIdOnce("html-sync")!!
+        assertEquals(raw, saved.body)
+        assertEquals(EmailHtmlCleaner.clean(raw), saved.cleanBody)
+        assertEquals(refs, saved.toDomain().inlineReferences)
+        assertEquals(listOf(pdf), saved.toDomain().pdfAttachments)
+        assertEquals(EmailContentState.READY.name, saved.contentState)
+    }
+
+    @Test
+    fun payload_incomplete_sync_preserves_existing_ready_content() = runTest {
+        val existing = testEmail("partial-content").copy(
+            body = "<p>cached</p>",
+            cleanBody = "<p>cached</p>",
+            pdfMetadataScanned = true,
+            contentState = EmailContentState.READY,
+            bodyKind = EmailBodyKind.HTML,
+            cachedContentBytes = 30L
+        )
+        seedInbox(listOf(existing))
+        provider.fetchInboxResult = PaginatedResult(
+            listOf(
+                testEmail("partial-content").copy(
+                    contentState = EmailContentState.EMPTY,
+                    bodyKind = EmailBodyKind.UNKNOWN,
+                    pdfMetadataScanned = false
+                )
+            ),
+            null,
+            isComplete = false
+        )
+
+        repository.refreshInbox(null)
+
+        val saved = db.emailDao().getByIdOnce("partial-content")!!
+        assertEquals(existing.body, saved.body)
+        assertEquals(existing.cleanBody, saved.cleanBody)
+        assertEquals(EmailContentState.READY.name, saved.contentState)
     }
 
     // ── Inbox: first page complete → replace ────────────────────

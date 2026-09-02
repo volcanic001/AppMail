@@ -7,8 +7,11 @@ import com.david.mailapp.data.remote.provider.EmailProvider
 import com.david.mailapp.domain.model.Email
 import com.david.mailapp.domain.model.EmailFolder
 import com.david.mailapp.domain.model.PaginatedResult
+import com.david.mailapp.feature.emaildetail.components.EmailHtmlCleaner
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 
 /**
  * Live Room-backed reads and refresh coordination for mailbox folders.
@@ -58,18 +61,14 @@ internal class EmailMailboxCoordinator(
         val fetched = p.fetchInbox(pageToken)
         val result = if (fetched.isComplete) fetched else fetched.copy(nextPageToken = null)
 
-        val entities = result.items.map { EmailEntity.fromDomain(it.asSummaryOnly(), EmailFolder.Inbox) }
-        inboxCommitCoordinator.commitIfValid(gen) {
-            writeGuard.commit(lease) {
-                // Replace folder only on a complete first page;
-                // partial pages or pagination append/merge.
-                if (pageToken == null && result.isComplete) {
-                    dao.replaceFolder("inbox", entities)
-                } else {
-                    dao.upsertPreservingCachedContent(entities)
-                }
-            }
-        }
+        persistMailboxPage(
+            folder = EmailFolder.Inbox,
+            pageToken = pageToken,
+            result = result,
+            generation = gen,
+            commitCoordinator = inboxCommitCoordinator,
+            lease = lease
+        )
 
         return result
     }
@@ -86,19 +85,63 @@ internal class EmailMailboxCoordinator(
         val fetched = p.fetchTrash(pageToken)
         val result = if (fetched.isComplete) fetched else fetched.copy(nextPageToken = null)
 
-        val entities = result.items.map { EmailEntity.fromDomain(it.asSummaryOnly(), EmailFolder.Trash) }
-        trashCommitCoordinator.commitIfValid(gen) {
-            writeGuard.commit(lease) {
-                // Refresh replaces the paginated window only for a complete first page.
-                // Partial pages and subsequent pages can only merge into the cache.
+        persistMailboxPage(
+            folder = EmailFolder.Trash,
+            pageToken = pageToken,
+            result = result,
+            generation = gen,
+            commitCoordinator = trashCommitCoordinator,
+            lease = lease
+        )
+
+        return result
+    }
+
+    private suspend fun persistMailboxPage(
+        folder: EmailFolder,
+        pageToken: String?,
+        result: PaginatedResult<Email>,
+        generation: Long,
+        commitCoordinator: FolderCommitCoordinator,
+        lease: com.david.mailapp.core.session.SessionWriteLease
+    ) {
+        val syncEmails = result.items.map(Email::materializeForMailboxSync)
+        val entities = syncEmails.map { EmailEntity.fromDomain(it, folder) }
+        val folderName = folder.name.lowercase()
+        var sessionCommitted = false
+
+        val generationAccepted = commitCoordinator.commitIfValid(generation) {
+            sessionCommitted = writeGuard.commit(lease) {
                 if (pageToken == null && result.isComplete) {
-                    dao.replaceFolder("trash", entities)
+                    dao.replaceFolder(folderName, entities)
                 } else {
                     dao.upsertPreservingCachedContent(entities)
                 }
+                dao.enforceContentBudget(EMAIL_CONTENT_CACHE_BUDGET_BYTES)
+                true
+            } == true
+        }
+        if (!generationAccepted || !sessionCommitted) return
+
+        val cleanedContent = withContext(Dispatchers.Default) {
+            syncEmails.mapNotNull { email ->
+                email.toCleanedSyncContent(EmailHtmlCleaner::clean)
             }
         }
+        if (cleanedContent.isEmpty()) return
 
-        return result
+        commitCoordinator.commitIfValid(generation) {
+            writeGuard.commit(lease) {
+                cleanedContent.forEach { cleaned ->
+                    dao.updateCleanBodyIfCurrent(
+                        emailId = cleaned.emailId,
+                        expectedRawBody = cleaned.expectedRawBody,
+                        cleanBody = cleaned.cleanBody,
+                        cachedContentBytes = cleaned.cachedContentBytes
+                    )
+                }
+                dao.enforceContentBudget(EMAIL_CONTENT_CACHE_BUDGET_BYTES)
+            }
+        }
     }
 }

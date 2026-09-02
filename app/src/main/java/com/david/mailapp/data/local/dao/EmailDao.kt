@@ -222,6 +222,22 @@ interface EmailDao {
         inlineReferencesJson: String,
         cachedContentBytes: Long
     )
+
+    @Query("""
+        UPDATE emails SET
+            clean_body = :cleanBody,
+            cached_content_bytes = :cachedContentBytes
+        WHERE id = :emailId
+          AND body = :expectedRawBody
+          AND content_state = 'READY'
+          AND body_kind = 'HTML'
+    """)
+    suspend fun updateCleanBodyIfCurrent(
+        emailId: String,
+        expectedRawBody: String,
+        cleanBody: String,
+        cachedContentBytes: Long
+    ): Int
     
     // LRU Policy Methods (Subfase 2.3)
 
@@ -234,6 +250,13 @@ interface EmailDao {
         ORDER BY content_last_access_epoch_ms ASC, id ASC
     """)
     suspend fun getLruEvictionCandidates(protectedEmailId: String): List<EmailEntity>
+
+    @Query("""
+        SELECT * FROM emails
+        WHERE content_state = 'READY'
+        ORDER BY content_last_access_epoch_ms ASC, id ASC
+    """)
+    suspend fun getGlobalLruEvictionCandidates(): List<EmailEntity>
 
     @Query("""
         UPDATE emails SET 
@@ -283,6 +306,18 @@ interface EmailDao {
                 currentSum -= candidate.cachedContentBytes
                 if (currentSum <= maxBudgetBytes) break
             }
+        }
+    }
+
+    @Transaction
+    suspend fun enforceContentBudget(maxBudgetBytes: Long) {
+        var currentSum = sumReadyContentBytes() ?: 0L
+        if (currentSum <= maxBudgetBytes) return
+
+        for (candidate in getGlobalLruEvictionCandidates()) {
+            clearContent(candidate.id)
+            currentSum -= candidate.cachedContentBytes
+            if (currentSum <= maxBudgetBytes) break
         }
     }
 

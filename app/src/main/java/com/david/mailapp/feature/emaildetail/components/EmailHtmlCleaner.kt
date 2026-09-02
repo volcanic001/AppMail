@@ -49,7 +49,7 @@ internal object EmailHtmlCleaner {
             Log.d(CLEAN_TAG, "[JSOUP_CLEAN] DONE outputLen=${result.length} totalMs=${cleanNow() - t0}")
             result
         } catch (e: Exception) {
-            Log.d(CLEAN_TAG, "[JSOUP_CLEAN] ERROR error=${e.javaClass.simpleName}: ${e.message}")
+            Log.d(CLEAN_TAG, "[JSOUP_CLEAN] ERROR error=${e.javaClass.simpleName}")
             html
         }
     }
