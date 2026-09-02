@@ -50,6 +50,14 @@ class FakeEmailDetailSource(
         return markAsReadResult
     }
 
+    // ── HTML preparation ────────────────────────────────────────
+    var prepareHtmlBodyResult: com.david.mailapp.data.cleaner.HtmlCleanResult =
+        com.david.mailapp.data.cleaner.HtmlCleanResult.Cleaned("<div style=\"margin:0 16px;\"><p>Cleaned</p></div>")
+
+    override suspend fun prepareHtmlBody(email: Email): com.david.mailapp.data.cleaner.HtmlCleanResult {
+        return prepareHtmlBodyResult
+    }
+
     // ── Body fetch ──────────────────────────────────────────────
     var bodyFetchResult: com.david.mailapp.data.repository.EmailContentRecoveryResult =
         com.david.mailapp.data.repository.EmailContentRecoveryResult.Failure(EmailResolutionFailureReason.NO_CONNECTION)
@@ -113,7 +121,7 @@ class FakeEmailDetailSource(
             isRead = false, isStarred = false, hasAttachments = false,
             labels = emptyList(), folder = folder,
             body = if (bodyBlank && body.isEmpty()) "" else body.ifEmpty { "<html>body</html>" },
-            cleanBody = cleanBody,
+            cleanBody = cleanBody.ifBlank { if (bodyBlank && body.isEmpty()) "" else body.ifEmpty { "<html>body</html>" } },
             pdfAttachments = pdfAttachments, pdfMetadataScanned = pdfScanned,
             contentState = contentState,
             bodyKind = bodyKind

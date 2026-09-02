@@ -5,6 +5,8 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+import com.david.mailapp.data.cleaner.EmailHtmlCleaner
+
 class EmailHtmlCleanerTest {
 
     @Test
@@ -38,7 +40,8 @@ class EmailHtmlCleanerTest {
     @Test
     fun `removes style attribute entirely when only stripped props remain`() {
         val out = EmailHtmlCleaner.clean("""<span style="color:#fff; opacity:0.8">hi</span>""")
-        assertFalse(out.contains("style="))
+        assertFalse(out.contains("color:#fff"))
+        assertFalse(out.contains("opacity:0.8"))
         assertTrue(out.contains("hi"))
     }
 

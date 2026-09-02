@@ -10,7 +10,7 @@ import com.david.mailapp.data.remote.provider.EmailLookupResult
 import com.david.mailapp.domain.model.Email
 import com.david.mailapp.domain.model.EmailFolder
 import com.david.mailapp.domain.model.PdfAttachmentMetadata
-import com.david.mailapp.feature.emaildetail.components.EmailHtmlCleaner
+import com.david.mailapp.data.cleaner.EmailHtmlCleaner
 import com.david.mailapp.testhelpers.FakeEmailProvider
 import com.david.mailapp.testhelpers.FakeSessionWriteGuard
 import com.david.mailapp.testhelpers.testEmail

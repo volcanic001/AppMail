@@ -24,6 +24,9 @@ interface EmailDetailEmailSource {
     /** Mark as read, once. */
     suspend fun markAsRead(emailId: String): EmailActionResult
 
+    /** Single-flight HTML cleaning and persistence for READY HTML emails. */
+    suspend fun prepareHtmlBody(email: Email): com.david.mailapp.data.cleaner.HtmlCleanResult
+
     /** Cache-first content recovery with typed remote and persistence failures. */
     suspend fun recoverContentById(emailId: String): com.david.mailapp.data.repository.EmailContentRecoveryResult
 

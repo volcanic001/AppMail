@@ -11,7 +11,7 @@ import com.david.mailapp.domain.model.EmailContentState
 import com.david.mailapp.domain.model.EmailInlineReference
 import com.david.mailapp.domain.model.PaginatedResult
 import com.david.mailapp.domain.model.PdfAttachmentMetadata
-import com.david.mailapp.feature.emaildetail.components.EmailHtmlCleaner
+import com.david.mailapp.data.cleaner.EmailHtmlCleaner
 import com.david.mailapp.testhelpers.FakeEmailProvider
 import com.david.mailapp.testhelpers.FakeSessionWriteGuard
 import com.david.mailapp.testhelpers.testEmail

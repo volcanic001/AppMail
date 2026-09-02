@@ -7,7 +7,7 @@ import com.david.mailapp.data.remote.provider.EmailProvider
 import com.david.mailapp.domain.model.Email
 import com.david.mailapp.domain.model.EmailFolder
 import com.david.mailapp.domain.model.PaginatedResult
-import com.david.mailapp.feature.emaildetail.components.EmailHtmlCleaner
+import com.david.mailapp.data.cleaner.EmailHtmlCleaner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map

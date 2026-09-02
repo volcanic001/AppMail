@@ -47,11 +47,18 @@ internal fun mergeWithExisting(incoming: EmailEntity, existing: EmailEntity): Em
         }
         incomingState == "READY" && existingState == "READY" -> {
             mergedBody = incoming.body
-            mergedCleanBody = incoming.cleanBody
+            if (incoming.body == existing.body && existing.cleanBody.isNotBlank()) {
+                mergedCleanBody = existing.cleanBody
+                mergedBytes = mergedBody.toByteArray(Charsets.UTF_8).size.toLong() +
+                    mergedCleanBody.toByteArray(Charsets.UTF_8).size.toLong() +
+                    incoming.inlineReferencesJson.toByteArray(Charsets.UTF_8).size.toLong()
+            } else {
+                mergedCleanBody = incoming.cleanBody
+                mergedBytes = incoming.cachedContentBytes
+            }
             mergedState = incoming.contentState
             mergedKind = incoming.bodyKind
             mergedRefs = incoming.inlineReferencesJson
-            mergedBytes = incoming.cachedContentBytes
             mergedAccess = existing.contentLastAccessEpochMs
         }
         else -> {
@@ -262,6 +269,7 @@ interface EmailDao {
           AND body = :expectedRawBody
           AND content_state = 'READY'
           AND body_kind = 'HTML'
+          AND (clean_body = '' OR clean_body IS NULL)
     """)
     suspend fun updateCleanBodyIfCurrent(
         emailId: String,
@@ -269,6 +277,29 @@ interface EmailDao {
         cleanBody: String,
         cachedContentBytes: Long
     ): Int
+
+    @Transaction
+    suspend fun updateCleanBodyIfCurrentAndEnforceLru(
+        emailId: String,
+        expectedRawBody: String,
+        cleanBody: String,
+        cachedContentBytes: Long,
+        maxBudgetBytes: Long = 52_428_800L
+    ): Boolean {
+        val rows = updateCleanBodyIfCurrent(emailId, expectedRawBody, cleanBody, cachedContentBytes)
+        if (rows > 0) {
+            var currentSum = sumReadyContentBytes() ?: 0L
+            if (currentSum > maxBudgetBytes) {
+                for (candidate in getLruEvictionCandidates(emailId)) {
+                    clearContent(candidate.id)
+                    currentSum -= candidate.cachedContentBytes
+                    if (currentSum <= maxBudgetBytes) break
+                }
+            }
+            return true
+        }
+        return false
+    }
     
     // LRU Policy Methods (Subfase 2.3)
 

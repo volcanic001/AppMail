@@ -60,7 +60,7 @@ class EmailBodyDocumentTest {
     @Test
     fun buildHtml_simpleHtml_wrapsCleanBodyWithSimpleMargins() {
         val html = buildHtml(
-            body = "<p>hola</p>",
+            body = "<div style=\"margin:0 16px; padding-top: 20px;\"><p>hola</p></div>",
             showImages = true,
             isDark = false,
             surfaceArgb = 0xFFFFFBFE.toInt(),

@@ -9,7 +9,7 @@ import com.david.mailapp.data.local.entity.EmailEntity
 import com.david.mailapp.data.remote.provider.EmailLookupFailureReason
 import com.david.mailapp.data.remote.provider.EmailLookupResult
 import com.david.mailapp.data.remote.provider.EmailProvider
-import com.david.mailapp.feature.emaildetail.components.EmailHtmlCleaner
+import com.david.mailapp.data.cleaner.EmailHtmlCleaner
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CancellationException

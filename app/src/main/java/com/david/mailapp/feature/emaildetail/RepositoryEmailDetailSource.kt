@@ -24,6 +24,9 @@ class RepositoryEmailDetailSource(
     override suspend fun markAsRead(emailId: String): EmailActionResult =
         repository.markAsRead(emailId)
 
+    override suspend fun prepareHtmlBody(email: Email): com.david.mailapp.data.cleaner.HtmlCleanResult =
+        repository.prepareHtmlBody(email)
+
     override suspend fun recoverContentById(emailId: String): com.david.mailapp.data.repository.EmailContentRecoveryResult =
         repository.recoverContentById(emailId)
 

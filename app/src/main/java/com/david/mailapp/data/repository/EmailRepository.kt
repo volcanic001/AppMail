@@ -42,6 +42,12 @@ class EmailRepository(
     /** Shared individual recovery for resolution and content, deduplicated per session and id. */
     private val remoteRecoveryCoordinator = EmailRemoteRecoveryCoordinator(dao, providerFactory, writeGuard)
 
+    /** Single-flight HTML cleaning coordinator. */
+    internal val htmlCleaningCoordinator = com.david.mailapp.data.cleaner.HtmlCleaningCoordinator(
+        emailDao = dao,
+        sessionGenerationProvider = { writeGuard.capture()?.generation ?: -1L }
+    )
+
     /** Body recovery plus inline image and content-access operations. */
     private val contentCoordinator = EmailContentCoordinator(dao, providerFactory, remoteRecoveryCoordinator, writeGuard)
 
@@ -108,6 +114,9 @@ class EmailRepository(
      * Devuelve el resultado remoto (o MemoryOnly) si fue exitoso, o null en caso
      * de cancelación, pérdida de sesión o fallo de red.
      */
+    suspend fun prepareHtmlBody(email: Email): com.david.mailapp.data.cleaner.HtmlCleanResult =
+        htmlCleaningCoordinator.cleanAndPersist(email)
+
     suspend fun recoverContentById(emailId: String): EmailContentRecoveryResult =
         contentCoordinator.recoverContentById(emailId)
 

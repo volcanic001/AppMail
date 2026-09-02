@@ -1,11 +1,10 @@
-package com.david.mailapp.feature.emaildetail.components
+package com.david.mailapp.data.cleaner
 
 import android.os.SystemClock
 import android.util.Log
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 
-// DEBUG_PERF
 private const val CLEAN_TAG = "MailPerfTrace"
 private fun cleanNow() = SystemClock.elapsedRealtime()
 
@@ -16,38 +15,41 @@ private fun cleanNow() = SystemClock.elapsedRealtime()
  * color-scheme hints so the WebView can adopt the app theme cleanly, while
  * preserving layout (width, margin, padding, borders, fonts, tables).
  *
- * Runs unconditionally in both light and dark modes. Kept free of Android /
- * Compose dependencies so it can be unit tested in isolation.
+ * Evaluates simple HTML structure and integrates margin wrapping internally so
+ * visual layout decisions are stored once inside [Email.cleanBody].
  */
 internal object EmailHtmlCleaner {
 
-    /**
-     * CSS properties removed everywhere (inline `style="..."` attributes and
-     * internal `<style>` blocks). Single source of truth — adding a property
-     * here strips it in every code path.
-     */
     val STRIPPED_PROPERTIES: Set<String> = setOf(
         "background",
         "background-color",
         "color",
         "-webkit-text-fill-color",
-        "opacity",
+        "opacity"
     )
 
     /**
-     * Normalizes [html], returning the cleaned body fragment. On any parse
-     * failure the original input is returned unchanged (fail-open).
+     * Normalizes [html], returning the cleaned and margin-wrapped body fragment.
+     * On any parse failure or empty output for non-empty input, returns [html] (fail-open).
      */
     fun clean(html: String): String {
+        if (html.isBlank()) return ""
+        if (html.length > 2_000_000) return html
         return try {
             val t0 = cleanNow()
             Log.d(CLEAN_TAG, "[JSOUP_CLEAN] START htmlLen=${html.length}")
             val doc: Document = Jsoup.parseBodyFragment(html)
             val tParse = cleanNow()
             Log.d(CLEAN_TAG, "[JSOUP_CLEAN] PARSE_DONE parseMs=${tParse - t0}")
-            val result = clean(doc)
-            Log.d(CLEAN_TAG, "[JSOUP_CLEAN] DONE outputLen=${result.length} totalMs=${cleanNow() - t0}")
-            result
+            val isSimple = isSimpleHtml(doc)
+            val cleanedBody = clean(doc)
+            val wrappedBody = if (isSimple) {
+                """<div style="margin:0 16px; padding-top: 20px;">$cleanedBody</div>"""
+            } else {
+                cleanedBody
+            }
+            Log.d(CLEAN_TAG, "[JSOUP_CLEAN] DONE outputLen=${wrappedBody.length} totalMs=${cleanNow() - t0}")
+            wrappedBody.ifBlank { html }
         } catch (e: Exception) {
             Log.d(CLEAN_TAG, "[JSOUP_CLEAN] ERROR error=${e.javaClass.simpleName}")
             html
@@ -56,8 +58,6 @@ internal object EmailHtmlCleaner {
 
     /**
      * Normalizes the already-parsed [doc] in-place and returns the cleaned body fragment.
-     * Use this overload together with [isSimpleHtml] to reuse a single Jsoup parse for both
-     * classification and cleaning, avoiding a redundant second parse.
      */
     fun clean(doc: Document): String {
         // Remove bgcolor and background attributes
@@ -115,17 +115,12 @@ internal object EmailHtmlCleaner {
     }
 
     /**
-     * Heuristic to distinguish simple HTML emails (plain text + inline images, like Gmail
-     * compose) from professionally laid-out emails (newsletters, transactional).
-     *
-     * Returns `true` when the document is structurally simple and should receive the
-     * app's default horizontal margin for visual consistency with Compose headers.
+     * Heuristic to distinguish simple HTML emails from complex layout emails.
      */
     fun isSimpleHtml(doc: Document): Boolean {
         return doc.select("table table").isEmpty()
     }
 
-    /** True if the CSS declaration [rule] targets a stripped property. */
     private fun isStrippedProperty(rule: String): Boolean {
         val colonIdx = rule.indexOf(':')
         if (colonIdx == -1) return false
@@ -153,7 +148,7 @@ internal object EmailHtmlCleaner {
                     val header = css.substring(i, j)
                     if (header.contains("prefers-color-scheme", ignoreCase = true)) {
                         var braceCount = 1
-                        j++ // skip '{'
+                        j++
                         while (j < n && braceCount > 0) {
                             if (css[j] == '{') {
                                 braceCount++

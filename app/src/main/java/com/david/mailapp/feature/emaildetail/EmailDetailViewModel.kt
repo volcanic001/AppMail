@@ -9,6 +9,7 @@ import com.david.mailapp.data.pdf.PdfDownloadState
 import com.david.mailapp.data.repository.EmailResolutionFailureReason
 import com.david.mailapp.data.repository.EmailResolutionResult
 import com.david.mailapp.domain.model.Email
+import com.david.mailapp.domain.model.EmailBodyKind
 import com.david.mailapp.domain.model.EmailContentState
 import com.david.mailapp.domain.model.PdfAttachmentMetadata
 import kotlinx.coroutines.CancellationException
@@ -210,13 +211,51 @@ class EmailDetailViewModel(
         }
     }
 
+    private var isPreparingHtmlBody = false
+
     private suspend fun handleReadyEmail(email: Email) {
         if (!hasRecordedAccess) {
             hasRecordedAccess = true
             viewModelScope.launch { source.recordContentAccess(emailId) }
         }
 
-        val displayBody = email.cleanBody.ifBlank { email.body }
+        // If HTML email has a non-blank body but empty cleanBody, transition to PreparingBody and request single-flight cleaning
+        if (email.bodyKind == EmailBodyKind.HTML && email.body.isNotBlank() && email.cleanBody.isBlank()) {
+            if (!delivered) {
+                EmailRenderTrace.d(traceMail, "VM", "VM_STATE_PREPARING", "reason=uncleaned_html")
+                _uiState.value = EmailDetailUiState.PreparingBody(email)
+            }
+            if (!isPreparingHtmlBody) {
+                isPreparingHtmlBody = true
+                viewModelScope.launch {
+                    try {
+                        val outcome = source.prepareHtmlBody(email)
+                        ensureActive()
+                        when (outcome) {
+                            is com.david.mailapp.data.cleaner.HtmlCleanResult.Cleaned -> {
+                                handleReadyEmail(email.copy(cleanBody = outcome.displayBody))
+                            }
+                            is com.david.mailapp.data.cleaner.HtmlCleanResult.Fallback -> {
+                                handleReadyEmail(email.copy(cleanBody = outcome.displayBody))
+                            }
+                            com.david.mailapp.data.cleaner.HtmlCleanResult.Stale -> {
+                                EmailRenderTrace.d(traceMail, "VM", "VM_STALE_HTML_CLEAN_IGNORED")
+                            }
+                        }
+                    } finally {
+                        isPreparingHtmlBody = false
+                    }
+                }
+            }
+            return
+        }
+
+        val displayBody = if (email.bodyKind == EmailBodyKind.PLAIN_TEXT) {
+            email.body
+        } else {
+            email.cleanBody.ifBlank { email.body }
+        }
+
         if (displayBody.isEmpty()) {
             if (!delivered) {
                 delivered = true

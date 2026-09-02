@@ -1,7 +1,5 @@
 package com.david.mailapp.feature.emaildetail.components
 
-import org.jsoup.Jsoup
-
 internal data class PreparedDocument(val key: String, val html: String)
 
 internal fun buildLoadKey(
@@ -34,14 +32,6 @@ internal fun buildHtml(
     val linkRgb = toCssRgb(primaryArgb)
     val colorScheme = if (isDark) "dark" else "light"
     val hideRemoteImages = if (!showImages) "img:not([src^=\"data:\"]){display:none!important}" else ""
-    val doc = Jsoup.parseBodyFragment(body)
-    val isSimple = EmailHtmlCleaner.isSimpleHtml(doc)
-    val cleanedBody = EmailHtmlCleaner.clean(doc)
-    val wrappedBody = if (isSimple) {
-        """<div style="margin:0 16px; padding-top: 20px;">$cleanedBody</div>"""
-    } else {
-        cleanedBody
-    }
     val cssOverrides = """
   * {
     -webkit-tap-highlight-color: transparent;
@@ -93,7 +83,7 @@ internal fun buildHtml(
 </style>
 </head>
 <body>
-$wrappedBody
+$body
 </body>
 </html>
 """.trimIndent()
