@@ -43,7 +43,9 @@ private fun perfNow() = SystemClock.elapsedRealtime()
 class GmailProvider(
     private val client: HttpClient,
     private val lookupBackoffMillis: List<Long> = DEFAULT_LOOKUP_BACKOFF_MILLIS,
-    private val lookupDelay: suspend (Long) -> Unit = { delay(it) }
+    private val lookupDelay: suspend (Long) -> Unit = { delay(it) },
+    private val clock: () -> Long = { com.david.mailapp.core.perf.MailOpenPerformanceTrace.now() },
+    private val networkDiagnosticSink: NetworkDiagnosticSink? = null
 ) : EmailProvider {
 
     companion object {
@@ -72,16 +74,14 @@ class GmailProvider(
      * A blank id is treated as INVALID_RESPONSE without touching the network.
      */
     override suspend fun fetchEmailById(emailId: String): EmailLookupResult {
-        val t0 = perfNow()
         if (emailId.isBlank()) {
-            logLookup(emailId, attempts = 0, t0, "INVALID_RESPONSE")
             return EmailLookupResult.Failure(EmailLookupFailureReason.INVALID_RESPONSE)
         }
 
         var attempt = 0
         while (true) {
+            val t0 = clock()
             attempt++
-            Log.d(LOOKUP_TAG, "[LOOKUP] ATTEMPT id=$emailId attempt=$attempt")
             try {
                 val response: HttpResponse = requestFullMessage(client, emailId)
                 when {
@@ -94,11 +94,11 @@ class GmailProvider(
                         return EmailLookupResult.Failure(EmailLookupFailureReason.SESSION_EXPIRED)
                     }
                     isTransientHttpError(response.status.value) -> {
+                        logLookup(emailId, attempt, t0, "TEMPORARY_REMOTE")
                         if (attempt < MAX_LOOKUP_ATTEMPTS) {
                             waitBeforeRetry(attempt)
                             continue
                         }
-                        logLookup(emailId, attempt, t0, "TEMPORARY_REMOTE")
                         return EmailLookupResult.Failure(EmailLookupFailureReason.TEMPORARY_REMOTE)
                     }
                     response.status.isSuccess() -> {
@@ -121,16 +121,17 @@ class GmailProvider(
                     }
                 }
             } catch (e: CancellationException) {
+                logLookup(emailId, attempt, t0, "CANCELLED")
                 throw e
             } catch (e: OAuthSessionExpiredException) {
                 logLookup(emailId, attempt, t0, "SESSION_EXPIRED")
                 return EmailLookupResult.Failure(EmailLookupFailureReason.SESSION_EXPIRED)
             } catch (e: IOException) {
+                logLookup(emailId, attempt, t0, "NO_CONNECTION")
                 if (attempt < MAX_LOOKUP_ATTEMPTS) {
                     waitBeforeRetry(attempt)
                     continue
                 }
-                logLookup(emailId, attempt, t0, "NO_CONNECTION")
                 return EmailLookupResult.Failure(EmailLookupFailureReason.NO_CONNECTION)
             } catch (e: Exception) {
                 logLookup(emailId, attempt, t0, "INVALID_RESPONSE")
@@ -145,25 +146,35 @@ class GmailProvider(
         lookupDelay(delayMillis)
     }
 
-    /** Logs only id, attempt count, duration and result category — never content. */
     private fun logLookup(emailId: String, attempts: Int, t0: Long, category: String) {
-        Log.d(LOOKUP_TAG, "[LOOKUP] RESULT id=$emailId attempts=$attempts durationMs=${perfNow() - t0} category=$category")
+        val cat = when (category) {
+            "FOUND" -> DiagnosticCategory.SUCCESS
+            "NOT_FOUND" -> DiagnosticCategory.NOT_FOUND
+            "SESSION_EXPIRED" -> DiagnosticCategory.SESSION_EXPIRED
+            "TEMPORARY_REMOTE" -> DiagnosticCategory.TRANSIENT_HTTP
+            "REMOTE_REJECTED" -> DiagnosticCategory.PERMANENT_HTTP
+            "NO_CONNECTION" -> DiagnosticCategory.IO
+            "INVALID_RESPONSE" -> DiagnosticCategory.INVALID_RESPONSE
+            "CANCELLED" -> DiagnosticCategory.CANCELLED
+            else -> DiagnosticCategory.PERMANENT_HTTP
+        }
+        val mailKey = com.david.mailapp.core.perf.MailOpenPerformanceTrace.mailKey(emailId)
+        val durationMs = clock() - t0
+        networkDiagnosticSink?.invoke(NetworkDiagnosticEvent(mailKey, attempts, durationMs, cat))
     }
 
     // ── fetch ───────────────────────────────────────────────────
 
     override suspend fun fetchInbox(pageToken: String?): PaginatedResult<Email> {
-        return fetchGmailPage(client, labelId = "INBOX", pageToken = pageToken)
+        return fetchGmailPage(client, labelId = "INBOX", pageToken = pageToken, delayFn = lookupDelay, clock = clock, sink = networkDiagnosticSink)
     }
 
     override suspend fun fetchTrash(pageToken: String?): PaginatedResult<Email> {
-        return fetchGmailPage(client, labelId = "TRASH", pageToken = pageToken)
+        return fetchGmailPage(client, labelId = "TRASH", pageToken = pageToken, delayFn = lookupDelay, clock = clock, sink = networkDiagnosticSink)
     }
 
     override suspend fun search(query: String, pageToken: String?): PaginatedResult<Email> {
-        Log.d("SearchDebug", "[GmailProvider] Search pageToken=$pageToken")
-        val result = fetchGmailPage(client, query = query, pageToken = pageToken)
-        Log.d("SearchDebug", "[GmailProvider] Search returned ${result.items.size} emails, complete=${result.isComplete}")
+        val result = fetchGmailPage(client, query = query, pageToken = pageToken, delayFn = lookupDelay, clock = clock, sink = networkDiagnosticSink)
         return result
     }
 
@@ -172,7 +183,6 @@ class GmailProvider(
         refs: List<com.david.mailapp.domain.model.EmailInlineReference>
     ): Map<String, String> {
         // DEBUG_PERF
-        Log.d(PERF_TAG, "[INLINE_DOWNLOAD] START imageCount=${refs.size} emailId=$emailId")
         if (refs.isEmpty()) return emptyMap()
 
         val t0 = perfNow()
@@ -181,25 +191,20 @@ class GmailProvider(
                 async {
                     // DEBUG_PERF
                     val tImg = perfNow()
-                    Log.d(PERF_TAG, "[INLINE_DOWNLOAD] IMG_START idx=$idx cid=${ref.contentId} mime=${ref.mimeType} attachId=${ref.attachmentId}")
                     try {
                         val bytes = fetchAttachmentBytes(emailId, ref.attachmentId)
                         val tBytes = perfNow()
-                        Log.d(PERF_TAG, "[INLINE_DOWNLOAD] IMG_BYTES idx=$idx sizeBytes=${bytes.size} fetchMs=${tBytes - tImg}")
                         val b64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
                         val tEncode = perfNow()
-                        Log.d(PERF_TAG, "[INLINE_DOWNLOAD] IMG_ENCODED idx=$idx b64Len=${b64.length} encodeMs=${tEncode - tBytes} totalImgMs=${tEncode - tImg}")
                         ref.contentId to "data:${ref.mimeType};base64,$b64"
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {
-                        Log.d(PERF_TAG, "[INLINE_DOWNLOAD] IMG_ERROR idx=$idx cid=${ref.contentId} error=${e.javaClass.simpleName}")
                         null
                     }
                 }
             }.awaitAll().mapNotNull { it }.toMap()
         }
-        Log.d(PERF_TAG, "[INLINE_DOWNLOAD] ALL_DONE emailId=$emailId successCount=${result.size} parallelMs=${perfNow() - t0}")
         return result
     }
 
@@ -216,14 +221,11 @@ class GmailProvider(
         val response: AttachmentResponse =
             client.get("users/me/messages/$messageId/attachments/$attachmentId").body()
         val tHttp = perfNow()
-        Log.d(PERF_TAG, "[ATTACHMENT] HTTP_DONE attachmentId=$attachmentId httpMs=${tHttp - t0}")
 
         val b64Data = response.data ?: run {
-            Log.d(PERF_TAG, "[ATTACHMENT] NO_DATA attachmentId=$attachmentId")
             return ByteArray(0)
         }
         val bytes = android.util.Base64.decode(b64Data, android.util.Base64.URL_SAFE)
-        Log.d(PERF_TAG, "[ATTACHMENT] DECODED attachmentId=$attachmentId rawB64Len=${b64Data.length} bytesLen=${bytes.size} decodeMs=${perfNow() - tHttp}")
         return bytes
     }
 

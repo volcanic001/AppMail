@@ -17,6 +17,7 @@ import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.supervisorScope
 import java.io.IOException
+import com.david.mailapp.core.perf.MailOpenPerformanceTrace
 
 private const val MAX_CONCURRENT_DETAIL_REQUESTS = 6
 
@@ -28,7 +29,9 @@ internal suspend fun fetchGmailPage(
     maxResults: Int = 20,
     transientRetries: Int = 2,
     backoffMillis: List<Long> = emptyList(),
-    delayFn: suspend (Long) -> Unit = { kotlinx.coroutines.delay(it) }
+    delayFn: suspend (Long) -> Unit = { kotlinx.coroutines.delay(it) },
+    clock: () -> Long = { MailOpenPerformanceTrace.now() },
+    sink: NetworkDiagnosticSink? = null
 ): PaginatedResult<Email> {
     // 1. List message IDs
     val listResponse: MessageListResponse = client.get("users/me/messages") {
@@ -55,7 +58,9 @@ internal suspend fun fetchGmailPage(
                     maxAttempts = transientRetries + 1, // initial + retries
                     backoffMillis = backoffMillis,
                     semaphore = semaphore,
-                    delayFn = delayFn
+                    delayFn = delayFn,
+                    clock = clock,
+                    sink = sink
                 )
                 IndexedResult(index, result)
             }
@@ -87,10 +92,12 @@ internal suspend fun fetchGmailPage(
 
 private data class IndexedResult(val index: Int, val result: DetailResult)
 
+
 private sealed interface AttemptOutcome {
     data class Success(val msg: MessageResponse) : AttemptOutcome
     data class HttpError(val statusCode: Int) : AttemptOutcome
     object IoError : AttemptOutcome
+    object InvalidResponse : AttemptOutcome
     object OtherError : AttemptOutcome
 }
 
@@ -109,20 +116,32 @@ internal suspend fun fetchWithRetry(
     maxAttempts: Int = 3,
     backoffMillis: List<Long> = emptyList(),
     semaphore: Semaphore = Semaphore(1),
-    delayFn: suspend (Long) -> Unit = { kotlinx.coroutines.delay(it) }
+    delayFn: suspend (Long) -> Unit = { kotlinx.coroutines.delay(it) },
+    clock: () -> Long = { MailOpenPerformanceTrace.now() },
+    sink: NetworkDiagnosticSink? = null
 ): DetailResult {
+    val mailKey = MailOpenPerformanceTrace.mailKey(messageId)
+
     for (attempt in 0 until maxAttempts) {
+        val t0 = clock()
         val attemptResult = try {
             semaphore.withPermit {
                 val response: HttpResponse = requestFullMessage(client, messageId)
                 if (response.status.isSuccess()) {
-                    val msg: MessageResponse = response.body()
-                    AttemptOutcome.Success(msg)
+                    try {
+                        val msg: MessageResponse = response.body()
+                        AttemptOutcome.Success(msg)
+                    } catch (e: Exception) {
+                        if (e is CancellationException) throw e
+                        AttemptOutcome.InvalidResponse
+                    }
                 } else {
                     AttemptOutcome.HttpError(response.status.value)
                 }
             }
         } catch (e: CancellationException) {
+            val t1 = clock()
+            sink?.invoke(NetworkDiagnosticEvent(mailKey, attempt + 1, t1 - t0, DiagnosticCategory.CANCELLED))
             throw e
         } catch (e: IOException) {
             AttemptOutcome.IoError
@@ -130,12 +149,31 @@ internal suspend fun fetchWithRetry(
             AttemptOutcome.OtherError
         }
 
+        val t1 = clock()
+        val durationMs = t1 - t0
+
         when (attemptResult) {
             is AttemptOutcome.Success -> {
-                return DetailResult(email = attemptResult.msg.toDomainEmail())
+                try {
+                    val email = attemptResult.msg.toDomainEmail()
+                    sink?.invoke(NetworkDiagnosticEvent(mailKey, attempt + 1, durationMs, DiagnosticCategory.SUCCESS))
+                    return DetailResult(email = email)
+                } catch (e: Exception) {
+                    if (e is CancellationException) throw e
+                    sink?.invoke(NetworkDiagnosticEvent(mailKey, attempt + 1, durationMs, DiagnosticCategory.INVALID_RESPONSE))
+                    return DetailResult(
+                        failure = PageItemFailure(
+                            itemId = messageId,
+                            kind = PageItemFailureKind.PERMANENT,
+                            attempts = attempt + 1
+                        )
+                    )
+                }
             }
             is AttemptOutcome.HttpError -> {
-                if (isTransientHttpError(attemptResult.statusCode)) {
+                val status = attemptResult.statusCode
+                if (isTransientHttpError(status)) {
+                    sink?.invoke(NetworkDiagnosticEvent(mailKey, attempt + 1, durationMs, DiagnosticCategory.TRANSIENT_HTTP))
                     if (attempt < maxAttempts - 1) {
                         if (backoffMillis.isNotEmpty()) {
                             val delay = backoffMillis.getOrElse(attempt) { backoffMillis.last() }
@@ -151,6 +189,12 @@ internal suspend fun fetchWithRetry(
                         )
                     )
                 }
+                val category = when (status) {
+                    401 -> DiagnosticCategory.SESSION_EXPIRED
+                    404 -> DiagnosticCategory.NOT_FOUND
+                    else -> DiagnosticCategory.PERMANENT_HTTP
+                }
+                sink?.invoke(NetworkDiagnosticEvent(mailKey, attempt + 1, durationMs, category))
                 return DetailResult(
                     failure = PageItemFailure(
                         itemId = messageId,
@@ -160,6 +204,7 @@ internal suspend fun fetchWithRetry(
                 )
             }
             is AttemptOutcome.IoError -> {
+                sink?.invoke(NetworkDiagnosticEvent(mailKey, attempt + 1, durationMs, DiagnosticCategory.IO))
                 if (attempt < maxAttempts - 1) {
                     if (backoffMillis.isNotEmpty()) {
                         val delay = backoffMillis.getOrElse(attempt) { backoffMillis.last() }
@@ -175,7 +220,18 @@ internal suspend fun fetchWithRetry(
                     )
                 )
             }
+            is AttemptOutcome.InvalidResponse -> {
+                sink?.invoke(NetworkDiagnosticEvent(mailKey, attempt + 1, durationMs, DiagnosticCategory.INVALID_RESPONSE))
+                return DetailResult(
+                    failure = PageItemFailure(
+                        itemId = messageId,
+                        kind = PageItemFailureKind.PERMANENT,
+                        attempts = attempt + 1
+                    )
+                )
+            }
             is AttemptOutcome.OtherError -> {
+                sink?.invoke(NetworkDiagnosticEvent(mailKey, attempt + 1, durationMs, DiagnosticCategory.PERMANENT_HTTP))
                 return DetailResult(
                     failure = PageItemFailure(
                         itemId = messageId,
