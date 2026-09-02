@@ -256,6 +256,8 @@
     <string name="detail_email_local_cache_failed">No se pudo usar la caché local. Reinténtalo.</string>
     <string name="detail_body_load_error">No se pudo cargar el contenido del email</string>
     <string name="detail_body_pdfs_only">Este correo contiene PDF adjuntos pero no se pudo cargar el contenido del mensaje</string>
+    <string name="detail_body_empty">Este correo no contiene un mensaje visible</string>
+    <string name="detail_body_empty_with_pdfs">Este correo no contiene un mensaje visible. Revisa los PDF adjuntos.</string>
     <string name="detail_subject_missing">(Sin asunto)</string>
 
     <!-- Imágenes -->

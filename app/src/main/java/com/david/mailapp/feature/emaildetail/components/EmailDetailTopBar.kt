@@ -35,9 +35,11 @@ internal fun EmailDetailTopBar(
             }
         },
         actions = {
-            // Responder/Reenviar solo disponibles en Ready — durante
-            // resolución, preparación o error permanecen deshabilitados.
-            val currentEmail = (uiState as? EmailDetailUiState.Ready)?.email
+            val currentEmail = when (uiState) {
+                is EmailDetailUiState.Ready -> uiState.email
+                is EmailDetailUiState.Empty -> uiState.email
+                else -> null
+            }
             IconButton(
                 onClick = {
                     currentEmail?.let { onReply(it.id) }

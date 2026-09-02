@@ -54,6 +54,7 @@ class FakeEmailDetailSource(
     var bodyFetchResult: com.david.mailapp.data.repository.EmailContentRecoveryResult =
         com.david.mailapp.data.repository.EmailContentRecoveryResult.Failure(EmailResolutionFailureReason.NO_CONNECTION)
     var bodyFetchGate: CompletableDeferred<Unit>? = null
+    var bodyFetchError: Throwable? = null
     var onBodyFetch: ((callCount: Int) -> Unit)? = null
     var bodyFetchCallCount = 0
     var recordAccessCallCount = 0
@@ -61,6 +62,7 @@ class FakeEmailDetailSource(
     override suspend fun recoverContentById(emailId: String): com.david.mailapp.data.repository.EmailContentRecoveryResult {
         bodyFetchCallCount++
         bodyFetchGate?.await()
+        bodyFetchError?.let { throw it }
         onBodyFetch?.invoke(bodyFetchCallCount)
         return bodyFetchResult
     }
@@ -73,6 +75,8 @@ class FakeEmailDetailSource(
     var inlineImagesResult: Map<String, String> = emptyMap()
     var inlineImagesCallCount = 0
     var injectInlineImagesResult: String = ""
+    var pdfCacheCheckCallCount = 0
+    val checkedPdfStableIds = mutableListOf<String>()
 
     override suspend fun downloadInlineImages(emailId: String, refs: List<com.david.mailapp.domain.model.EmailInlineReference>): Map<String, String> {
         inlineImagesCallCount++
@@ -83,7 +87,11 @@ class FakeEmailDetailSource(
         injectInlineImagesResult.ifBlank { html }
 
     // ── PDF ─────────────────────────────────────────────────────
-    override suspend fun checkPdfCache(emailId: String, stablePartId: String): PdfDownloadState.Ready? = null
+    override suspend fun checkPdfCache(emailId: String, stablePartId: String): PdfDownloadState.Ready? {
+        pdfCacheCheckCallCount++
+        checkedPdfStableIds += stablePartId
+        return null
+    }
     override suspend fun downloadPdf(emailId: String, metadata: PdfAttachmentMetadata): PdfDownloadState =
         PdfDownloadState.Error(com.david.mailapp.data.pdf.PdfDownloadFailure.NETWORK)
     override suspend fun getValidatedCachedPdf(emailId: String, stablePartId: String): File? = null

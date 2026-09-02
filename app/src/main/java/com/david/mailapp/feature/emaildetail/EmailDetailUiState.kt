@@ -43,6 +43,9 @@ sealed interface EmailDetailUiState {
         val inlineImagesLoading: Boolean = false
     ) : EmailDetailUiState
 
+    /** MIME parsing completed successfully but the message has no visible body. */
+    data class Empty(val email: Email) : EmailDetailUiState
+
     /**
      * Body-level error. [email] may be non-null when metadata was already
      * available before the fetch failed. [retryable] is true when the body

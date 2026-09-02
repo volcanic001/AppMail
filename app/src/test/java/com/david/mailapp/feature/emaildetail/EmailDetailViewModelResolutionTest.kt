@@ -155,6 +155,85 @@ class EmailDetailViewModelResolutionTest {
     }
 
     @Test
+    fun readyWithUnscannedMetadata_isDeliveredWithoutRecovery() = runTest {
+        val source = FakeEmailDetailSource("e1")
+        source.resolveResult = EmailResolutionResult.Found(
+            FakeEmailDetailSource.sampleEmail(
+                body = "<html>legacy</html>",
+                bodyBlank = false,
+                pdfScanned = false,
+                contentState = com.david.mailapp.domain.model.EmailContentState.READY
+            )
+        )
+
+        val vm = createViewModel(source)
+
+        assertTrue(vm.uiState.value is EmailDetailUiState.Ready)
+        assertEquals(0, source.bodyFetchCallCount)
+    }
+
+    @Test
+    fun corruptReadyWithBlankBody_showsRetryableErrorWithoutAutomaticRecovery() = runTest {
+        val source = FakeEmailDetailSource("e1")
+        source.resolveResult = EmailResolutionResult.Found(
+            FakeEmailDetailSource.sampleEmail(
+                bodyBlank = true,
+                pdfScanned = true,
+                contentState = com.david.mailapp.domain.model.EmailContentState.READY,
+                bodyKind = com.david.mailapp.domain.model.EmailBodyKind.HTML
+            )
+        )
+
+        val vm = createViewModel(source)
+
+        val error = vm.uiState.value as EmailDetailUiState.BodyError
+        assertTrue(error.retryable)
+        assertEquals(0, source.bodyFetchCallCount)
+
+        vm.onRetryBody()
+        advanceUntilIdle()
+        assertEquals(1, source.bodyFetchCallCount)
+    }
+
+    @Test
+    fun emptyFromRoom_isNeutralAndNeverRecovers() = runTest {
+        val source = FakeEmailDetailSource("e1")
+        source.resolveResult = EmailResolutionResult.Found(
+            FakeEmailDetailSource.sampleEmail(
+                bodyBlank = true,
+                pdfScanned = true,
+                contentState = com.david.mailapp.domain.model.EmailContentState.EMPTY
+            )
+        )
+
+        val vm = createViewModel(source)
+
+        assertTrue(vm.uiState.value is EmailDetailUiState.Empty)
+        assertEquals(0, source.bodyFetchCallCount)
+    }
+
+    @Test
+    fun readyWithPersistedCidRefs_downloadsInlineWithoutContentRecovery() = runTest {
+        val source = FakeEmailDetailSource("e1")
+        val ref = com.david.mailapp.domain.model.EmailInlineReference("image-1", "att-1", "image/png")
+        source.resolveResult = EmailResolutionResult.Found(
+            FakeEmailDetailSource.sampleEmail(
+                body = "<html><img src=\"cid:image-1\"></html>",
+                bodyBlank = false,
+                pdfScanned = true
+            ).copy(inlineReferences = listOf(ref))
+        )
+        source.inlineImagesResult = mapOf("image-1" to "data:image/png;base64,AA")
+        source.injectInlineImagesResult = "<html><img src=\"data:image/png;base64,AA\"></html>"
+
+        val vm = createViewModel(source)
+
+        assertTrue(vm.uiState.value is EmailDetailUiState.Ready)
+        assertEquals(1, source.inlineImagesCallCount)
+        assertEquals(0, source.bodyFetchCallCount)
+    }
+
+    @Test
     fun foundWithoutBody_emitsPreparingBody() = runTest {
         val source = FakeEmailDetailSource("e1")
         source.resolveResult = EmailResolutionResult.Found(
@@ -171,6 +250,143 @@ class EmailDetailViewModelResolutionTest {
     }
 
     @Test
+    fun notFetchedRecoveryFound_isDeliveredWithoutRoomEmission() = runTest {
+        val source = FakeEmailDetailSource("e1")
+        source.resolveResult = EmailResolutionResult.Found(
+            FakeEmailDetailSource.sampleEmail(bodyBlank = true)
+        )
+        val recovered = FakeEmailDetailSource.sampleEmail(
+            body = "<html>direct</html>",
+            bodyBlank = false,
+            pdfScanned = true
+        )
+        source.bodyFetchResult = com.david.mailapp.data.repository.EmailContentRecoveryResult.Found(
+            recovered,
+            com.david.mailapp.data.repository.EmailContentStorage.PERSISTED
+        )
+
+        val vm = createViewModel(source)
+
+        val ready = vm.uiState.value as EmailDetailUiState.Ready
+        assertEquals("<html>direct</html>", ready.email.body)
+        assertEquals(1, source.bodyFetchCallCount)
+    }
+
+    @Test
+    fun notFetchedMemoryOnly_isDeliveredDirectlyWithoutLruAccessWrite() = runTest {
+        val source = FakeEmailDetailSource("e1")
+        source.resolveResult = EmailResolutionResult.Found(
+            FakeEmailDetailSource.sampleEmail(bodyBlank = true)
+        )
+        val recovered = FakeEmailDetailSource.sampleEmail(
+            body = "<html>oversized</html>",
+            cleanBody = "<html>oversized</html>",
+            bodyBlank = false,
+            pdfScanned = true
+        )
+        source.bodyFetchResult = com.david.mailapp.data.repository.EmailContentRecoveryResult.Found(
+            recovered,
+            com.david.mailapp.data.repository.EmailContentStorage.MEMORY_ONLY
+        )
+
+        val vm = createViewModel(source)
+
+        val ready = vm.uiState.value as EmailDetailUiState.Ready
+        assertEquals("<html>oversized</html>", ready.email.body)
+        assertEquals(1, source.bodyFetchCallCount)
+        assertEquals(0, source.recordAccessCallCount)
+    }
+
+    @Test
+    fun notFetched_startsReadAndPdfChecksWhileRecoveryIsSuspended() = runTest {
+        val source = FakeEmailDetailSource("e1")
+        val attachment = com.david.mailapp.domain.model.PdfAttachmentMetadata(
+            "doc.pdf", "application/pdf", "att-1", 10L, "part-1"
+        )
+        source.resolveResult = EmailResolutionResult.Found(
+            FakeEmailDetailSource.sampleEmail(
+                bodyBlank = true,
+                pdfScanned = true,
+                pdfAttachments = listOf(attachment)
+            )
+        )
+        source.bodyFetchGate = CompletableDeferred()
+        val vm = newViewModel(source)
+
+        runCurrent()
+
+        assertTrue(vm.uiState.value is EmailDetailUiState.PreparingBody)
+        assertEquals(1, source.bodyFetchCallCount)
+        assertEquals(1, source.markAsReadCallCount)
+        assertEquals(1, source.pdfCacheCheckCallCount)
+        source.bodyFetchGate?.complete(Unit)
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun repeatedNotFetchedEmissions_duringRecovery_keepExactlyOneCall() = runTest {
+        val source = FakeEmailDetailSource("e1")
+        val notFetched = FakeEmailDetailSource.sampleEmail(bodyBlank = true)
+        source.resolveResult = EmailResolutionResult.Found(notFetched)
+        source.bodyFetchGate = CompletableDeferred()
+        newViewModel(source)
+        runCurrent()
+
+        source.emitRoomEmail(notFetched)
+        source.emitRoomEmail(notFetched.copy(subject = "updated"))
+        runCurrent()
+
+        assertEquals(1, source.bodyFetchCallCount)
+        source.bodyFetchGate?.complete(Unit)
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun reopeningReadyAndEmpty_neverStartsContentRecovery() = runTest {
+        val readySource = FakeEmailDetailSource("e1").apply {
+            resolveResult = EmailResolutionResult.Found(
+                FakeEmailDetailSource.sampleEmail(
+                    body = "<html>cached</html>",
+                    bodyBlank = false,
+                    pdfScanned = true
+                )
+            )
+        }
+        newViewModel(readySource)
+        newViewModel(readySource)
+        advanceUntilIdle()
+        assertEquals(0, readySource.bodyFetchCallCount)
+
+        val emptySource = FakeEmailDetailSource("e1").apply {
+            resolveResult = EmailResolutionResult.Found(
+                FakeEmailDetailSource.sampleEmail(
+                    bodyBlank = true,
+                    pdfScanned = true,
+                    contentState = com.david.mailapp.domain.model.EmailContentState.EMPTY
+                )
+            )
+        }
+        newViewModel(emptySource)
+        newViewModel(emptySource)
+        advanceUntilIdle()
+        assertEquals(0, emptySource.bodyFetchCallCount)
+    }
+
+    @Test
+    fun cancelledContentRecovery_doesNotBecomeBodyError() = runTest {
+        val source = FakeEmailDetailSource("e1")
+        source.resolveResult = EmailResolutionResult.Found(
+            FakeEmailDetailSource.sampleEmail(bodyBlank = true)
+        )
+        source.bodyFetchError = kotlinx.coroutines.CancellationException("cancelled")
+
+        val vm = createViewModel(source)
+
+        assertTrue(vm.uiState.value is EmailDetailUiState.PreparingBody)
+        assertEquals(1, source.bodyFetchCallCount)
+    }
+
+    @Test
     fun repeatedRoomEmissions_doNotDuplicateResolution_body_or_read() = runTest {
         val source = FakeEmailDetailSource("e1")
         source.resolveResult = EmailResolutionResult.Found(
@@ -181,7 +397,7 @@ class EmailDetailViewModelResolutionTest {
 
         assertEquals("one resolution call", 1, source.resolveCallCount)
         assertEquals("one read call", 1, source.markAsReadCallCount)
-        assertEquals("one body fetch", 1, source.bodyFetchCallCount)
+        assertEquals("READY never triggers body recovery", 0, source.bodyFetchCallCount)
 
         // Re-emit the same email from Room
         source.emitRoomEmail(
@@ -191,7 +407,7 @@ class EmailDetailViewModelResolutionTest {
 
         assertEquals("still one resolution call", 1, source.resolveCallCount)
         assertEquals("still one read call", 1, source.markAsReadCallCount)
-        assertEquals("still one body fetch", 1, source.bodyFetchCallCount)
+        assertEquals("still no body recovery", 0, source.bodyFetchCallCount)
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -262,10 +478,6 @@ class EmailDetailViewModelResolutionTest {
             recoveredEmail,
             com.david.mailapp.data.repository.EmailContentStorage.PERSISTED
         )
-        source.onBodyFetch = { callCount ->
-            if (callCount == 2) source.emitRoomEmail(recoveredEmail)
-        }
-
         vm.onRetryBody()
         advanceUntilIdle()
 
@@ -321,7 +533,7 @@ class EmailDetailViewModelResolutionTest {
     }
 
     @Test
-    fun retryBody_nonRetryableBodyError_isIgnored() = runTest {
+    fun recoveredEmpty_isTerminalAndRetryBodyIsIgnored() = runTest {
         val source = FakeEmailDetailSource("e1")
         source.resolveResult = EmailResolutionResult.Found(
             FakeEmailDetailSource.sampleEmail(bodyBlank = true)
@@ -334,19 +546,19 @@ class EmailDetailViewModelResolutionTest {
         ), com.david.mailapp.data.repository.EmailContentStorage.PERSISTED)
         val vm = createViewModel(source)
 
-        val error = vm.uiState.value as EmailDetailUiState.BodyError
-        assertEquals(false, error.retryable)
+        val empty = vm.uiState.value as EmailDetailUiState.Empty
+        assertEquals(com.david.mailapp.domain.model.EmailContentState.EMPTY, empty.email.contentState)
         assertEquals(1, source.bodyFetchCallCount)
 
         vm.onRetryBody()
         advanceUntilIdle()
 
-        assertTrue(vm.uiState.value is EmailDetailUiState.BodyError)
-        assertEquals("non-retryable error must not fetch again", 1, source.bodyFetchCallCount)
+        assertTrue(vm.uiState.value is EmailDetailUiState.Empty)
+        assertEquals("EMPTY must not fetch again", 1, source.bodyFetchCallCount)
     }
 
     @Test
-    fun pdfsOnly_isNotRetryable() = runTest {
+    fun pdfsOnly_isNeutralEmpty_andChecksPdfCache() = runTest {
         val source = FakeEmailDetailSource("e1")
         source.resolveResult = EmailResolutionResult.Found(
             FakeEmailDetailSource.sampleEmail(bodyBlank = true)
@@ -365,9 +577,8 @@ class EmailDetailViewModelResolutionTest {
         ), com.david.mailapp.data.repository.EmailContentStorage.PERSISTED)
         val vm = createViewModel(source)
 
-        val error = vm.uiState.value as EmailDetailUiState.BodyError
-        assertEquals(UiErrorReason.EMAIL_BODY_PDFS_ONLY, error.reason)
-        assertEquals("PDFs only → no body retry", false, error.retryable)
-        assertTrue("PDF metadata preserved", error.email?.pdfAttachments?.isNotEmpty() == true)
+        val empty = vm.uiState.value as EmailDetailUiState.Empty
+        assertTrue("PDF metadata preserved", empty.email.pdfAttachments.isNotEmpty())
+        assertEquals(1, source.pdfCacheCheckCallCount)
     }
 }

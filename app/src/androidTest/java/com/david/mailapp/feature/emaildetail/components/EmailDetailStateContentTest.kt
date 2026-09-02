@@ -142,7 +142,67 @@ class EmailDetailStateContentTest {
         composeRule.runOnIdle { assertEquals(attachment, saved) }
     }
 
+    @Test
+    fun emptyWithPdf_isNeutralWithoutRetry_andForwardsPdfActions() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val attachment = PdfAttachmentMetadata(
+            fileName = EMPTY_PDF_NAME,
+            mimeType = "application/pdf",
+            attachmentId = "empty-attachment",
+            sizeBytes = 2_048L,
+            partId = "empty-part"
+        )
+        val email = Email(
+            id = "empty-email",
+            threadId = "thread-empty",
+            from = "fixture@example.com",
+            fromInitials = "F",
+            to = "receiver@example.com",
+            subject = "Empty fixture",
+            snippet = "fixture",
+            timestamp = 1L,
+            isRead = true,
+            isStarred = false,
+            hasAttachments = true,
+            labels = emptyList(),
+            folder = EmailFolder.Inbox,
+            pdfAttachments = listOf(attachment),
+            pdfMetadataScanned = true,
+            contentState = com.david.mailapp.domain.model.EmailContentState.EMPTY
+        )
+        var opened: PdfAttachmentMetadata? = null
+        var saved: PdfAttachmentMetadata? = null
+
+        composeRule.setContent {
+            MaterialTheme {
+                EmailDetailEmpty(
+                    state = EmailDetailUiState.Empty(email),
+                    pdfDownloadStates = mapOf(
+                        attachment.stableId to PdfDownloadState.Ready(attachment.sizeBytes!!)
+                    ),
+                    onPdfAttachmentClick = { opened = it },
+                    onPdfSaveClick = { saved = it },
+                    savingStableIds = emptySet()
+                )
+            }
+        }
+
+        composeRule.onNodeWithText(context.getString(R.string.detail_body_empty_with_pdfs))
+            .assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.action_retry))
+            .assertDoesNotExist()
+        composeRule.onNode(hasText(EMPTY_PDF_NAME) and hasClickAction())
+            .performClick()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.pdf_save_as))
+            .performClick()
+        composeRule.runOnIdle {
+            assertEquals(attachment, opened)
+            assertEquals(attachment, saved)
+        }
+    }
+
     private companion object {
         const val PDF_NAME = "body-error-fixture.pdf"
+        const val EMPTY_PDF_NAME = "empty-fixture.pdf"
     }
 }

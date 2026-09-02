@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.outlined.MailOutline
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -125,6 +126,56 @@ internal fun EmailDetailBodyError(
         if (pdfEmail?.pdfAttachments?.isNotEmpty() == true) {
             PdfAttachmentSection(
                 attachments = pdfEmail.pdfAttachments,
+                downloadStates = pdfDownloadStates,
+                onAttachmentClick = onPdfAttachmentClick,
+                onSaveClick = onPdfSaveClick,
+                savingStableIds = savingStableIds
+            )
+        }
+    }
+}
+
+@Composable
+internal fun EmailDetailEmpty(
+    state: EmailDetailUiState.Empty,
+    pdfDownloadStates: Map<String, PdfDownloadState>,
+    onPdfAttachmentClick: (PdfAttachmentMetadata) -> Unit,
+    onPdfSaveClick: (PdfAttachmentMetadata) -> Unit,
+    savingStableIds: Set<String>,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    Icons.Outlined.MailOutline,
+                    contentDescription = null,
+                    modifier = Modifier.size(48.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    text = stringResource(
+                        if (state.email.pdfAttachments.isEmpty()) {
+                            R.string.detail_body_empty
+                        } else {
+                            R.string.detail_body_empty_with_pdfs
+                        }
+                    ),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        if (state.email.pdfAttachments.isNotEmpty()) {
+            PdfAttachmentSection(
+                attachments = state.email.pdfAttachments,
                 downloadStates = pdfDownloadStates,
                 onAttachmentClick = onPdfAttachmentClick,
                 onSaveClick = onPdfSaveClick,

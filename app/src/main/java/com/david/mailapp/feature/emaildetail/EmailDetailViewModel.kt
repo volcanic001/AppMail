@@ -9,6 +9,7 @@ import com.david.mailapp.data.pdf.PdfDownloadState
 import com.david.mailapp.data.repository.EmailResolutionFailureReason
 import com.david.mailapp.data.repository.EmailResolutionResult
 import com.david.mailapp.domain.model.Email
+import com.david.mailapp.domain.model.EmailContentState
 import com.david.mailapp.domain.model.PdfAttachmentMetadata
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -54,7 +55,6 @@ class EmailDetailViewModel(
     private var isFetchingRemoteBody = false
     private var isFetchingInlineImages = false
     private var cachedInlineImages: Map<String, String>? = null
-    private var cachedInlineRefs: List<com.david.mailapp.domain.model.EmailInlineReference>? = null
     private var delivered = false
     private var hasRecordedAccess = false
     private val traceMail = EmailRenderTrace.mailKey(emailId)
@@ -161,27 +161,10 @@ class EmailDetailViewModel(
 
         EmailRenderTrace.d(
             traceMail, "VM", "VM_ROOM_EMIT",
-            "bodyBlank=${email.body.isBlank()} cleanBlank=${email.cleanBody.isBlank()} " +
-                "bodyLen=${email.body.length} delivered=$delivered " +
+            "contentState=${email.contentState.name} bodyLen=${email.body.length} " +
+                "cleanLen=${email.cleanBody.length} delivered=$delivered " +
                 "remoteFetching=$isFetchingRemoteBody inlineFetching=$isFetchingInlineImages"
         )
-
-        val baseHtml = if (email.cleanBody.isNotBlank()) email.cleanBody else email.body
-        val isReady = email.contentState == com.david.mailapp.domain.model.EmailContentState.READY
-        val isEmpty = email.contentState == com.david.mailapp.domain.model.EmailContentState.EMPTY
-        
-        val needsStablePdfIdentity = email.pdfAttachments.any { it.partId.isNullOrBlank() }
-        val needsHistoricalFetch = isReady && email.inlineReferences.isEmpty() && baseHtml.contains("cid:", ignoreCase = true)
-        
-        val needsRemoteFetch = email.contentState == com.david.mailapp.domain.model.EmailContentState.NOT_FETCHED ||
-                               !email.pdfMetadataScanned || 
-                               needsStablePdfIdentity || 
-                               needsHistoricalFetch
-                               
-        if (isReady && !hasRecordedAccess) {
-            hasRecordedAccess = true
-            viewModelScope.launch { source.recordContentAccess(emailId) }
-        }
 
         // Check each unseen MIME part's PDF cache
         val uncheckedAttachments = email.pdfAttachments.filter {
@@ -207,58 +190,97 @@ class EmailDetailViewModel(
             }
         }
 
-        when {
-            isEmpty && !delivered -> {
-                delivered = true
-                val reason = if (email.pdfAttachments.isNotEmpty()) com.david.mailapp.core.localization.UiErrorReason.EMAIL_BODY_PDFS_ONLY else com.david.mailapp.core.localization.UiErrorReason.EMAIL_BODY_LOAD_FAILED
-                _uiState.value = EmailDetailUiState.BodyError(email, reason, retryable = false)
-            }
-            needsRemoteFetch && !isFetchingRemoteBody && !delivered -> {
-                isFetchingRemoteBody = true
-                EmailRenderTrace.d(traceMail, "VM", "VM_STATE_PREPARING", "reason=remote_body")
-                if (!delivered) {
+        when (email.contentState) {
+            EmailContentState.NOT_FETCHED -> {
+                if (!isFetchingRemoteBody && !delivered) {
+                    isFetchingRemoteBody = true
+                    EmailRenderTrace.d(traceMail, "VM", "VM_STATE_PREPARING", "reason=not_fetched")
                     _uiState.value = EmailDetailUiState.PreparingBody(email)
+                    viewModelScope.launch { fetchRemoteBody(emailId, email) }
                 }
-                viewModelScope.launch { fetchRemoteBody(emailId, email) }
             }
-            baseHtml.isNotBlank() && baseHtml.contains("cid:", ignoreCase = true) &&
-                cachedInlineImages == null && !isFetchingInlineImages -> {
-                isFetchingInlineImages = true
+            EmailContentState.EMPTY -> {
                 if (!delivered) {
                     delivered = true
-                    EmailRenderTrace.d(traceMail, "VM", "VM_STATE_READY",
-                        "source=clean_body_pending_inline bodyLen=${baseHtml.length} " +
-                            "bodyKey=${EmailRenderTrace.bodyKey(baseHtml)}")
-                    _uiState.value = EmailDetailUiState.Ready(
-                        email.copy(body = baseHtml), inlineImagesLoading = true
+                    EmailRenderTrace.d(traceMail, "VM", "VM_STATE_EMPTY", "pdfCount=${email.pdfAttachments.size}")
+                    _uiState.value = EmailDetailUiState.Empty(email)
+                }
+            }
+            EmailContentState.READY -> handleReadyEmail(email)
+        }
+    }
+
+    private suspend fun handleReadyEmail(email: Email) {
+        if (!hasRecordedAccess) {
+            hasRecordedAccess = true
+            viewModelScope.launch { source.recordContentAccess(emailId) }
+        }
+
+        val displayBody = email.cleanBody.ifBlank { email.body }
+        if (displayBody.isEmpty()) {
+            if (!delivered) {
+                delivered = true
+                _uiState.value = EmailDetailUiState.BodyError(
+                    email,
+                    UiErrorReason.EMAIL_BODY_LOAD_FAILED,
+                    retryable = true
+                )
+            }
+            return
+        }
+
+        val needsInlineImages = displayBody.contains("cid:", ignoreCase = true) &&
+            email.inlineReferences.isNotEmpty()
+        if (needsInlineImages && cachedInlineImages == null) {
+            if (!delivered) {
+                delivered = true
+                EmailRenderTrace.d(
+                    traceMail,
+                    "VM",
+                    "VM_STATE_READY",
+                    "source=persisted_refs_pending_inline bodyLen=${displayBody.length} " +
+                        "bodyKey=${EmailRenderTrace.bodyKey(displayBody)}"
+                )
+                _uiState.value = EmailDetailUiState.Ready(
+                    email.copy(body = displayBody),
+                    inlineImagesLoading = true
+                )
+            }
+            if (!isFetchingInlineImages) {
+                isFetchingInlineImages = true
+                viewModelScope.launch {
+                    resolveInlineImages(
+                        emailId,
+                        email.copy(body = displayBody),
+                        email.inlineReferences
                     )
                 }
-                viewModelScope.launch { resolveInlineImages(emailId, email.copy(body = baseHtml)) }
             }
-            baseHtml.isNotBlank() && (!baseHtml.contains("cid:", ignoreCase = true) || cachedInlineImages != null) -> {
-                if (delivered && !isFetchingInlineImages) {
-                    EmailRenderTrace.d(traceMail, "VM", "VM_IGNORED_EMISSION", "reason=delivered")
-                    return
-                }
-                val inlineImages = cachedInlineImages ?: emptyMap()
-                val injectedBody = if (inlineImages.isNotEmpty()) {
-                    withContext(Dispatchers.Default) {
-                        source.injectInlineImages(baseHtml, inlineImages)
-                    }
-                } else baseHtml
-                val finalEmail = email.copy(body = injectedBody)
-                delivered = true
-                EmailRenderTrace.d(traceMail, "VM", "VM_STATE_READY",
-                    "source=ready_final bodyLen=${finalEmail.body.length} " +
-                        "bodyKey=${EmailRenderTrace.bodyKey(finalEmail.body)}")
-                _uiState.value = EmailDetailUiState.Ready(finalEmail, inlineImagesLoading = false)
-            }
-            else -> {
-                if (!delivered) {
-                    _uiState.value = EmailDetailUiState.PreparingBody(email)
-                }
-            }
+            return
         }
+
+        if (delivered && !isFetchingInlineImages) {
+            EmailRenderTrace.d(traceMail, "VM", "VM_IGNORED_EMISSION", "reason=delivered")
+            return
+        }
+        val inlineImages = cachedInlineImages ?: emptyMap()
+        val injectedBody = if (inlineImages.isNotEmpty()) {
+            withContext(Dispatchers.Default) {
+                source.injectInlineImages(displayBody, inlineImages)
+            }
+        } else {
+            displayBody
+        }
+        val finalEmail = email.copy(body = injectedBody)
+        delivered = true
+        EmailRenderTrace.d(
+            traceMail,
+            "VM",
+            "VM_STATE_READY",
+            "source=ready_final bodyLen=${finalEmail.body.length} " +
+                "bodyKey=${EmailRenderTrace.bodyKey(finalEmail.body)}"
+        )
+        _uiState.value = EmailDetailUiState.Ready(finalEmail, inlineImagesLoading = false)
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -292,40 +314,27 @@ class EmailDetailViewModel(
             fetchedOutcome as com.david.mailapp.data.repository.EmailContentRecoveryResult.Found
             val fetchedResult = fetchedOutcome.email
 
-            val isRemoteEmpty = fetchedResult.contentState == com.david.mailapp.domain.model.EmailContentState.EMPTY
-            if (isRemoteEmpty) {
-                if (!delivered) {
-                    delivered = true
-                    val reason = if (fetchedResult.pdfAttachments.isNotEmpty()) UiErrorReason.EMAIL_BODY_PDFS_ONLY else UiErrorReason.EMAIL_BODY_LOAD_FAILED
-                    val errEmail = email.copy(
-                        pdfAttachments = fetchedResult.pdfAttachments,
-                        pdfMetadataScanned = true,
-                        contentState = com.david.mailapp.domain.model.EmailContentState.EMPTY
-                    )
-                    _uiState.value = EmailDetailUiState.BodyError(errEmail, reason, retryable = false)
-                }
+            if (fetchedResult.contentState == EmailContentState.NOT_FETCHED) {
+                delivered = true
+                _uiState.value = EmailDetailUiState.BodyError(
+                    email,
+                    UiErrorReason.EMAIL_BODY_LOAD_FAILED,
+                    retryable = true
+                )
                 return
             }
-
-            cachedInlineRefs = fetchedResult.inlineReferences
-            EmailRenderTrace.d(traceMail, "VM", "VM_REMOTE_SUCCESS", "durationMs=${EmailRenderTrace.now() - startedAt} refs=${cachedInlineRefs?.size ?: 0}")
+            EmailRenderTrace.d(
+                traceMail,
+                "VM",
+                "VM_REMOTE_SUCCESS",
+                "durationMs=${EmailRenderTrace.now() - startedAt} refs=${fetchedResult.inlineReferences.size}"
+            )
 
             if (fetchedOutcome.storage == com.david.mailapp.data.repository.EmailContentStorage.MEMORY_ONLY) {
                 EmailRenderTrace.d(traceMail, "VM", "VM_MEMORY_ONLY", "bodyLen=${fetchedResult.cleanBody.length}")
-                if (!hasRecordedAccess) {
-                    hasRecordedAccess = true
-                }
-                val transientEmail = email.copy(
-                    body = fetchedResult.cleanBody,
-                    cleanBody = fetchedResult.cleanBody,
-                    inlineReferences = fetchedResult.inlineReferences,
-                    pdfAttachments = fetchedResult.pdfAttachments,
-                    pdfMetadataScanned = true,
-                    contentState = com.david.mailapp.domain.model.EmailContentState.READY,
-                    bodyKind = fetchedResult.bodyKind
-                )
-                handleEmail(transientEmail)
+                hasRecordedAccess = true
             }
+            handleEmail(fetchedResult)
         } catch (e: CancellationException) {
             throw e
         } catch (error: Exception) {
@@ -348,19 +357,15 @@ class EmailDetailViewModel(
     // Inline image resolution
     // ═══════════════════════════════════════════════════════════════
 
-    private suspend fun resolveInlineImages(emailId: String, email: Email) {
+    private suspend fun resolveInlineImages(
+        emailId: String,
+        email: Email,
+        refs: List<com.david.mailapp.domain.model.EmailInlineReference>
+    ) {
         val startedAt = EmailRenderTrace.now()
         EmailRenderTrace.d(traceMail, "VM", "VM_INLINE_START",
             "bodyLen=${email.body.length} bodyKey=${EmailRenderTrace.bodyKey(email.body)}")
         try {
-            val refs = cachedInlineRefs ?: withContext(workerDispatcher) {
-                val outcome = source.recoverContentById(emailId)
-                (outcome as? com.david.mailapp.data.repository.EmailContentRecoveryResult.Found)
-                    ?.email
-                    ?.inlineReferences
-            } ?: emptyList()
-            currentCoroutineContext().ensureActive()
-
             val images = if (refs.isNotEmpty()) {
                 withContext(workerDispatcher) { source.downloadInlineImages(emailId, refs) }
             } else emptyMap()

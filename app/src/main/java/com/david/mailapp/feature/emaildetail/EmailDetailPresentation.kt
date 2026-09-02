@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.zIndex
 import com.david.mailapp.feature.emaildetail.components.EmailDetailBodyError
 import com.david.mailapp.feature.emaildetail.components.EmailDetailContent
+import com.david.mailapp.feature.emaildetail.components.EmailDetailEmpty
 import com.david.mailapp.feature.emaildetail.components.EmailDetailLoading
 import com.david.mailapp.feature.emaildetail.components.EmailDetailResolutionError
 import com.david.mailapp.feature.emaildetail.components.EmailDetailTopBar
@@ -102,6 +103,17 @@ internal fun EmailDetailPresentation(
                     )
                 }
 
+                is EmailDetailUiState.Empty -> {
+                    EmailDetailEmpty(
+                        state = state,
+                        pdfDownloadStates = pdfDownloadStates,
+                        onPdfAttachmentClick = onPdfAttachmentClick,
+                        onPdfSaveClick = onPdfSaveClick,
+                        savingStableIds = savingStableIds,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+
                 is EmailDetailUiState.PreparingBody, is EmailDetailUiState.Ready -> {
                     val email = when (state) {
                         is EmailDetailUiState.PreparingBody -> state.email
@@ -126,6 +138,7 @@ internal fun EmailDetailPresentation(
             // ── Floating header panel (overlay, zIndex 2) ─────────
             val emailForPanel = (uiState as? EmailDetailUiState.PreparingBody)?.email
                 ?: (uiState as? EmailDetailUiState.Ready)?.email
+                ?: (uiState as? EmailDetailUiState.Empty)?.email
 
             if (emailForPanel != null) {
                 // Scrim: blocks touches to WebView when panel is open

@@ -213,11 +213,11 @@ class EmailDetailPresentationTest {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // 6. Reply/Forward/Back only in Ready
+    // 6. Reply/Forward/Back in terminal content states
     // ═══════════════════════════════════════════════════════════════
 
     @Test
-    fun replyForwardAndBack_areForwardedOnlyInReady() {
+    fun replyForwardAndBack_areForwardedInReadyAndEmpty() {
         val email = testEmail(id = "rfb", subject = "RFB")
         val currentState = mutableStateOf<EmailDetailUiState>(EmailDetailUiState.Loading)
         var replyId: String? = null
@@ -278,6 +278,21 @@ class EmailDetailPresentationTest {
             .performClick()
         composeRule.onNodeWithContentDescription(context.getString(R.string.detail_forward))
             .assertIsDisplayed()
+            .assertIsEnabled()
+            .performClick()
+        composeRule.runOnIdle {
+            assertEquals("rfb", replyId)
+            assertEquals("rfb", forwardId)
+        }
+
+        replyId = null
+        forwardId = null
+        composeRule.runOnIdle { currentState.value = EmailDetailUiState.Empty(email) }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.detail_reply))
+            .assertIsEnabled()
+            .performClick()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.detail_forward))
             .assertIsEnabled()
             .performClick()
         composeRule.runOnIdle {

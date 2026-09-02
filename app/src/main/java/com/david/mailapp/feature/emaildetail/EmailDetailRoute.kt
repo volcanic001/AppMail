@@ -84,6 +84,8 @@ internal fun EmailDetailRoute(
             is EmailDetailUiState.Ready ->
                 "state=Ready bodyLen=${state.email.body.length} " +
                     "bodyKey=${EmailRenderTrace.bodyKey(state.email.body)}"
+            is EmailDetailUiState.Empty ->
+                "state=Empty pdfCount=${state.email.pdfAttachments.size}"
             is EmailDetailUiState.BodyError ->
                 "state=BodyError hasMetadata=${state.email != null}"
         }
