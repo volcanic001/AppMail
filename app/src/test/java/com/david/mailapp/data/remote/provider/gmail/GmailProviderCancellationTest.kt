@@ -11,6 +11,8 @@ import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import com.david.mailapp.data.remote.provider.EmailLookupFailureReason
+import com.david.mailapp.data.remote.provider.EmailLookupResult
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -42,10 +44,10 @@ class GmailProviderCancellationTest {
         }
     }
 
-    // ── fetchBodyWithRefs ─────────────────────────────────────────
+    // ── fetchEmailById ────────────────────────────────────────────
 
     @Test
-    fun `fetchBodyWithRefs propagates CancellationException and does not return null`() = runTest {
+    fun `fetchEmailById propagates CancellationException`() = runTest {
         val sentinel = CancellationException("sentinel-body")
         val c = client { path ->
             if (path.contains("/messages/")) throw sentinel
@@ -53,7 +55,7 @@ class GmailProviderCancellationTest {
         val provider = GmailProvider(c)
 
         try {
-            provider.fetchBodyWithRefs("msg_1")
+            provider.fetchEmailById("msg_1")
             fail("Expected CancellationException to propagate")
         } catch (e: CancellationException) {
             assertEquals("sentinel-body", e.message?.substringAfterLast(": ")?.trim())
@@ -61,13 +63,16 @@ class GmailProviderCancellationTest {
     }
 
     @Test
-    fun `fetchBodyWithRefs returns null for ordinary HTTP errors`() = runTest {
+    fun `fetchEmailById classifies ordinary errors as invalid response`() = runTest {
         val c = client {
             throw RuntimeException("ordinary-error")
         }
         val provider = GmailProvider(c)
-        val result = provider.fetchBodyWithRefs("msg_1")
-        assertNull("Ordinary errors should still produce null", result)
+        val result = provider.fetchEmailById("msg_1")
+        assertEquals(
+            EmailLookupResult.Failure(EmailLookupFailureReason.INVALID_RESPONSE),
+            result
+        )
     }
 
     // ── downloadInlineImages ───────────────────────────────────────

@@ -3,7 +3,6 @@ package com.david.mailapp.data.repository
 import com.david.mailapp.data.local.MailDatabase
 import com.david.mailapp.data.pdf.PdfCacheManager
 import com.david.mailapp.data.pdf.PdfDownloadState
-import com.david.mailapp.data.remote.provider.BodyFetchResult
 import com.david.mailapp.data.remote.provider.EmailProvider
 import com.david.mailapp.data.remote.provider.ReplyContext
 import com.david.mailapp.domain.model.Email

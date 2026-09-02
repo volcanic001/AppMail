@@ -1,8 +1,8 @@
 package com.david.mailapp.data.repository
 
-import com.david.mailapp.data.remote.provider.BodyFetchResult
+import com.david.mailapp.domain.model.Email
 
 sealed interface EmailContentFetchOutcome {
-    data class Persisted(val remote: BodyFetchResult) : EmailContentFetchOutcome
-    data class MemoryOnly(val remote: BodyFetchResult, val cleanBody: String) : EmailContentFetchOutcome
+    data class Persisted(val remote: Email) : EmailContentFetchOutcome
+    data class MemoryOnly(val remote: Email, val cleanBody: String) : EmailContentFetchOutcome
 }

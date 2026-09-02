@@ -732,7 +732,6 @@ class EmailRepositoryReadSyncSearchContractsTest {
         assertEquals(0, provider.fetchTrashCalls)
         assertEquals(0, provider.searchCalls)
         assertEquals(0, provider.fetchEmailByIdCalls)
-        assertEquals(0, provider.fetchBodyCalls)
         assertEquals(0, provider.inlineImagesCalls)
         assertEquals(0, provider.downloadAttachmentCalls)
         assertEquals(0, provider.moveToTrashCalls)

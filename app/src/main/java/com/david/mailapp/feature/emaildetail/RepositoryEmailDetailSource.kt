@@ -2,7 +2,6 @@ package com.david.mailapp.feature.emaildetail
 
 import com.david.mailapp.core.localization.UiErrorReason
 import com.david.mailapp.data.pdf.PdfDownloadState
-import com.david.mailapp.data.remote.provider.BodyFetchResult
 import com.david.mailapp.data.repository.EmailActionResult
 import com.david.mailapp.data.repository.EmailRepository
 import com.david.mailapp.data.repository.EmailResolutionResult

@@ -144,7 +144,7 @@ internal class EmailResolutionCoordinator(
                 EmailResolutionResult.Failure(reason)
             }
             is EmailLookupResult.Found -> {
-                val email = lookupResult.email
+                val email = lookupResult.email.asSummaryOnly()
                 val entity = EmailEntity.fromDomain(email, email.folder)
                 try {
                     val persisted = writeGuard.commit(lease) {

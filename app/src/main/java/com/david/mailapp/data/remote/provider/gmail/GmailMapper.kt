@@ -18,7 +18,7 @@ internal fun MessageResponse.toDomainEmail(): Email {
     val references = headers.headerValue("References")
 
     val labels = labelIds ?: emptyList()
-    val pdfAttachments = GmailMimeParser.parse(this).pdfAttachments
+    val parsed = GmailMimeParser.parse(this)
 
     return Email(
         id = id,
@@ -31,13 +31,17 @@ internal fun MessageResponse.toDomainEmail(): Email {
         timestamp = internalDate?.toLongOrNull() ?: 0L,
         isRead = labels.contains("UNREAD").not(),
         isStarred = labels.contains("STARRED"),
-        hasAttachments = pdfAttachments.isNotEmpty(),
+        hasAttachments = parsed.pdfAttachments.isNotEmpty(),
         labels = labels,
         folder = classifyGmailFolder(labels),
-        pdfAttachments = pdfAttachments,
+        body = parsed.body.orEmpty(),
+        pdfAttachments = parsed.pdfAttachments,
         pdfMetadataScanned = payload != null,
         rfcMessageId = msgId,
-        rfcReferences = references
+        rfcReferences = references,
+        contentState = parsed.contentState,
+        bodyKind = parsed.bodyKind,
+        inlineReferences = parsed.inlineReferences
     )
 }
 

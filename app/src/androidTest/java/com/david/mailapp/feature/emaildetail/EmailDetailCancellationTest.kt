@@ -10,7 +10,7 @@ import com.david.mailapp.data.local.MailDatabase
 import com.david.mailapp.data.local.entity.EmailEntity
 import com.david.mailapp.data.pdf.PdfCacheManager
 import com.david.mailapp.data.pdf.PdfDownloadState
-import com.david.mailapp.data.remote.provider.BodyFetchResult
+import com.david.mailapp.data.remote.provider.EmailLookupResult
 import com.david.mailapp.data.repository.EmailRepository
 import com.david.mailapp.domain.model.EmailFolder
 import com.david.mailapp.domain.model.PdfAttachmentMetadata
@@ -77,11 +77,11 @@ class EmailDetailCancellationTest {
         database.emailDao().upsertAll(
             listOf(EmailEntity.fromDomain(email, EmailFolder.Inbox))
         )
-        provider.fetchBodyError = CancellationException("sentinel-body")
+        provider.fetchEmailByIdError = CancellationException("sentinel-body")
 
         val viewModel = createViewModel(email.id)
 
-        awaitCondition("body provider was not invoked") { provider.fetchBodyCalls >= 1 }
+        awaitCondition("body provider was not invoked") { provider.fetchEmailByIdCalls >= 1 }
         delay(50)
 
         val state = viewModel.uiState.value
@@ -101,18 +101,18 @@ class EmailDetailCancellationTest {
         )
 
         val bodyWithCid = "<html><body><img src=\"cid:image-1\"></body></html>"
-        provider.fetchBodyResult = BodyFetchResult(
-            rawBody = bodyWithCid,
+        provider.fetchEmailByIdResult = EmailLookupResult.Found(email.copy(
+            body = bodyWithCid,
             contentState = com.david.mailapp.domain.model.EmailContentState.READY,
             bodyKind = com.david.mailapp.domain.model.EmailBodyKind.HTML,
-            inlineRefs = listOf(
+            inlineReferences = listOf(
                 com.david.mailapp.domain.model.EmailInlineReference(
                     contentId = "image-1",
                     attachmentId = "attachment-1",
                     mimeType = "image/png"
                 )
             )
-        )
+        ))
         provider.inlineImagesError = CancellationException("sentinel-inline")
 
         val viewModel = createViewModel(email.id)
@@ -150,19 +150,17 @@ class EmailDetailCancellationTest {
             listOf(EmailEntity.fromDomain(email, EmailFolder.Inbox))
         )
         val bodyGate = CompletableDeferred<Unit>()
-        provider.fetchBodyDeferred = bodyGate
-        provider.fetchBodyResult = BodyFetchResult(
-            rawBody = "Fetched Body",
+        provider.fetchEmailByIdDeferred = bodyGate
+        provider.fetchEmailByIdResult = EmailLookupResult.Found(email.copy(
+            body = "Fetched Body",
             contentState = com.david.mailapp.domain.model.EmailContentState.READY,
-            bodyKind = com.david.mailapp.domain.model.EmailBodyKind.PLAIN_TEXT,
-            inlineRefs = emptyList(),
-            pdfAttachments = emptyList()
-        )
+            bodyKind = com.david.mailapp.domain.model.EmailBodyKind.PLAIN_TEXT
+        ))
 
         createViewModel(email.id)
 
         // Wait for body fetch to start
-        awaitCondition("body fetch start") { provider.fetchBodyCalls == 1 }
+        awaitCondition("body fetch start") { provider.fetchEmailByIdCalls == 1 }
 
         // Clear viewModelStore (simulating leaving the screen)
         viewModelStore.clear()
@@ -172,7 +170,7 @@ class EmailDetailCancellationTest {
         delay(50)
 
         // Check provider cancellation registered
-        assertTrue("Provider should detect cancellation", provider.wasCancelledFetchBody)
+        assertTrue("Provider should detect cancellation", provider.wasCancelledFetchEmailById)
 
         // Verify Room was not modified
         val stored = database.emailDao().getEntitiesByIdsSync(listOf(email.id)).single()
@@ -187,18 +185,18 @@ class EmailDetailCancellationTest {
             listOf(EmailEntity.fromDomain(email, EmailFolder.Inbox))
         )
 
-        provider.fetchBodyResult = BodyFetchResult(
-            rawBody = bodyWithCid,
+        provider.fetchEmailByIdResult = EmailLookupResult.Found(email.copy(
+            body = bodyWithCid,
             contentState = com.david.mailapp.domain.model.EmailContentState.READY,
             bodyKind = com.david.mailapp.domain.model.EmailBodyKind.HTML,
-            inlineRefs = listOf(
+            inlineReferences = listOf(
                 com.david.mailapp.domain.model.EmailInlineReference(
                     contentId = "image-1",
                     attachmentId = "attachment-1",
                     mimeType = "image/png"
                 )
             )
-        )
+        ))
 
         val inlineGate = CompletableDeferred<Unit>()
         provider.downloadInlineImagesDeferred = inlineGate
@@ -292,19 +290,17 @@ class EmailDetailCancellationTest {
             listOf(EmailEntity.fromDomain(email, EmailFolder.Inbox))
         )
         val bodyGate = CompletableDeferred<Unit>()
-        provider.fetchBodyDeferred = bodyGate
-        provider.ignoreCancellationFetchBody = true
-        provider.fetchBodyResult = BodyFetchResult(
-            rawBody = "Fetched Body Late",
+        provider.fetchEmailByIdDeferred = bodyGate
+        provider.ignoreCancellationFetchEmailById = true
+        provider.fetchEmailByIdResult = EmailLookupResult.Found(email.copy(
+            body = "Fetched Body Late",
             contentState = com.david.mailapp.domain.model.EmailContentState.READY,
-            bodyKind = com.david.mailapp.domain.model.EmailBodyKind.PLAIN_TEXT,
-            inlineRefs = emptyList(),
-            pdfAttachments = emptyList()
-        )
+            bodyKind = com.david.mailapp.domain.model.EmailBodyKind.PLAIN_TEXT
+        ))
 
         val viewModel = createViewModel(email.id)
 
-        awaitCondition("body fetch start") { provider.fetchBodyCalls == 1 }
+        awaitCondition("body fetch start") { provider.fetchEmailByIdCalls == 1 }
         val stateBeforeDismissal = viewModel.uiState.value
 
         // Clear viewModelStore
@@ -315,8 +311,8 @@ class EmailDetailCancellationTest {
         delay(50)
 
         // Verify provider ran to completion after ignoring cancellation.
-        assertTrue(provider.wasCancelledFetchBody)
-        assertTrue(provider.completedFetchBody)
+        assertTrue(provider.wasCancelledFetchEmailById)
+        assertTrue(provider.completedFetchEmailById)
 
         // Verify neither ViewModel state nor Room changed after the late response.
         assertEquals(stateBeforeDismissal, viewModel.uiState.value)

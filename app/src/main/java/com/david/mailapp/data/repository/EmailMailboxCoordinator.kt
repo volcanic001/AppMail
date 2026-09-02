@@ -58,7 +58,7 @@ internal class EmailMailboxCoordinator(
         val fetched = p.fetchInbox(pageToken)
         val result = if (fetched.isComplete) fetched else fetched.copy(nextPageToken = null)
 
-        val entities = result.items.map { EmailEntity.fromDomain(it, EmailFolder.Inbox) }
+        val entities = result.items.map { EmailEntity.fromDomain(it.asSummaryOnly(), EmailFolder.Inbox) }
         inboxCommitCoordinator.commitIfValid(gen) {
             writeGuard.commit(lease) {
                 // Replace folder only on a complete first page;
@@ -86,7 +86,7 @@ internal class EmailMailboxCoordinator(
         val fetched = p.fetchTrash(pageToken)
         val result = if (fetched.isComplete) fetched else fetched.copy(nextPageToken = null)
 
-        val entities = result.items.map { EmailEntity.fromDomain(it, EmailFolder.Trash) }
+        val entities = result.items.map { EmailEntity.fromDomain(it.asSummaryOnly(), EmailFolder.Trash) }
         trashCommitCoordinator.commitIfValid(gen) {
             writeGuard.commit(lease) {
                 // Refresh replaces the paginated window only for a complete first page.

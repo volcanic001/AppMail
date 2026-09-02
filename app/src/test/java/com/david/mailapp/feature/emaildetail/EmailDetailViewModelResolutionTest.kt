@@ -3,7 +3,6 @@ package com.david.mailapp.feature.emaildetail
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
 import com.david.mailapp.core.localization.UiErrorReason
-import com.david.mailapp.data.remote.provider.BodyFetchResult
 import com.david.mailapp.data.repository.EmailResolutionFailureReason
 import com.david.mailapp.data.repository.EmailResolutionResult
 import kotlinx.coroutines.CompletableDeferred
@@ -258,12 +257,7 @@ class EmailDetailViewModelResolutionTest {
             bodyBlank = false,
             pdfScanned = true
         )
-        source.bodyFetchResult = com.david.mailapp.data.repository.EmailContentFetchOutcome.Persisted(BodyFetchResult(
-            rawBody = recoveredEmail.body,
-            contentState = com.david.mailapp.domain.model.EmailContentState.READY,
-            bodyKind = com.david.mailapp.domain.model.EmailBodyKind.HTML,
-            inlineRefs = emptyList()
-        ))
+        source.bodyFetchResult = com.david.mailapp.data.repository.EmailContentFetchOutcome.Persisted(recoveredEmail)
         source.onBodyFetch = { callCount ->
             if (callCount == 2) source.emitRoomEmail(recoveredEmail)
         }
@@ -328,11 +322,11 @@ class EmailDetailViewModelResolutionTest {
         source.resolveResult = EmailResolutionResult.Found(
             FakeEmailDetailSource.sampleEmail(bodyBlank = true)
         )
-        source.bodyFetchResult = com.david.mailapp.data.repository.EmailContentFetchOutcome.Persisted(BodyFetchResult(
-            rawBody = "",
+        source.bodyFetchResult = com.david.mailapp.data.repository.EmailContentFetchOutcome.Persisted(
+            FakeEmailDetailSource.sampleEmail(
+            bodyBlank = true,
             contentState = com.david.mailapp.domain.model.EmailContentState.EMPTY,
-            bodyKind = com.david.mailapp.domain.model.EmailBodyKind.UNKNOWN,
-            inlineRefs = emptyList()
+            bodyKind = com.david.mailapp.domain.model.EmailBodyKind.UNKNOWN
         ))
         val vm = createViewModel(source)
 
@@ -353,11 +347,12 @@ class EmailDetailViewModelResolutionTest {
         source.resolveResult = EmailResolutionResult.Found(
             FakeEmailDetailSource.sampleEmail(bodyBlank = true)
         )
-        source.bodyFetchResult = com.david.mailapp.data.repository.EmailContentFetchOutcome.Persisted(BodyFetchResult(
-            rawBody = null,
+        source.bodyFetchResult = com.david.mailapp.data.repository.EmailContentFetchOutcome.Persisted(
+            FakeEmailDetailSource.sampleEmail(
+            bodyBlank = true,
+            pdfScanned = true,
             contentState = com.david.mailapp.domain.model.EmailContentState.EMPTY,
             bodyKind = com.david.mailapp.domain.model.EmailBodyKind.UNKNOWN,
-            inlineRefs = emptyList(),
             pdfAttachments = listOf(
                 com.david.mailapp.domain.model.PdfAttachmentMetadata(
                     "doc.pdf", "application/pdf", "att1", 1024L

@@ -2,7 +2,6 @@ package com.david.mailapp.feature.emaildetail
 
 import com.david.mailapp.core.localization.UiErrorReason
 import com.david.mailapp.data.pdf.PdfDownloadState
-import com.david.mailapp.data.remote.provider.BodyFetchResult
 import com.david.mailapp.data.repository.EmailActionResult
 import com.david.mailapp.data.repository.EmailResolutionFailureReason
 import com.david.mailapp.data.repository.EmailResolutionResult
@@ -96,7 +95,9 @@ class FakeEmailDetailSource(
             bodyBlank: Boolean = body.isBlank(),
             pdfScanned: Boolean = false,
             folder: EmailFolder = EmailFolder.Inbox,
-            contentState: com.david.mailapp.domain.model.EmailContentState = if (bodyBlank) com.david.mailapp.domain.model.EmailContentState.NOT_FETCHED else com.david.mailapp.domain.model.EmailContentState.READY
+            contentState: com.david.mailapp.domain.model.EmailContentState = if (bodyBlank) com.david.mailapp.domain.model.EmailContentState.NOT_FETCHED else com.david.mailapp.domain.model.EmailContentState.READY,
+            bodyKind: com.david.mailapp.domain.model.EmailBodyKind = if (bodyBlank) com.david.mailapp.domain.model.EmailBodyKind.UNKNOWN else com.david.mailapp.domain.model.EmailBodyKind.HTML,
+            pdfAttachments: List<PdfAttachmentMetadata> = emptyList()
         ): Email = Email(
             id = id, threadId = "t1", from = "a@b.com", fromInitials = "A",
             to = "c@d.com", subject = "S", snippet = "snip", timestamp = 1L,
@@ -104,8 +105,9 @@ class FakeEmailDetailSource(
             labels = emptyList(), folder = folder,
             body = if (bodyBlank && body.isEmpty()) "" else body.ifEmpty { "<html>body</html>" },
             cleanBody = cleanBody,
-            pdfAttachments = emptyList(), pdfMetadataScanned = pdfScanned,
-            contentState = contentState
+            pdfAttachments = pdfAttachments, pdfMetadataScanned = pdfScanned,
+            contentState = contentState,
+            bodyKind = bodyKind
         )
     }
 }

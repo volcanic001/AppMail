@@ -1,6 +1,5 @@
 package com.david.mailapp.testhelpers
 
-import com.david.mailapp.data.remote.provider.BodyFetchResult
 import com.david.mailapp.data.remote.provider.EmailLookupResult
 import com.david.mailapp.data.remote.provider.EmailProvider
 import com.david.mailapp.data.remote.provider.ReplyContext
@@ -47,13 +46,12 @@ class FakeEmailProvider : EmailProvider {
     var sendEmailDeferred: CompletableDeferred<Unit>? = null
     var downloadAttachmentDeferred: CompletableDeferred<Unit>? = null
     var downloadAttachmentStarted: CompletableDeferred<Unit>? = null
-    var fetchBodyDeferred: CompletableDeferred<Unit>? = null
-    var fetchBodyStarted: CompletableDeferred<Unit>? = null
+    var fetchEmailByIdStarted: CompletableDeferred<Unit>? = null
     var downloadInlineImagesDeferred: CompletableDeferred<Unit>? = null
 
-    var wasCancelledFetchBody = false
-    var completedFetchBody = false
-    var ignoreCancellationFetchBody = false
+    var wasCancelledFetchEmailById = false
+    var completedFetchEmailById = false
+    var ignoreCancellationFetchEmailById = false
     var wasCancelledInlineImages = false
     var ignoreCancellationInlineImages = false
     var wasCancelledDownloadAttachment = false
@@ -63,7 +61,6 @@ class FakeEmailProvider : EmailProvider {
     var fetchTrashResult: PaginatedResult<Email> = PaginatedResult(emptyList(), null)
     var searchResult: PaginatedResult<Email> = PaginatedResult(emptyList(), null)
     var fetchEmailByIdResult: EmailLookupResult = EmailLookupResult.NotFound
-    var fetchBodyResult: BodyFetchResult? = null
     var inlineImagesResult: Map<String, String> = emptyMap()
     var userEmailResult: String? = "test@example.com"
     var getUserEmailCalls = 0
@@ -80,14 +77,12 @@ class FakeEmailProvider : EmailProvider {
     var fetchTrashCalls = 0
     var searchCalls = 0
     var fetchEmailByIdCalls = 0
-    var fetchBodyCalls = 0
     var inlineImagesCalls = 0
     var eventLog: MutableList<String>? = null
     val receivedInboxTokens = mutableListOf<String?>()
     val receivedTrashTokens = mutableListOf<String?>()
     val receivedSearchRequests = mutableListOf<Pair<String, String?>>()
     val receivedFetchEmailByIdIds = mutableListOf<String>()
-    val receivedFetchBodyIds = mutableListOf<String>()
     val receivedInlineImageRequests = mutableListOf<Pair<String, List<com.david.mailapp.domain.model.EmailInlineReference>>>()
     val receivedDownloadAttachmentRequests = mutableListOf<Pair<String, String>>()
     val receivedSendRequests = mutableListOf<SendRequest>()
@@ -109,7 +104,6 @@ class FakeEmailProvider : EmailProvider {
 
     /** Per-call results: call N returns resultsByCall[N]. Falls back to [fetchEmailByIdResult] when empty. */
     var fetchEmailByIdResultsByCall: List<EmailLookupResult> = emptyList()
-    var fetchBodyError: Exception? = null
     var inlineImagesError: Exception? = null
 
     override suspend fun fetchInbox(pageToken: String?): PaginatedResult<Email> {
@@ -159,14 +153,25 @@ class FakeEmailProvider : EmailProvider {
         eventLog?.add("gmail.fetchEmailById")
         fetchEmailByIdCalls++
         receivedFetchEmailByIdIds += emailId
+        fetchEmailByIdStarted?.complete(Unit)
         val callIndex = fetchEmailByIdCalls - 1
         val perCallGate = fetchEmailByIdDeferredByCall.getOrNull(callIndex)
         if (perCallGate != null) {
             perCallGate.await()
         } else {
-            fetchEmailByIdDeferred?.await()
+            val deferred = fetchEmailByIdDeferred
+            if (deferred != null) {
+                try {
+                    deferred.await()
+                } catch (e: CancellationException) {
+                    wasCancelledFetchEmailById = true
+                    if (!ignoreCancellationFetchEmailById) throw e
+                    withContext(NonCancellable) { deferred.await() }
+                }
+            }
         }
         fetchEmailByIdError?.let { throw it }
+        completedFetchEmailById = true
         return fetchEmailByIdResultsByCall.getOrNull(callIndex) ?: fetchEmailByIdResult
     }
 
@@ -196,26 +201,6 @@ class FakeEmailProvider : EmailProvider {
         markAsReadDeferred?.await()
         markAsReadCalls++
         markAsReadError?.let { throw it }
-    }
-
-    override suspend fun fetchBodyWithRefs(emailId: String): BodyFetchResult? {
-        eventLog?.add("gmail.fetchBody")
-        fetchBodyCalls++
-        receivedFetchBodyIds += emailId
-        fetchBodyStarted?.complete(Unit)
-        val deferred = fetchBodyDeferred
-        if (deferred != null) {
-            try {
-                deferred.await()
-            } catch (e: CancellationException) {
-                wasCancelledFetchBody = true
-                if (!ignoreCancellationFetchBody) throw e
-                withContext(NonCancellable) { deferred.await() }
-            }
-        }
-        fetchBodyError?.let { throw it }
-        completedFetchBody = true
-        return fetchBodyResult
     }
 
     override suspend fun downloadInlineImages(emailId: String, refs: List<com.david.mailapp.domain.model.EmailInlineReference>): Map<String, String> {

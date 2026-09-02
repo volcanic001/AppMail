@@ -3,7 +3,6 @@ package com.david.mailapp.data.remote.provider.gmail
 import android.os.SystemClock
 import android.util.Log
 import com.david.mailapp.core.network.OAuthSessionExpiredException
-import com.david.mailapp.data.remote.provider.BodyFetchResult
 import com.david.mailapp.data.remote.provider.EmailLookupFailureReason
 import com.david.mailapp.data.remote.provider.EmailLookupResult
 import com.david.mailapp.data.remote.provider.EmailProvider
@@ -84,13 +83,7 @@ class GmailProvider(
             attempt++
             Log.d(LOOKUP_TAG, "[LOOKUP] ATTEMPT id=$emailId attempt=$attempt")
             try {
-                val response: HttpResponse = com.david.mailapp.core.perf.MailOpenPerformanceTrace.traceNetworkFull(
-                    emailId
-                ) {
-                    client.get("users/me/messages/$emailId") {
-                        parameter("format", "full")
-                    }
-                }
+                val response: HttpResponse = requestFullMessage(client, emailId)
                 when {
                     response.status == HttpStatusCode.NotFound -> {
                         logLookup(emailId, attempt, t0, "NOT_FOUND")
@@ -172,43 +165,6 @@ class GmailProvider(
         val result = fetchGmailPage(client, query = query, pageToken = pageToken)
         Log.d("SearchDebug", "[GmailProvider] Search returned ${result.items.size} emails, complete=${result.isComplete}")
         return result
-    }
-
-    // ── body fetch ──────────────────────────────────────────────
-
-    override suspend fun fetchBodyWithRefs(emailId: String): BodyFetchResult? {
-        val t0 = perfNow()
-        Log.d(PERF_TAG, "[BODY_FETCH] START emailId=$emailId")
-        return try {
-            val response: MessageResponse = com.david.mailapp.core.perf.MailOpenPerformanceTrace.traceNetworkFull(
-                emailId
-            ) {
-                client.get("users/me/messages/$emailId") {
-                    parameter("format", "full")
-                }.body()
-            }
-            val tHttp = perfNow()
-            Log.d(PERF_TAG, "[BODY_FETCH] HTTP_DONE emailId=$emailId durationMs=${tHttp - t0}")
-
-            val parsed = GmailMimeParser.parse(response)
-
-            Log.d(PERF_TAG, "[BODY_FETCH] EXTRACT_DONE emailId=$emailId totalMs=${perfNow() - t0}")
-            Log.d(PERF_TAG, "[BODY_FETCH] INLINE_REFS_FOUND count=${parsed.inlineReferences.size} emailId=$emailId")
-            Log.d(PERF_TAG, "[BODY_FETCH] PDF_ATTACHMENTS_FOUND count=${parsed.pdfAttachments.size} emailId=$emailId")
-
-            BodyFetchResult(
-                rawBody = parsed.body,
-                contentState = parsed.contentState,
-                bodyKind = parsed.bodyKind,
-                inlineRefs = parsed.inlineReferences,
-                pdfAttachments = parsed.pdfAttachments
-            )
-        } catch (e: kotlinx.coroutines.CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            Log.d(PERF_TAG, "[BODY_FETCH] ERROR emailId=$emailId durationMs=${perfNow() - t0} error=${e.javaClass.simpleName}")
-            null
-        }
     }
 
     override suspend fun downloadInlineImages(

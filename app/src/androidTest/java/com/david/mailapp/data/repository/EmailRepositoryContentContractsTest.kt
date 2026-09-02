@@ -6,7 +6,7 @@ import com.david.mailapp.core.session.SessionWriteGuardImpl
 import com.david.mailapp.data.local.MailDatabase
 import com.david.mailapp.data.local.entity.EmailEntity
 import com.david.mailapp.data.pdf.PdfCacheManager
-import com.david.mailapp.data.remote.provider.BodyFetchResult
+import com.david.mailapp.data.remote.provider.EmailLookupResult
 import com.david.mailapp.domain.model.Email
 import com.david.mailapp.domain.model.EmailFolder
 import com.david.mailapp.domain.model.PdfAttachmentMetadata
@@ -111,21 +111,22 @@ class EmailRepositoryContentContractsTest {
         }
         emissions.awaitValue { it?.id == "e1" && it.body.isEmpty() }
 
-        val result = BodyFetchResult(
-            rawBody = rawHtml,
+        val result = contentEmail(
+            id = "e1",
+            body = rawHtml,
             contentState = com.david.mailapp.domain.model.EmailContentState.READY,
             bodyKind = com.david.mailapp.domain.model.EmailBodyKind.HTML,
-            inlineRefs = listOf(com.david.mailapp.domain.model.EmailInlineReference("cid:img1", "att-img-1", "image/png")),
+            inlineReferences = listOf(com.david.mailapp.domain.model.EmailInlineReference("cid:img1", "att-img-1", "image/png")),
             pdfAttachments = pdfs
         )
-        fakeProvider.fetchBodyResult = result
+        fakeProvider.fetchEmailByIdResult = EmailLookupResult.Found(result)
 
         val returned = repository.fetchAndCacheBody("e1")
 
-        assertSame("Same BodyFetchResult instance must be returned", result, returned)
-        assertEquals(listOf("e1"), fakeProvider.receivedFetchBodyIds)
-        assertEquals(1, fakeProvider.fetchBodyCalls)
-        assertEquals(listOf("gmail.fetchBody", "room.commit"), events)
+        assertSame(result, (returned as EmailContentFetchOutcome.Persisted).remote)
+        assertEquals(listOf("e1"), fakeProvider.receivedFetchEmailByIdIds)
+        assertEquals(1, fakeProvider.fetchEmailByIdCalls)
+        assertEquals(listOf("gmail.fetchEmailById", "room.commit"), events)
 
         // Una sola actualización con todos los campos ya consistentes
         val finalEmission = emissions.awaitNext()!!
@@ -137,7 +138,7 @@ class EmailRepositoryContentContractsTest {
         assertEquals("READY", finalEmission.contentState)
         assertEquals("HTML", finalEmission.bodyKind)
 
-        val refsJson = com.david.mailapp.data.local.converter.InlineContentReferenceCodec.encode(result.inlineRefs)
+        val refsJson = com.david.mailapp.data.local.converter.InlineContentReferenceCodec.encode(result.inlineReferences)
         assertEquals(refsJson, finalEmission.inlineReferencesJson)
         val expectedBytes = rawHtml.toByteArray(Charsets.UTF_8).size.toLong() + expectedClean.toByteArray(Charsets.UTF_8).size.toLong() + refsJson.toByteArray(Charsets.UTF_8).size.toLong()
         assertEquals(expectedBytes, finalEmission.cachedContentBytes)
@@ -177,19 +178,20 @@ class EmailRepositoryContentContractsTest {
         db.emailDao().upsertAll(listOf(storedEmail))
         val beforeStored = get("e2-stored")!!
 
-        fakeProvider.fetchBodyResult = BodyFetchResult(
-            rawBody = null,
+        val remote = contentEmail(
+            id = "e2-stored",
+            body = "",
             contentState = com.david.mailapp.domain.model.EmailContentState.EMPTY,
             bodyKind = com.david.mailapp.domain.model.EmailBodyKind.UNKNOWN,
-            inlineRefs = emptyList(),
             pdfAttachments = pdfs
         )
+        fakeProvider.fetchEmailByIdResult = EmailLookupResult.Found(remote)
 
         val returnedStored = repository.fetchAndCacheBody("e2-stored")
 
-        assertSame(fakeProvider.fetchBodyResult, returnedStored)
-        assertEquals(listOf("e2-stored"), fakeProvider.receivedFetchBodyIds)
-        assertEquals(listOf("gmail.fetchBody", "room.commit"), events)
+        assertSame(remote, (returnedStored as EmailContentFetchOutcome.Persisted).remote)
+        assertEquals(listOf("e2-stored"), fakeProvider.receivedFetchEmailByIdIds)
+        assertEquals(listOf("gmail.fetchEmailById", "room.commit"), events)
 
         // La fila con cuerpo se limpia y gana metadata PDF y el nuevo estado
         val storedAfter = get("e2-stored")!!
@@ -201,7 +203,7 @@ class EmailRepositoryContentContractsTest {
         assertEquals("EMPTY", storedAfter.contentState)
         assertEquals("UNKNOWN", storedAfter.bodyKind)
         assertEquals("[]", storedAfter.inlineReferencesJson)
-        assertEquals(2L, storedAfter.cachedContentBytes) // "[]".toByteArray().size
+        assertEquals(0L, storedAfter.cachedContentBytes)
 
         assertUnrelatedFieldsPreserved(beforeStored, storedAfter)
     }
@@ -235,19 +237,20 @@ class EmailRepositoryContentContractsTest {
         assertEquals(true, before.hasAttachments)
         assertEquals(listOf(oldMeta), before.toDomain().pdfAttachments)
 
-        fakeProvider.fetchBodyResult = BodyFetchResult(
-            rawBody = newHtml,
+        val remote = contentEmail(
+            id = "e3",
+            body = newHtml,
             contentState = com.david.mailapp.domain.model.EmailContentState.READY,
             bodyKind = com.david.mailapp.domain.model.EmailBodyKind.HTML,
-            inlineRefs = emptyList(),
             pdfAttachments = emptyList()
         )
+        fakeProvider.fetchEmailByIdResult = EmailLookupResult.Found(remote)
 
         val returned = repository.fetchAndCacheBody("e3")
 
-        assertSame(fakeProvider.fetchBodyResult, returned)
-        assertEquals(listOf("e3"), fakeProvider.receivedFetchBodyIds)
-        assertEquals(listOf("gmail.fetchBody", "room.commit"), events)
+        assertSame(remote, (returned as EmailContentFetchOutcome.Persisted).remote)
+        assertEquals(listOf("e3"), fakeProvider.receivedFetchEmailByIdIds)
+        assertEquals(listOf("gmail.fetchEmailById", "room.commit"), events)
 
         val after = get("e3")!!
         assertEquals(newHtml, after.body)
@@ -274,7 +277,7 @@ class EmailRepositoryContentContractsTest {
         val returned = repository.fetchAndCacheBody("e4")
 
         assertNull(returned)
-        assertEquals(0, fakeProvider.fetchBodyCalls)
+        assertEquals(0, fakeProvider.fetchEmailByIdCalls)
         assertEquals(0, fakeWriteGuard.commitCalls)
         assertTrue(events.isEmpty())
         assertEquals(before, get("e4")!!)
@@ -326,15 +329,15 @@ class EmailRepositoryContentContractsTest {
             )
         )
         val before = get("e6")!!
-        fakeProvider.fetchBodyResult = null
+        fakeProvider.fetchEmailByIdResult = EmailLookupResult.NotFound
 
         val returned = repository.fetchAndCacheBody("e6")
 
         assertNull(returned)
-        assertEquals(1, fakeProvider.fetchBodyCalls)
-        assertEquals(listOf("e6"), fakeProvider.receivedFetchBodyIds)
+        assertEquals(1, fakeProvider.fetchEmailByIdCalls)
+        assertEquals(listOf("e6"), fakeProvider.receivedFetchEmailByIdIds)
         assertEquals(0, fakeWriteGuard.commitCalls)
-        assertEquals(listOf("gmail.fetchBody"), events)
+        assertEquals(listOf("gmail.fetchEmailById"), events)
         assertEquals(before, get("e6")!!)
     }
 
@@ -349,7 +352,7 @@ class EmailRepositoryContentContractsTest {
         )
         val before = get("e7")!!
         val sentinel = IOException("sentinel remote failure")
-        fakeProvider.fetchBodyError = sentinel
+        fakeProvider.fetchEmailByIdError = sentinel
 
         val thrown = try {
             repository.fetchAndCacheBody("e7")
@@ -359,9 +362,9 @@ class EmailRepositoryContentContractsTest {
         }
 
         assertSame(sentinel, thrown)
-        assertEquals(1, fakeProvider.fetchBodyCalls)
+        assertEquals(1, fakeProvider.fetchEmailByIdCalls)
         assertEquals(0, fakeWriteGuard.commitCalls)
-        assertEquals(listOf("gmail.fetchBody"), events)
+        assertEquals(listOf("gmail.fetchEmailById"), events)
         assertEquals(before, get("e7")!!)
     }
 
@@ -376,7 +379,7 @@ class EmailRepositoryContentContractsTest {
         )
         val before = get("e8")!!
         val sentinel = CancellationException("sentinel remote cancellation")
-        fakeProvider.fetchBodyError = sentinel
+        fakeProvider.fetchEmailByIdError = sentinel
 
         val thrown = try {
             repository.fetchAndCacheBody("e8")
@@ -386,9 +389,9 @@ class EmailRepositoryContentContractsTest {
         }
 
         assertSame(sentinel, thrown)
-        assertEquals(1, fakeProvider.fetchBodyCalls)
+        assertEquals(1, fakeProvider.fetchEmailByIdCalls)
         assertEquals(0, fakeWriteGuard.commitCalls)
-        assertEquals(listOf("gmail.fetchBody"), events)
+        assertEquals(listOf("gmail.fetchEmailById"), events)
         assertEquals(before, get("e8")!!)
     }
 
@@ -406,19 +409,19 @@ class EmailRepositoryContentContractsTest {
         )
 
         val gate = CompletableDeferred<Unit>()
-        fakeProvider.fetchBodyDeferred = gate
-        fakeProvider.fetchBodyStarted = CompletableDeferred()
-        val oldResult = BodyFetchResult(
-            rawBody = "<html><body><p>old session body</p></body></html>",
+        fakeProvider.fetchEmailByIdDeferred = gate
+        fakeProvider.fetchEmailByIdStarted = CompletableDeferred()
+        val oldResult = contentEmail(
+            id = "e9",
+            body = "<html><body><p>old session body</p></body></html>",
             contentState = com.david.mailapp.domain.model.EmailContentState.READY,
             bodyKind = com.david.mailapp.domain.model.EmailBodyKind.HTML,
-            inlineRefs = emptyList(),
             pdfAttachments = listOf(PdfAttachmentMetadata("old.pdf", "application/pdf", "att-old", 100L))
         )
-        fakeProvider.fetchBodyResult = oldResult
+        fakeProvider.fetchEmailByIdResult = EmailLookupResult.Found(oldResult)
 
         val job = async { sessionRepo.fetchAndCacheBody("e9") }
-        fakeProvider.fetchBodyStarted!!.await() // el lease de la generación 1 ya está capturado
+        fakeProvider.fetchEmailByIdStarted!!.await() // el lease de la generación 1 ya está capturado
 
         // La sesión cambia mientras la descarga está pendiente
         realGuard.invalidate()
@@ -437,9 +440,8 @@ class EmailRepositoryContentContractsTest {
         gate.complete(Unit)
         val returned = job.await()
 
-        // Comportamiento heredado: el resultado remoto antiguo se devuelve
-        assertSame(oldResult, returned)
-        assertEquals(listOf("e9"), fakeProvider.receivedFetchBodyIds)
+        assertNull(returned)
+        assertEquals(listOf("e9"), fakeProvider.receivedFetchEmailByIdIds)
 
         // El commit del lease antiguo es rechazado: la fila de la sesión nueva no se contamina
         val after = get("e9")!!
@@ -475,13 +477,13 @@ class EmailRepositoryContentContractsTest {
         val before = get("e10")!!
         val sentinel = IllegalStateException("sentinel commit failure")
         fakeWriteGuard.commitError = sentinel
-        fakeProvider.fetchBodyResult = BodyFetchResult(
-            rawBody = "<html><body><p>new remote body</p></body></html>",
+        fakeProvider.fetchEmailByIdResult = EmailLookupResult.Found(contentEmail(
+            id = "e10",
+            body = "<html><body><p>new remote body</p></body></html>",
             contentState = com.david.mailapp.domain.model.EmailContentState.READY,
             bodyKind = com.david.mailapp.domain.model.EmailBodyKind.HTML,
-            inlineRefs = emptyList(),
             pdfAttachments = emptyList()
-        )
+        ))
 
         val thrown = try {
             repository.fetchAndCacheBody("e10")
@@ -492,7 +494,7 @@ class EmailRepositoryContentContractsTest {
 
         assertSame(sentinel, thrown)
         assertEquals(1, fakeWriteGuard.commitCalls)
-        assertEquals(listOf("gmail.fetchBody", "room.commit"), events)
+        assertEquals(listOf("gmail.fetchEmailById", "room.commit"), events)
         assertEquals(before, get("e10")!!)
     }
 
@@ -664,6 +666,22 @@ class EmailRepositoryContentContractsTest {
     // ═══════════════════════════════════════════════════════════════
     // Helpers
     // ═══════════════════════════════════════════════════════════════
+
+    private fun contentEmail(
+        id: String,
+        body: String,
+        contentState: com.david.mailapp.domain.model.EmailContentState,
+        bodyKind: com.david.mailapp.domain.model.EmailBodyKind,
+        inlineReferences: List<com.david.mailapp.domain.model.EmailInlineReference> = emptyList(),
+        pdfAttachments: List<PdfAttachmentMetadata> = emptyList()
+    ): Email = testEmail(id = id).copy(
+        body = body,
+        pdfAttachments = pdfAttachments,
+        pdfMetadataScanned = true,
+        contentState = contentState,
+        bodyKind = bodyKind,
+        inlineReferences = inlineReferences
+    )
 
     private suspend fun get(id: String) = db.emailDao().getEntitiesByIdsSync(listOf(id)).firstOrNull()
 

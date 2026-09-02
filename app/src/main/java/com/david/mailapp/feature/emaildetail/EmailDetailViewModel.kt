@@ -303,7 +303,7 @@ class EmailDetailViewModel(
                 return
             }
 
-            cachedInlineRefs = fetchedResult.inlineRefs
+            cachedInlineRefs = fetchedResult.inlineReferences
             EmailRenderTrace.d(traceMail, "VM", "VM_REMOTE_SUCCESS", "durationMs=${EmailRenderTrace.now() - startedAt} refs=${cachedInlineRefs?.size ?: 0}")
 
             if (fetchedOutcome is com.david.mailapp.data.repository.EmailContentFetchOutcome.MemoryOnly) {
@@ -314,7 +314,7 @@ class EmailDetailViewModel(
                 val transientEmail = email.copy(
                     body = fetchedOutcome.cleanBody,
                     cleanBody = fetchedOutcome.cleanBody,
-                    inlineReferences = fetchedResult.inlineRefs,
+                    inlineReferences = fetchedResult.inlineReferences,
                     pdfAttachments = fetchedResult.pdfAttachments,
                     pdfMetadataScanned = true,
                     contentState = com.david.mailapp.domain.model.EmailContentState.READY,
@@ -356,7 +356,7 @@ class EmailDetailViewModel(
                     is com.david.mailapp.data.repository.EmailContentFetchOutcome.MemoryOnly -> outcome.remote
                     null -> null
                 }
-                remote?.inlineRefs
+                remote?.inlineReferences
             } ?: emptyList()
             currentCoroutineContext().ensureActive()
 

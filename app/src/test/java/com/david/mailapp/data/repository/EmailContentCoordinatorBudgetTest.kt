@@ -4,7 +4,6 @@ import com.david.mailapp.core.session.SessionWriteGuardImpl
 import com.david.mailapp.data.local.dao.EmailDao
 import com.david.mailapp.data.local.entity.EmailEntity
 import com.david.mailapp.data.local.entity.EmailSummaryProjection
-import com.david.mailapp.data.remote.provider.BodyFetchResult
 import com.david.mailapp.data.remote.provider.EmailProvider
 import com.david.mailapp.domain.model.PaginatedResult
 import com.david.mailapp.data.remote.provider.EmailLookupResult
@@ -97,7 +96,7 @@ class EmailContentCoordinatorBudgetTest {
         }
     }
 
-    private class FakeProvider(val result: BodyFetchResult) : EmailProvider {
+    private class FakeProvider(val result: Email) : EmailProvider {
         override suspend fun fetchInbox(pageToken: String?): PaginatedResult<Email> = throw NotImplementedError()
         override suspend fun fetchTrash(pageToken: String?): PaginatedResult<Email> = throw NotImplementedError()
         override suspend fun search(query: String, pageToken: String?): PaginatedResult<Email> = throw NotImplementedError()
@@ -105,8 +104,7 @@ class EmailContentCoordinatorBudgetTest {
         override suspend fun restoreFromTrash(emailId: String) {}
         override suspend fun deletePermanently(emailId: String) {}
         override suspend fun markAsRead(emailId: String) {}
-        override suspend fun fetchEmailById(emailId: String): EmailLookupResult = throw NotImplementedError()
-        override suspend fun fetchBodyWithRefs(emailId: String): BodyFetchResult = result
+        override suspend fun fetchEmailById(emailId: String): EmailLookupResult = EmailLookupResult.Found(result)
         override suspend fun getUserEmail(): String? = null
         override suspend fun downloadAttachment(emailId: String, attachmentId: String): ByteArray = throw NotImplementedError()
         override suspend fun sendEmail(to: String, cc: String?, bcc: String?, subject: String, body: String, replyContext: ReplyContext?) {}
@@ -116,11 +114,11 @@ class EmailContentCoordinatorBudgetTest {
     @Test
     fun oversizedPayload_returnsMemoryOnly_andClearsDatabaseContent() = runTest {
         val oversizedBody = "a".repeat(53 * 1024 * 1024)
-        val fetchResult = BodyFetchResult(
-            rawBody = oversizedBody,
+        val fetchResult = fullEmail(
+            id = "e1",
+            body = oversizedBody,
             contentState = EmailContentState.READY,
             bodyKind = EmailBodyKind.HTML,
-            inlineRefs = emptyList(),
             pdfAttachments = listOf(PdfAttachmentMetadata("f1.pdf", "application/pdf", "att1", 1024L, "part1"))
         )
         
@@ -135,7 +133,7 @@ class EmailContentCoordinatorBudgetTest {
         
         assertTrue("Outcome should be MemoryOnly due to budget constraint", outcome is EmailContentFetchOutcome.MemoryOnly)
         outcome as EmailContentFetchOutcome.MemoryOnly
-        assertEquals(oversizedBody, outcome.remote.rawBody)
+        assertEquals(oversizedBody, outcome.remote.body)
         assertEquals(oversizedBody, outcome.cleanBody)
         
         val updateArgs = dao.lastUpdateBodyAndPdf!!
@@ -153,11 +151,11 @@ class EmailContentCoordinatorBudgetTest {
     @Test
     fun undersizedPayload_returnsPersisted_andAppliesLru() = runTest {
         val validBody = "a".repeat(10 * 1024 * 1024)
-        val fetchResult = BodyFetchResult(
-            rawBody = validBody,
+        val fetchResult = fullEmail(
+            id = "e2",
+            body = validBody,
             contentState = EmailContentState.READY,
             bodyKind = EmailBodyKind.HTML,
-            inlineRefs = emptyList(),
             pdfAttachments = emptyList()
         )
         
@@ -172,7 +170,7 @@ class EmailContentCoordinatorBudgetTest {
         
         assertTrue("Outcome should be Persisted", outcome is EmailContentFetchOutcome.Persisted)
         outcome as EmailContentFetchOutcome.Persisted
-        assertEquals(validBody, outcome.remote.rawBody)
+        assertEquals(validBody, outcome.remote.body)
         
         val lruArgs = dao.lastApplyLru!!
         assertEquals("e2", lruArgs["emailId"])
@@ -186,4 +184,31 @@ class EmailContentCoordinatorBudgetTest {
         assertEquals(validBody.toByteArray(Charsets.UTF_8).size.toLong() * 2 + 2L, lruArgs["cachedContentBytes"])
         assertEquals(52_428_800L, lruArgs["maxBudgetBytes"])
     }
+
+    private fun fullEmail(
+        id: String,
+        body: String,
+        contentState: EmailContentState,
+        bodyKind: EmailBodyKind,
+        pdfAttachments: List<PdfAttachmentMetadata>
+    ) = Email(
+        id = id,
+        threadId = "thread-$id",
+        from = "sender@example.com",
+        fromInitials = "S",
+        to = "recipient@example.com",
+        subject = "subject",
+        snippet = "snippet",
+        timestamp = 1L,
+        isRead = true,
+        isStarred = false,
+        hasAttachments = pdfAttachments.isNotEmpty(),
+        labels = listOf("INBOX"),
+        folder = com.david.mailapp.domain.model.EmailFolder.Inbox,
+        body = body,
+        pdfAttachments = pdfAttachments,
+        pdfMetadataScanned = true,
+        contentState = contentState,
+        bodyKind = bodyKind
+    )
 }

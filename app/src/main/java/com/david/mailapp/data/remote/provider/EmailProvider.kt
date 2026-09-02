@@ -2,7 +2,6 @@ package com.david.mailapp.data.remote.provider
 
 import com.david.mailapp.domain.model.Email
 import com.david.mailapp.domain.model.PaginatedResult
-import com.david.mailapp.domain.model.PdfAttachmentMetadata
 
 /**
  * Abstraction over email providers (Gmail, Outlook, IMAP, etc.).
@@ -47,13 +46,7 @@ interface EmailProvider {
     suspend fun fetchEmailById(emailId: String): EmailLookupResult
 
     /**
-     * Fetch the full HTML body of a message along with references to any inline images (format=full).
-     * Returns null if the message cannot be fetched or parsed.
-     */
-    suspend fun fetchBodyWithRefs(emailId: String): BodyFetchResult?
-
-    /**
-     * Download inline images given their references from [fetchBodyWithRefs].
+     * Download inline image bytes represented by [Email.inlineReferences].
      * Returns a map of CID -> Base64 Data URI.
      */
     suspend fun downloadInlineImages(emailId: String, refs: List<com.david.mailapp.domain.model.EmailInlineReference>): Map<String, String>
@@ -81,36 +74,6 @@ interface EmailProvider {
         body: String,
         replyContext: ReplyContext? = null
     )
-}
-
-/** Result of fetching the email body, containing both raw body and inline image references. */
-data class BodyFetchResult(
-    val rawBody: String?,
-    val contentState: com.david.mailapp.domain.model.EmailContentState,
-    val bodyKind: com.david.mailapp.domain.model.EmailBodyKind,
-    val inlineRefs: List<com.david.mailapp.domain.model.EmailInlineReference> = emptyList(),
-    val pdfAttachments: List<PdfAttachmentMetadata> = emptyList()
-) {
-    init {
-        when (contentState) {
-            com.david.mailapp.domain.model.EmailContentState.READY -> {
-                require(!rawBody.isNullOrBlank()) { "READY content requires a non-blank body" }
-                require(bodyKind != com.david.mailapp.domain.model.EmailBodyKind.UNKNOWN) {
-                    "READY content requires a known body kind"
-                }
-            }
-            com.david.mailapp.domain.model.EmailContentState.EMPTY -> {
-                require(rawBody.isNullOrBlank()) { "EMPTY content cannot include a body" }
-                require(bodyKind == com.david.mailapp.domain.model.EmailBodyKind.UNKNOWN) {
-                    "EMPTY content must use UNKNOWN body kind"
-                }
-                require(inlineRefs.isEmpty()) { "EMPTY content cannot include inline references" }
-            }
-            com.david.mailapp.domain.model.EmailContentState.NOT_FETCHED -> {
-                require(false) { "BodyFetchResult cannot represent NOT_FETCHED content" }
-            }
-        }
-    }
 }
 
 /**

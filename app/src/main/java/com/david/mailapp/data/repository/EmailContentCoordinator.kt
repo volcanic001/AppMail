@@ -4,7 +4,7 @@ import android.util.Log
 import com.david.mailapp.core.session.SessionWriteGuard
 import com.david.mailapp.data.local.converter.PdfAttachmentMetadataCodec
 import com.david.mailapp.data.local.dao.EmailDao
-import com.david.mailapp.data.remote.provider.BodyFetchResult
+import com.david.mailapp.data.remote.provider.EmailLookupResult
 import com.david.mailapp.data.remote.provider.EmailProvider
 import com.david.mailapp.feature.emaildetail.components.EmailHtmlCleaner
 import kotlinx.coroutines.Dispatchers
@@ -28,14 +28,21 @@ internal class EmailContentCoordinator(
                 Log.d(RepositoryTrace.MAIL_PERF_TAG, "[REPO_BODY] GUARD_INVALIDATED emailId=$emailId")
                 return@traceAsyncSection null
             }
-            val result = providerFactory()?.fetchBodyWithRefs(emailId) ?: run {
+            val provider = providerFactory() ?: run {
                 Log.d(RepositoryTrace.MAIL_PERF_TAG, "[REPO_BODY] NO_PROVIDER_OR_FAILED emailId=$emailId")
                 return@traceAsyncSection null
             }
-            val rawBody = result.rawBody.orEmpty()
-            val tFetch = RepositoryTrace.now()
+            val remote = when (val lookup = provider.fetchEmailById(emailId)) {
+                is EmailLookupResult.Found -> lookup.email
+                EmailLookupResult.NotFound,
+                is EmailLookupResult.Failure -> {
+                    Log.d(RepositoryTrace.MAIL_PERF_TAG, "[REPO_BODY] REMOTE_NOT_FOUND_OR_FAILED emailId=$emailId")
+                    return@traceAsyncSection null
+                }
+            }
+            val rawBody = remote.body
 
-            val cleanBody = if (rawBody.isNotBlank() && result.bodyKind == com.david.mailapp.domain.model.EmailBodyKind.HTML) {
+            val cleanBody = if (rawBody.isNotBlank() && remote.bodyKind == com.david.mailapp.domain.model.EmailBodyKind.HTML) {
                 withContext(Dispatchers.Default) {
                     EmailHtmlCleaner.clean(rawBody)
                 }
@@ -43,11 +50,11 @@ internal class EmailContentCoordinator(
                 rawBody
             } else ""
 
-            val pdfJson = PdfAttachmentMetadataCodec.encode(result.pdfAttachments)
-            val hasAtt = result.pdfAttachments.isNotEmpty()
-            val inlineRefsJson = com.david.mailapp.data.local.converter.InlineContentReferenceCodec.encode(result.inlineRefs)
+            val pdfJson = PdfAttachmentMetadataCodec.encode(remote.pdfAttachments)
+            val hasAtt = remote.pdfAttachments.isNotEmpty()
+            val inlineRefsJson = com.david.mailapp.data.local.converter.InlineContentReferenceCodec.encode(remote.inlineReferences)
             
-            val isRemoteEmpty = result.contentState == com.david.mailapp.domain.model.EmailContentState.EMPTY
+            val isRemoteEmpty = remote.contentState == com.david.mailapp.domain.model.EmailContentState.EMPTY
             val cachedContentBytes = if (isRemoteEmpty) 0L else {
                 rawBody.toByteArray(Charsets.UTF_8).size.toLong() +
                 cleanBody.toByteArray(Charsets.UTF_8).size.toLong() +
@@ -60,7 +67,7 @@ internal class EmailContentCoordinator(
             var commitSuccess = false
             withContext(Dispatchers.IO) {
                 if (isOversized) {
-                    val result = writeGuard.commit(lease) {
+                    val commit = writeGuard.commit(lease) {
                         dao.updateBodyAndPdfMetadata(
                             emailId = emailId,
                             body = "",
@@ -73,23 +80,23 @@ internal class EmailContentCoordinator(
                             cachedContentBytes = 0L
                         )
                     }
-                    commitSuccess = result != null
+                    commitSuccess = commit != null
                 } else {
-                    val result = writeGuard.commit(lease) {
+                    val commit = writeGuard.commit(lease) {
                         dao.applyLruAndSaveContent(
                             emailId = emailId,
                             body = rawBody,
                             cleanBody = cleanBody,
                             pdfAttachmentsJson = pdfJson,
                             hasAttachments = hasAtt,
-                            contentState = result.contentState.name,
-                            bodyKind = result.bodyKind.name,
+                            contentState = remote.contentState.name,
+                            bodyKind = remote.bodyKind.name,
                             inlineReferencesJson = inlineRefsJson,
                             cachedContentBytes = cachedContentBytes,
                             maxBudgetBytes = MAX_BUDGET_BYTES
                         )
                     }
-                    commitSuccess = result != null
+                    commitSuccess = commit != null
                 }
             }
 
@@ -100,9 +107,9 @@ internal class EmailContentCoordinator(
 
             Log.d(RepositoryTrace.MAIL_PERF_TAG, "[REPO_BODY] CACHED emailId=$emailId oversized=$isOversized")
             if (isOversized) {
-                com.david.mailapp.data.repository.EmailContentFetchOutcome.MemoryOnly(result, cleanBody)
+                com.david.mailapp.data.repository.EmailContentFetchOutcome.MemoryOnly(remote, cleanBody)
             } else {
-                com.david.mailapp.data.repository.EmailContentFetchOutcome.Persisted(result)
+                com.david.mailapp.data.repository.EmailContentFetchOutcome.Persisted(remote)
             }
         }
 

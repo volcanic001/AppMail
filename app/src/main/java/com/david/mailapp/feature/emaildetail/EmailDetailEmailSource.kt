@@ -1,7 +1,6 @@
 package com.david.mailapp.feature.emaildetail
 
 import com.david.mailapp.data.pdf.PdfDownloadState
-import com.david.mailapp.data.remote.provider.BodyFetchResult
 import com.david.mailapp.data.repository.EmailActionResult
 import com.david.mailapp.data.repository.EmailResolutionResult
 import com.david.mailapp.domain.model.Email

@@ -1,9 +1,8 @@
 package com.david.mailapp.data.remote.provider.gmail
 
-import com.david.mailapp.data.remote.provider.BodyFetchResult
+import com.david.mailapp.data.remote.provider.EmailLookupResult
 import com.david.mailapp.domain.model.EmailBodyKind
 import com.david.mailapp.domain.model.EmailContentState
-import com.david.mailapp.domain.model.EmailInlineReference
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -15,7 +14,6 @@ import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
-import org.junit.Assert.fail
 import org.junit.Test
 
 class GmailProviderContentTest {
@@ -37,7 +35,7 @@ class GmailProviderContentTest {
     }
 
     @Test
-    fun `fetchBodyWithRefs parses text_html as HTML and READY`() = runTest {
+    fun `fetchEmailById returns HTML content in Found`() = runTest {
         val htmlBase64 = "PGh0bWw-Ym9keTwvaHRtbD4=" // "<html>body</html>" (URL safe)
         val response = """
         {
@@ -56,15 +54,15 @@ class GmailProviderContentTest {
         """.trimIndent()
 
         val provider = createProvider(response)
-        val result = provider.fetchBodyWithRefs("1")
+        val result = provider.fetchEmailById("1") as EmailLookupResult.Found
 
-        assertEquals(EmailContentState.READY, result?.contentState)
-        assertEquals(EmailBodyKind.HTML, result?.bodyKind)
-        assertEquals("<html>body</html>", result?.rawBody)
+        assertEquals(EmailContentState.READY, result.email.contentState)
+        assertEquals(EmailBodyKind.HTML, result.email.bodyKind)
+        assertEquals("<html>body</html>", result.email.body)
     }
 
     @Test
-    fun `fetchBodyWithRefs parses text_plain fallback as PLAIN_TEXT and READY`() = runTest {
+    fun `fetchEmailById returns plain text fallback in Found`() = runTest {
         val plainBase64 = "aGVsbG8gJmJveQ==" // "hello &boy"
         val response = """
         {
@@ -83,15 +81,15 @@ class GmailProviderContentTest {
         """.trimIndent()
 
         val provider = createProvider(response)
-        val result = provider.fetchBodyWithRefs("2")
+        val result = provider.fetchEmailById("2") as EmailLookupResult.Found
 
-        assertEquals(EmailContentState.READY, result?.contentState)
-        assertEquals(EmailBodyKind.PLAIN_TEXT, result?.bodyKind)
-        assertEquals("hello &boy", result?.rawBody)
+        assertEquals(EmailContentState.READY, result.email.contentState)
+        assertEquals(EmailBodyKind.PLAIN_TEXT, result.email.bodyKind)
+        assertEquals("hello &boy", result.email.body)
     }
 
     @Test
-    fun `fetchBodyWithRefs produces EMPTY and UNKNOWN for empty result`() = runTest {
+    fun `fetchEmailById returns EMPTY content in Found`() = runTest {
         val response = """
         {
             "id": "3",
@@ -104,52 +102,10 @@ class GmailProviderContentTest {
         """.trimIndent()
 
         val provider = createProvider(response)
-        val result = provider.fetchBodyWithRefs("3")
+        val result = provider.fetchEmailById("3") as EmailLookupResult.Found
 
-        assertEquals(EmailContentState.EMPTY, result?.contentState)
-        assertEquals(EmailBodyKind.UNKNOWN, result?.bodyKind)
-        assertEquals(true, result?.rawBody.isNullOrBlank())
-    }
-
-    @Test
-    fun `BodyFetchResult rejects inconsistent content contracts`() {
-        assertInvalidResult {
-            BodyFetchResult(
-                rawBody = "<p>body</p>",
-                contentState = EmailContentState.EMPTY,
-                bodyKind = EmailBodyKind.UNKNOWN
-            )
-        }
-        assertInvalidResult {
-            BodyFetchResult(
-                rawBody = "",
-                contentState = EmailContentState.READY,
-                bodyKind = EmailBodyKind.HTML
-            )
-        }
-        assertInvalidResult {
-            BodyFetchResult(
-                rawBody = null,
-                contentState = EmailContentState.EMPTY,
-                bodyKind = EmailBodyKind.UNKNOWN,
-                inlineRefs = listOf(EmailInlineReference("cid", "attachment", "image/png"))
-            )
-        }
-        assertInvalidResult {
-            BodyFetchResult(
-                rawBody = null,
-                contentState = EmailContentState.NOT_FETCHED,
-                bodyKind = EmailBodyKind.UNKNOWN
-            )
-        }
-    }
-
-    private fun assertInvalidResult(block: () -> Unit) {
-        try {
-            block()
-            fail("Expected an invalid content contract to be rejected")
-        } catch (_: IllegalArgumentException) {
-            // Expected.
-        }
+        assertEquals(EmailContentState.EMPTY, result.email.contentState)
+        assertEquals(EmailBodyKind.UNKNOWN, result.email.bodyKind)
+        assertEquals(true, result.email.body.isBlank())
     }
 }
