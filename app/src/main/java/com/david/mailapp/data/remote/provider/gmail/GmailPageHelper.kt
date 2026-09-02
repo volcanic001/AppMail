@@ -12,20 +12,13 @@ import io.ktor.client.statement.HttpResponse
 import io.ktor.http.isSuccess
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.supervisorScope
 import java.io.IOException
 
-/**
- * Fetches a page of Gmail messages with controlled concurrency, retry,
- * and partial-page awareness.
- *
- * The caller provides the HTTP [client], the API path/query parameters via
- * [request], and a backoff strategy (default: one-shot with no delay for tests).
- */
-internal data class PageRequest(
-    val queryParams: Map<String, String?>
-)
+private const val MAX_CONCURRENT_DETAIL_REQUESTS = 6
 
 internal suspend fun fetchGmailPage(
     client: HttpClient,
@@ -34,7 +27,8 @@ internal suspend fun fetchGmailPage(
     pageToken: String? = null,
     maxResults: Int = 20,
     transientRetries: Int = 2,
-    backoffMillis: List<Long> = emptyList()
+    backoffMillis: List<Long> = emptyList(),
+    delayFn: suspend (Long) -> Unit = { kotlinx.coroutines.delay(it) }
 ): PaginatedResult<Email> {
     // 1. List message IDs
     val listResponse: MessageListResponse = client.get("users/me/messages") {
@@ -51,20 +45,21 @@ internal suspend fun fetchGmailPage(
     }
 
     // 2. Fetch details with bounded concurrency + retry
+    val semaphore = Semaphore(MAX_CONCURRENT_DETAIL_REQUESTS)
     val results: List<DetailResult> = supervisorScope {
-        // Process in batches of 6
-        messages.chunked(6).flatMap { batch ->
-            batch.map { header ->
-                async {
-                    fetchWithRetry(
-                        client = client,
-                        messageId = header.id,
-                        maxAttempts = transientRetries + 1, // initial + retries
-                        backoffMillis = backoffMillis
-                    )
-                }
-            }.map { it.await() }
-        }
+        messages.mapIndexed { index, header ->
+            async {
+                val result = fetchWithRetry(
+                    client = client,
+                    messageId = header.id,
+                    maxAttempts = transientRetries + 1, // initial + retries
+                    backoffMillis = backoffMillis,
+                    semaphore = semaphore,
+                    delayFn = delayFn
+                )
+                IndexedResult(index, result)
+            }
+        }.awaitAll().sortedBy { it.index }.map { it.result }
     }
 
     val emails = mutableListOf<Email>()
@@ -90,6 +85,15 @@ internal suspend fun fetchGmailPage(
     )
 }
 
+private data class IndexedResult(val index: Int, val result: DetailResult)
+
+private sealed interface AttemptOutcome {
+    data class Success(val msg: MessageResponse) : AttemptOutcome
+    data class HttpError(val statusCode: Int) : AttemptOutcome
+    object IoError : AttemptOutcome
+    object OtherError : AttemptOutcome
+}
+
 /**
  * Fetch a single message detail with retry for transient failures.
  *
@@ -103,26 +107,66 @@ internal suspend fun fetchWithRetry(
     client: HttpClient,
     messageId: String,
     maxAttempts: Int = 3,
-    backoffMillis: List<Long> = emptyList()
+    backoffMillis: List<Long> = emptyList(),
+    semaphore: Semaphore = Semaphore(1),
+    delayFn: suspend (Long) -> Unit = { kotlinx.coroutines.delay(it) }
 ): DetailResult {
     for (attempt in 0 until maxAttempts) {
-        try {
-            val response: HttpResponse = requestFullMessage(client, messageId)
-            if (response.status.isSuccess()) {
-                val msg: MessageResponse = response.body()
-                return DetailResult(email = msg.toDomainEmail())
+        val attemptResult = try {
+            semaphore.withPermit {
+                val response: HttpResponse = requestFullMessage(client, messageId)
+                if (response.status.isSuccess()) {
+                    val msg: MessageResponse = response.body()
+                    AttemptOutcome.Success(msg)
+                } else {
+                    AttemptOutcome.HttpError(response.status.value)
+                }
             }
-            // Non-success HTTP status
-            val statusCode = response.status.value
-            if (isTransientHttpError(statusCode)) {
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: IOException) {
+            AttemptOutcome.IoError
+        } catch (e: Exception) {
+            AttemptOutcome.OtherError
+        }
+
+        when (attemptResult) {
+            is AttemptOutcome.Success -> {
+                return DetailResult(email = attemptResult.msg.toDomainEmail())
+            }
+            is AttemptOutcome.HttpError -> {
+                if (isTransientHttpError(attemptResult.statusCode)) {
+                    if (attempt < maxAttempts - 1) {
+                        if (backoffMillis.isNotEmpty()) {
+                            val delay = backoffMillis.getOrElse(attempt) { backoffMillis.last() }
+                            delayFn(delay)
+                        }
+                        continue
+                    }
+                    return DetailResult(
+                        failure = PageItemFailure(
+                            itemId = messageId,
+                            kind = PageItemFailureKind.TRANSIENT_EXHAUSTED,
+                            attempts = attempt + 1
+                        )
+                    )
+                }
+                return DetailResult(
+                    failure = PageItemFailure(
+                        itemId = messageId,
+                        kind = PageItemFailureKind.PERMANENT,
+                        attempts = attempt + 1
+                    )
+                )
+            }
+            is AttemptOutcome.IoError -> {
                 if (attempt < maxAttempts - 1) {
                     if (backoffMillis.isNotEmpty()) {
                         val delay = backoffMillis.getOrElse(attempt) { backoffMillis.last() }
-                        kotlinx.coroutines.delay(delay)
+                        delayFn(delay)
                     }
-                    continue // retry transient
+                    continue
                 }
-                // Retries exhausted for transient error
                 return DetailResult(
                     failure = PageItemFailure(
                         itemId = messageId,
@@ -131,43 +175,17 @@ internal suspend fun fetchWithRetry(
                     )
                 )
             }
-            // Permanent HTTP error
-            return DetailResult(
-                failure = PageItemFailure(
-                    itemId = messageId,
-                    kind = PageItemFailureKind.PERMANENT,
-                    attempts = attempt + 1
+            is AttemptOutcome.OtherError -> {
+                return DetailResult(
+                    failure = PageItemFailure(
+                        itemId = messageId,
+                        kind = PageItemFailureKind.PERMANENT,
+                        attempts = attempt + 1
+                    )
                 )
-            )
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: IOException) {
-            if (attempt < maxAttempts - 1) {
-                if (backoffMillis.isNotEmpty()) {
-                    val delay = backoffMillis.getOrElse(attempt) { backoffMillis.last() }
-                    kotlinx.coroutines.delay(delay)
-                }
-                continue // retry
             }
-            return DetailResult(
-                failure = PageItemFailure(
-                    itemId = messageId,
-                    kind = PageItemFailureKind.TRANSIENT_EXHAUSTED,
-                    attempts = attempt + 1
-                )
-            )
-        } catch (e: Exception) {
-            // Non-IO, non-cancellation, non-http: treat as permanent
-            return DetailResult(
-                failure = PageItemFailure(
-                    itemId = messageId,
-                    kind = PageItemFailureKind.PERMANENT,
-                    attempts = attempt + 1
-                )
-            )
         }
     }
-    // Shouldn't reach here, but satisfy the compiler
     return DetailResult(
         failure = PageItemFailure(
             itemId = messageId,
