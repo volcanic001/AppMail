@@ -18,7 +18,7 @@ internal fun MessageResponse.toDomainEmail(): Email {
     val references = headers.headerValue("References")
 
     val labels = labelIds ?: emptyList()
-    val pdfAttachments = payload?.collectPdfAttachments().orEmpty()
+    val pdfAttachments = GmailMimeParser.parse(this).pdfAttachments
 
     return Email(
         id = id,

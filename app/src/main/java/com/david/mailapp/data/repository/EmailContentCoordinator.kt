@@ -35,10 +35,12 @@ internal class EmailContentCoordinator(
             val rawBody = result.rawBody.orEmpty()
             val tFetch = RepositoryTrace.now()
 
-            val cleanBody = if (rawBody.isNotBlank()) {
+            val cleanBody = if (rawBody.isNotBlank() && result.bodyKind == com.david.mailapp.domain.model.EmailBodyKind.HTML) {
                 withContext(Dispatchers.Default) {
                     EmailHtmlCleaner.clean(rawBody)
                 }
+            } else if (rawBody.isNotBlank()) {
+                rawBody
             } else ""
 
             val pdfJson = PdfAttachmentMetadataCodec.encode(result.pdfAttachments)

@@ -168,7 +168,7 @@ class GmailProvider(
     }
 
     override suspend fun search(query: String, pageToken: String?): PaginatedResult<Email> {
-        Log.d("SearchDebug", "[GmailProvider] Search with q='$query', pageToken=$pageToken")
+        Log.d("SearchDebug", "[GmailProvider] Search pageToken=$pageToken")
         val result = fetchGmailPage(client, query = query, pageToken = pageToken)
         Log.d("SearchDebug", "[GmailProvider] Search returned ${result.items.size} emails, complete=${result.isComplete}")
         return result
@@ -177,7 +177,6 @@ class GmailProvider(
     // ── body fetch ──────────────────────────────────────────────
 
     override suspend fun fetchBodyWithRefs(emailId: String): BodyFetchResult? {
-        // DEBUG_PERF
         val t0 = perfNow()
         Log.d(PERF_TAG, "[BODY_FETCH] START emailId=$emailId")
         return try {
@@ -191,41 +190,23 @@ class GmailProvider(
             val tHttp = perfNow()
             Log.d(PERF_TAG, "[BODY_FETCH] HTTP_DONE emailId=$emailId durationMs=${tHttp - t0}")
 
-            val payload = response.payload ?: run {
-                Log.d(PERF_TAG, "[BODY_FETCH] NO_PAYLOAD emailId=$emailId")
-                return null
-            }
+            val parsed = GmailMimeParser.parse(response)
 
-            val tExtract0 = perfNow()
-            val extracted = extractBodyAndKind(payload)
-            val rawBody = extracted?.first
-            val bodyKind = extracted?.second ?: com.david.mailapp.domain.model.EmailBodyKind.UNKNOWN
-            val tExtract1 = perfNow()
-            Log.d(PERF_TAG, "[BODY_FETCH] EXTRACT_DONE emailId=$emailId extractMs=${tExtract1 - tExtract0} bodyLen=${rawBody?.length ?: 0} totalMs=${tExtract1 - t0}")
+            Log.d(PERF_TAG, "[BODY_FETCH] EXTRACT_DONE emailId=$emailId totalMs=${perfNow() - t0}")
+            Log.d(PERF_TAG, "[BODY_FETCH] INLINE_REFS_FOUND count=${parsed.inlineReferences.size} emailId=$emailId")
+            Log.d(PERF_TAG, "[BODY_FETCH] PDF_ATTACHMENTS_FOUND count=${parsed.pdfAttachments.size} emailId=$emailId")
 
-            val contentState = if (rawBody.isNullOrBlank()) com.david.mailapp.domain.model.EmailContentState.EMPTY else com.david.mailapp.domain.model.EmailContentState.READY
-            val inlineRefs = if (contentState == com.david.mailapp.domain.model.EmailContentState.READY) {
-                payload.collectInlineImages().map {
-                    com.david.mailapp.domain.model.EmailInlineReference(
-                        contentId = it.contentId,
-                        attachmentId = it.attachmentId,
-                        mimeType = it.mimeType
-                    )
-                }
-            } else {
-                emptyList()
-            }
-            Log.d(PERF_TAG, "[BODY_FETCH] INLINE_REFS_FOUND count=${inlineRefs.size} emailId=$emailId")
-
-            val pdfAttachments = payload.collectPdfAttachments()
-            Log.d(PERF_TAG, "[BODY_FETCH] PDF_ATTACHMENTS_FOUND count=${pdfAttachments.size} emailId=$emailId")
-
-            BodyFetchResult(rawBody = rawBody, contentState = contentState, bodyKind = bodyKind, inlineRefs = inlineRefs, pdfAttachments = pdfAttachments)
-        } catch (e: CancellationException) {
+            BodyFetchResult(
+                rawBody = parsed.body,
+                contentState = parsed.contentState,
+                bodyKind = parsed.bodyKind,
+                inlineRefs = parsed.inlineReferences,
+                pdfAttachments = parsed.pdfAttachments
+            )
+        } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
-            println("GMAIL ERROR: ${e.message}")
-            Log.d(PERF_TAG, "[BODY_FETCH] ERROR emailId=$emailId durationMs=${perfNow() - t0} error=${e.javaClass.simpleName}: ${e.message}")
+            Log.d(PERF_TAG, "[BODY_FETCH] ERROR emailId=$emailId durationMs=${perfNow() - t0} error=${e.javaClass.simpleName}")
             null
         }
     }
@@ -256,7 +237,7 @@ class GmailProvider(
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {
-                        Log.d(PERF_TAG, "[INLINE_DOWNLOAD] IMG_ERROR idx=$idx cid=${ref.contentId} error=${e.javaClass.simpleName}: ${e.message}")
+                        Log.d(PERF_TAG, "[INLINE_DOWNLOAD] IMG_ERROR idx=$idx cid=${ref.contentId} error=${e.javaClass.simpleName}")
                         null
                     }
                 }
@@ -300,72 +281,6 @@ class GmailProvider(
      * - Prefers mimeType == "text/html"; falls back to text/plain.
      * - Decodes Gmail's URL-safe base64 data to UTF-8.
      */
-    private fun extractBodyAndKind(payload: Payload): Pair<String, com.david.mailapp.domain.model.EmailBodyKind>? {
-        // DEBUG_PERF
-        Log.d(PERF_TAG, "[EXTRACT_BODY] START")
-        // First, prefer text/html anywhere in the tree
-        val htmlPart = findPartByMimeType(payload, "text/html")
-        if (htmlPart != null) {
-            val rawData = htmlPart.body?.data
-            Log.d(PERF_TAG, "[EXTRACT_BODY] HTML_PART_FOUND rawDataLen=${rawData?.length ?: 0}")
-            val t0 = perfNow()
-            val decoded = rawData?.let { decodeBase64Url(it) }
-            Log.d(PERF_TAG, "[EXTRACT_BODY] HTML_DECODED decodedLen=${decoded?.length ?: 0} decodeMs=${perfNow() - t0}")
-            if (!decoded.isNullOrBlank()) {
-                return decoded to com.david.mailapp.domain.model.EmailBodyKind.HTML
-            }
-        } else {
-            Log.d(PERF_TAG, "[EXTRACT_BODY] NO_HTML_PART fallback=text/plain")
-        }
-
-        // Fallback to text/plain if no valid text/html part exists
-        val plainPart = findPartByMimeType(payload, "text/plain")
-        if (plainPart != null) {
-            val rawData = plainPart.body?.data
-            Log.d(PERF_TAG, "[EXTRACT_BODY] PLAIN_PART_FOUND rawDataLen=${rawData?.length ?: 0}")
-            val t0 = perfNow()
-            val decoded = rawData?.let { decodeBase64Url(it) }
-            Log.d(PERF_TAG, "[EXTRACT_BODY] PLAIN_DECODED decodedLen=${decoded?.length ?: 0} decodeMs=${perfNow() - t0}")
-            if (!decoded.isNullOrBlank()) {
-                val escaped = decoded
-                    .replace("&", "&amp;")
-                    .replace("<", "&lt;")
-                    .replace(">", "&gt;")
-                return "<pre style=\"white-space: pre-wrap; font-family: inherit; margin: 0;\">$escaped</pre>" to com.david.mailapp.domain.model.EmailBodyKind.PLAIN_TEXT
-            }
-        } else {
-            Log.d(PERF_TAG, "[EXTRACT_BODY] NO_PLAIN_PART result=null")
-        }
-
-        return null
-    }
-
-    private fun findPartByMimeType(payload: Payload, targetMimeType: String): Payload? {
-        val bodyData = payload.body
-        if (bodyData != null && bodyData.attachmentId == null && payload.filename.isNullOrEmpty()) {
-            if (payload.mimeType?.equals(targetMimeType, ignoreCase = true) == true) {
-                if (!bodyData.data.isNullOrBlank()) {
-                    return payload
-                }
-            }
-        }
-        payload.parts?.forEach { part ->
-            val found = findPartByMimeType(part, targetMimeType)
-            if (found != null) return found
-        }
-        return null
-    }
-
-    private fun decodeBase64Url(data: String): String {
-        // DEBUG_PERF
-        val t0 = perfNow()
-        val clean = data.filter { !it.isWhitespace() }
-        val bytes = java.util.Base64.getUrlDecoder().decode(clean)
-        val result = String(bytes, Charsets.UTF_8)
-        Log.d(PERF_TAG, "[DECODE_B64URL] inputLen=${data.length} cleanLen=${clean.length} outputLen=${result.length} durationMs=${perfNow() - t0}")
-        return result
-    }
-
     // ── actions ─────────────────────────────────────────────────
 
     override suspend fun moveToTrash(emailId: String) {

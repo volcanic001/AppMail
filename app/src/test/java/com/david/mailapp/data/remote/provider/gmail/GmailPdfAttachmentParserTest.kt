@@ -60,7 +60,7 @@ class GmailPdfAttachmentParserTest {
     fun `detects a valid PDF at root level`() {
         val payload = pdfPart(filename = "report.pdf", attachmentId = "att_1")
 
-        val result = payload.collectPdfAttachments()
+        val result = com.david.mailapp.data.remote.provider.gmail.GmailMimeParser.parse(com.david.mailapp.data.remote.provider.gmail.MessageResponse(id = "1", threadId = "1", payload = payload)).pdfAttachments
 
         assertEquals(1, result.size)
         with(result[0]) {
@@ -78,12 +78,12 @@ class GmailPdfAttachmentParserTest {
             filename = "report.pdf",
             attachmentId = "temporary_token_1",
             partId = "mime_part_2"
-        ).collectPdfAttachments().single()
+        ).let { com.david.mailapp.data.remote.provider.gmail.GmailMimeParser.parse(com.david.mailapp.data.remote.provider.gmail.MessageResponse(id = "1", threadId = "1", payload = it)).pdfAttachments }.single()
         val refreshed = pdfPart(
             filename = "report.pdf",
             attachmentId = "temporary_token_2",
             partId = "mime_part_2"
-        ).collectPdfAttachments().single()
+        ).let { com.david.mailapp.data.remote.provider.gmail.GmailMimeParser.parse(com.david.mailapp.data.remote.provider.gmail.MessageResponse(id = "1", threadId = "1", payload = it)).pdfAttachments }.single()
 
         assertEquals("mime_part_2", first.stableId)
         assertEquals(first.stableId, refreshed.stableId)
@@ -110,7 +110,7 @@ class GmailPdfAttachmentParserTest {
             filename = null
         )
 
-        val result = payload.collectPdfAttachments()
+        val result = com.david.mailapp.data.remote.provider.gmail.GmailMimeParser.parse(com.david.mailapp.data.remote.provider.gmail.MessageResponse(id = "1", threadId = "1", payload = payload)).pdfAttachments
 
         assertEquals(2, result.size)
         assertEquals("top.pdf", result[0].fileName)
@@ -122,7 +122,7 @@ class GmailPdfAttachmentParserTest {
     @Test
     fun `accepts uppercase PDF extension`() {
         val payload = pdfPart(filename = "document.PDF", attachmentId = "att_pdf")
-        val result = payload.collectPdfAttachments()
+        val result = com.david.mailapp.data.remote.provider.gmail.GmailMimeParser.parse(com.david.mailapp.data.remote.provider.gmail.MessageResponse(id = "1", threadId = "1", payload = payload)).pdfAttachments
         assertEquals(1, result.size)
         assertEquals("document.PDF", result[0].fileName)
     }
@@ -144,7 +144,7 @@ class GmailPdfAttachmentParserTest {
             filename = null
         )
 
-        val result = payload.collectPdfAttachments()
+        val result = com.david.mailapp.data.remote.provider.gmail.GmailMimeParser.parse(com.david.mailapp.data.remote.provider.gmail.MessageResponse(id = "1", threadId = "1", payload = payload)).pdfAttachments
 
         assertEquals(1, result.size)
         assertEquals("doc.pdf", result[0].fileName)
@@ -175,9 +175,9 @@ class GmailPdfAttachmentParserTest {
             attachmentId = "att_text"
         )
 
-        assertEquals(0, wrongCase.collectPdfAttachments().size)
-        assertEquals(0, octet.collectPdfAttachments().size)
-        assertEquals(0, text.collectPdfAttachments().size)
+        assertEquals(0, wrongCase.let { com.david.mailapp.data.remote.provider.gmail.GmailMimeParser.parse(com.david.mailapp.data.remote.provider.gmail.MessageResponse(id = "1", threadId = "1", payload = it)).pdfAttachments }.size)
+        assertEquals(0, octet.let { com.david.mailapp.data.remote.provider.gmail.GmailMimeParser.parse(com.david.mailapp.data.remote.provider.gmail.MessageResponse(id = "1", threadId = "1", payload = it)).pdfAttachments }.size)
+        assertEquals(0, text.let { com.david.mailapp.data.remote.provider.gmail.GmailMimeParser.parse(com.david.mailapp.data.remote.provider.gmail.MessageResponse(id = "1", threadId = "1", payload = it)).pdfAttachments }.size)
     }
 
     // ── Test 6: Rechaza nombres inválidos ────────────────────────
@@ -188,9 +188,9 @@ class GmailPdfAttachmentParserTest {
         val emptyName = pdfPart(filename = "", attachmentId = "att_empty")
         val noExt = pdfPart(filename = "readme", attachmentId = "att_noext")
 
-        assertTrue(txtFile.collectPdfAttachments().isEmpty())
-        assertTrue(emptyName.collectPdfAttachments().isEmpty())
-        assertTrue(noExt.collectPdfAttachments().isEmpty())
+        assertTrue(txtFile.let { com.david.mailapp.data.remote.provider.gmail.GmailMimeParser.parse(com.david.mailapp.data.remote.provider.gmail.MessageResponse(id = "1", threadId = "1", payload = it)).pdfAttachments }.isEmpty())
+        assertTrue(emptyName.let { com.david.mailapp.data.remote.provider.gmail.GmailMimeParser.parse(com.david.mailapp.data.remote.provider.gmail.MessageResponse(id = "1", threadId = "1", payload = it)).pdfAttachments }.isEmpty())
+        assertTrue(noExt.let { com.david.mailapp.data.remote.provider.gmail.GmailMimeParser.parse(com.david.mailapp.data.remote.provider.gmail.MessageResponse(id = "1", threadId = "1", payload = it)).pdfAttachments }.isEmpty())
     }
 
     // ── Test 7: Rechaza attachmentId inválido ────────────────────
@@ -209,10 +209,10 @@ class GmailPdfAttachmentParserTest {
         // Also test the copy constructor for body — validAtt should be detected
         val validAtt = pdfPart(filename = "f.pdf", attachmentId = "valid")
 
-        assertTrue(nullAtt.collectPdfAttachments().isEmpty())
-        assertTrue(emptyAtt.collectPdfAttachments().isEmpty())
-        assertTrue(blankAtt.collectPdfAttachments().isEmpty())
-        assertEquals(1, validAtt.collectPdfAttachments().size)
+        assertTrue(nullAtt.let { com.david.mailapp.data.remote.provider.gmail.GmailMimeParser.parse(com.david.mailapp.data.remote.provider.gmail.MessageResponse(id = "1", threadId = "1", payload = it)).pdfAttachments }.isEmpty())
+        assertTrue(emptyAtt.let { com.david.mailapp.data.remote.provider.gmail.GmailMimeParser.parse(com.david.mailapp.data.remote.provider.gmail.MessageResponse(id = "1", threadId = "1", payload = it)).pdfAttachments }.isEmpty())
+        assertTrue(blankAtt.let { com.david.mailapp.data.remote.provider.gmail.GmailMimeParser.parse(com.david.mailapp.data.remote.provider.gmail.MessageResponse(id = "1", threadId = "1", payload = it)).pdfAttachments }.isEmpty())
+        assertEquals(1, validAtt.let { com.david.mailapp.data.remote.provider.gmail.GmailMimeParser.parse(com.david.mailapp.data.remote.provider.gmail.MessageResponse(id = "1", threadId = "1", payload = it)).pdfAttachments }.size)
     }
 
     // ── Test 8: Rechaza Content-Disposition: inline ──────────────
@@ -235,9 +235,9 @@ class GmailPdfAttachmentParserTest {
             headers = listOf(header("Content-Disposition", "attachment"))
         )
 
-        assertTrue(inlineDisposition.collectPdfAttachments().isEmpty())
-        assertTrue(inlineWithParams.collectPdfAttachments().isEmpty())
-        assertEquals(1, attachmentOk.collectPdfAttachments().size)
+        assertTrue(inlineDisposition.let { com.david.mailapp.data.remote.provider.gmail.GmailMimeParser.parse(com.david.mailapp.data.remote.provider.gmail.MessageResponse(id = "1", threadId = "1", payload = it)).pdfAttachments }.isEmpty())
+        assertTrue(inlineWithParams.let { com.david.mailapp.data.remote.provider.gmail.GmailMimeParser.parse(com.david.mailapp.data.remote.provider.gmail.MessageResponse(id = "1", threadId = "1", payload = it)).pdfAttachments }.isEmpty())
+        assertEquals(1, attachmentOk.let { com.david.mailapp.data.remote.provider.gmail.GmailMimeParser.parse(com.david.mailapp.data.remote.provider.gmail.MessageResponse(id = "1", threadId = "1", payload = it)).pdfAttachments }.size)
     }
 
     // ── Test 9: Rechaza parte con Content-ID solo sin disposition ────
@@ -275,10 +275,10 @@ class GmailPdfAttachmentParserTest {
             attachmentId = "att_nocid"
         )
 
-        assertTrue("inline part with CID must be rejected", inlineCid.collectPdfAttachments().isEmpty())
-        assertEquals("attachment with CID must be accepted", 1, attachmentWithCid.collectPdfAttachments().size)
-        assertEquals("empty CID is accepted", 1, emptyCid.collectPdfAttachments().size)
-        assertEquals("no CID is accepted", 1, noCid.collectPdfAttachments().size)
+        assertTrue("inline part with CID must be rejected", inlineCid.let { com.david.mailapp.data.remote.provider.gmail.GmailMimeParser.parse(com.david.mailapp.data.remote.provider.gmail.MessageResponse(id = "1", threadId = "1", payload = it)).pdfAttachments }.isEmpty())
+        assertEquals("attachment with CID must be accepted", 1, attachmentWithCid.let { com.david.mailapp.data.remote.provider.gmail.GmailMimeParser.parse(com.david.mailapp.data.remote.provider.gmail.MessageResponse(id = "1", threadId = "1", payload = it)).pdfAttachments }.size)
+        assertEquals("empty CID is accepted", 1, emptyCid.let { com.david.mailapp.data.remote.provider.gmail.GmailMimeParser.parse(com.david.mailapp.data.remote.provider.gmail.MessageResponse(id = "1", threadId = "1", payload = it)).pdfAttachments }.size)
+        assertEquals("no CID is accepted", 1, noCid.let { com.david.mailapp.data.remote.provider.gmail.GmailMimeParser.parse(com.david.mailapp.data.remote.provider.gmail.MessageResponse(id = "1", threadId = "1", payload = it)).pdfAttachments }.size)
     }
 
     // ── Test 10: Deduplica por attachmentId ──────────────────────
@@ -296,7 +296,7 @@ class GmailPdfAttachmentParserTest {
             filename = null
         )
 
-        val result = payload.collectPdfAttachments()
+        val result = com.david.mailapp.data.remote.provider.gmail.GmailMimeParser.parse(com.david.mailapp.data.remote.provider.gmail.MessageResponse(id = "1", threadId = "1", payload = payload)).pdfAttachments
 
         assertEquals(1, result.size)
         assertEquals("first.pdf", result[0].fileName)
@@ -318,7 +318,7 @@ class GmailPdfAttachmentParserTest {
             filename = "nosize.pdf"
         )
 
-        val result = payload.collectPdfAttachments()
+        val result = com.david.mailapp.data.remote.provider.gmail.GmailMimeParser.parse(com.david.mailapp.data.remote.provider.gmail.MessageResponse(id = "1", threadId = "1", payload = payload)).pdfAttachments
 
         assertEquals(1, result.size)
         assertEquals("nosize.pdf", result[0].fileName)
@@ -354,7 +354,7 @@ class GmailPdfAttachmentParserTest {
             filename = null
         )
 
-        assertTrue(payload.collectPdfAttachments().isEmpty())
+        assertTrue(com.david.mailapp.data.remote.provider.gmail.GmailMimeParser.parse(com.david.mailapp.data.remote.provider.gmail.MessageResponse(id = "1", threadId = "1", payload = payload)).pdfAttachments.isEmpty())
     }
 
     // ── Mixed-case header reuse ────────────────────────────────
@@ -369,7 +369,7 @@ class GmailPdfAttachmentParserTest {
                 header("content-type", "Application/Pdf")
             )
         )
-        val result = payload.collectPdfAttachments()
+        val result = com.david.mailapp.data.remote.provider.gmail.GmailMimeParser.parse(com.david.mailapp.data.remote.provider.gmail.MessageResponse(id = "1", threadId = "1", payload = payload)).pdfAttachments
         assertEquals(1, result.size)
         assertEquals("doc.pdf", result[0].fileName)
         assertEquals("att_mc", result[0].attachmentId)
@@ -389,6 +389,6 @@ class GmailPdfAttachmentParserTest {
                 )
             )
         )
-        assertTrue(payload.collectPdfAttachments().isEmpty())
+        assertTrue(com.david.mailapp.data.remote.provider.gmail.GmailMimeParser.parse(com.david.mailapp.data.remote.provider.gmail.MessageResponse(id = "1", threadId = "1", payload = payload)).pdfAttachments.isEmpty())
     }
 }

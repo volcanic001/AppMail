@@ -87,7 +87,7 @@ class GmailProviderContentTest {
 
         assertEquals(EmailContentState.READY, result?.contentState)
         assertEquals(EmailBodyKind.PLAIN_TEXT, result?.bodyKind)
-        assertEquals("<pre style=\"white-space: pre-wrap; font-family: inherit; margin: 0;\">hello &amp;boy</pre>", result?.rawBody)
+        assertEquals("hello &boy", result?.rawBody)
     }
 
     @Test
