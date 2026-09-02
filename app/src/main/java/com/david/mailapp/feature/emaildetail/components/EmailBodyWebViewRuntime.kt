@@ -18,6 +18,29 @@ internal class EmailBodyWebViewRuntimeState {
     val webViewRef: MutableState<WeakReference<WebView>?> = mutableStateOf(null)
     val released: MutableState<Boolean> = mutableStateOf(false)
     val initialVisualReady: MutableState<Boolean> = mutableStateOf(false)
+    val instanceGeneration: MutableIntState = mutableIntStateOf(0)
+    val rendererReloadAttempts: MutableIntState = mutableIntStateOf(0)
+    val rendererFailure: MutableState<RendererFailure?> = mutableStateOf(null)
+    val recoveryInProgress: MutableState<Boolean> = mutableStateOf(false)
+}
+
+internal data class RendererFailure(
+    val didCrash: Boolean,
+    val canRetry: Boolean
+)
+
+internal fun EmailBodyWebViewRuntimeState.retryRenderer() {
+    if (rendererFailure.value?.canRetry != true) return
+    rendererReloadAttempts.intValue++
+    rendererFailure.value = null
+    recoveryInProgress.value = true
+    released.value = false
+    lastLoaded.value = null
+    activeLoadKey.value = null
+    loggedSkippedKey.value = null
+    loggedWaitingState.value = null
+    initialVisualReady.value = false
+    instanceGeneration.intValue++
 }
 
 @Composable

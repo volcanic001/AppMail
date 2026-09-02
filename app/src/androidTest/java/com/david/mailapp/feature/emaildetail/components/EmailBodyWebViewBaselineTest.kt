@@ -1,5 +1,6 @@
 package com.david.mailapp.feature.emaildetail.components
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Rect
@@ -31,6 +32,10 @@ import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewFeature
 import com.david.mailapp.ui.theme.ColorPalette
 import com.david.mailapp.ui.theme.MailAppTheme
+import com.david.mailapp.core.webview.WebViewStartupGate
+import com.david.mailapp.core.webview.WebViewStartupState
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import org.hamcrest.Matcher
 import org.hamcrest.Matchers
 import org.junit.Assert.assertEquals
@@ -907,11 +912,21 @@ class EmailBodyWebViewBaselineTest {
                             if (stableFixtureId != null) renderedIds.add(stableFixtureId)
                         },
                         onImageLongPress = { url -> imageUrls?.add(url) },
+                        startupGate = ReadyWebViewStartupGate,
                         modifier = Modifier
                     )
                 }
             }
         }
+    }
+
+    private object ReadyWebViewStartupGate : WebViewStartupGate {
+        override val state: StateFlow<WebViewStartupState> =
+            MutableStateFlow(WebViewStartupState.Ready)
+
+        override fun start(context: Context) = Unit
+
+        override fun retry(context: Context) = Unit
     }
 
     private fun waitForTrace(

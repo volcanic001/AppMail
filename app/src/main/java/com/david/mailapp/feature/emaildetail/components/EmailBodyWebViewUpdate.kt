@@ -1,6 +1,7 @@
 package com.david.mailapp.feature.emaildetail.components
 
 import android.content.Context
+import android.view.ViewGroup
 import android.webkit.WebView
 import com.david.mailapp.feature.emaildetail.EmailRenderTrace
 import java.lang.ref.WeakReference
@@ -15,7 +16,8 @@ internal fun updateEmailBodyWebView(
     isDark: Boolean,
     runtimeState: EmailBodyWebViewRuntimeState,
     traceMail: String,
-    onPageRendered: (() -> Unit)?
+    onPageRendered: (() -> Unit)?,
+    onRendererGone: (Boolean) -> Unit
 ) {
     if (document == null) {
         val waitingState = if (currentKey == null) {
@@ -65,70 +67,30 @@ internal fun updateEmailBodyWebView(
 
         webView.webChromeClient = TraceWebChromeClient(traceMail, document.key)
         webView.webViewClient = CustomTabsWebViewClient(
-            context,
-            traceMail,
-            document.key
-        ) {
-            if (!runtimeState.released.value && runtimeState.activeLoadKey.value == document.key) {
-                EmailRenderTrace.d(
-                    traceMail,
-                    "WV",
-                    "WV_SCROLL_RESTORE_POSTED",
-                    "loadKey=${document.key} scrollY=${runtimeState.savedScrollY.intValue}"
+            ctx = context,
+            traceMail = traceMail,
+            loadKey = document.key,
+            onPageReady = {
+                dispatchPageReady(
+                    webView = webView,
+                    document = document,
+                    showImages = showImages,
+                    isProgressiveReload = isProgressiveReload,
+                    runtimeState = runtimeState,
+                    traceMail = traceMail,
+                    onPageRendered = onPageRendered
                 )
-                webView.post {
-                    if (runtimeState.released.value || runtimeState.activeLoadKey.value != document.key) {
-                        EmailRenderTrace.d(
-                            traceMail,
-                            "WV",
-                            "WV_PAGE_RENDERED_IGNORED",
-                            "loadKey=${document.key} reason=stale_after_post"
-                        )
-                        return@post
-                    }
-                    webView.scrollTo(0, runtimeState.savedScrollY.intValue)
-                    webView.invalidate()
-                    if (isProgressiveReload) {
-                        EmailRenderTrace.d(
-                            traceMail,
-                            "WV",
-                            "WV_PROGRESSIVE_SCROLL_RESTORE",
-                            "loadKey=${document.key} scrollY=${runtimeState.savedScrollY.intValue}"
-                        )
-                    } else {
-                        EmailRenderTrace.d(
-                            traceMail,
-                            "WV",
-                            "WV_SCROLL_RESTORE_APPLIED",
-                            "loadKey=${document.key} scrollY=${runtimeState.savedScrollY.intValue}"
-                        )
-                    }
-
-                    if (!runtimeState.initialVisualReady.value) {
-                        runtimeState.initialVisualReady.value = true
-                        if (showImages) {
-                            webView.settings.loadsImagesAutomatically = true
-                        }
-                    }
-
-                    EmailRenderTrace.d(
-                        traceMail,
-                        "WV",
-                        "WV_PAGE_RENDERED_DISPATCH",
-                        "loadKey=${document.key}"
-                    )
-                    onPageRendered?.invoke()
-                }
-            } else {
-                EmailRenderTrace.d(
-                    traceMail,
-                    "WV",
-                    "WV_PAGE_RENDERED_IGNORED",
-                    "loadKey=${document.key} activeLoadKey=${runtimeState.activeLoadKey.value} " +
-                        "released=${runtimeState.released.value} reason=stale_or_released"
+            },
+            onRendererGone = { failedWebView, didCrash ->
+                handleRenderProcessGone(
+                    webView = failedWebView,
+                    runtimeState = runtimeState,
+                    traceMail = traceMail,
+                    didCrash = didCrash
                 )
+                onRendererGone(didCrash)
             }
-        }
+        )
         EmailRenderTrace.d(
             traceMail,
             "WV",
@@ -157,11 +119,80 @@ internal fun updateEmailBodyWebView(
     }
 }
 
+private fun dispatchPageReady(
+    webView: WebView,
+    document: PreparedDocument,
+    showImages: Boolean,
+    isProgressiveReload: Boolean,
+    runtimeState: EmailBodyWebViewRuntimeState,
+    traceMail: String,
+    onPageRendered: (() -> Unit)?
+) {
+    if (runtimeState.released.value || runtimeState.activeLoadKey.value != document.key) {
+        EmailRenderTrace.d(
+            traceMail,
+            "WV",
+            "WV_PAGE_RENDERED_IGNORED",
+            "loadKey=${document.key} activeLoadKey=${runtimeState.activeLoadKey.value} " +
+                "released=${runtimeState.released.value} reason=stale_or_released"
+        )
+        return
+    }
+
+    com.david.mailapp.core.perf.MailOpenPerformanceTrace.endSection(
+        com.david.mailapp.core.perf.MailOpenPerformanceTrace.SECTION_WEBVIEW_VISUAL,
+        traceMail
+    )
+    EmailRenderTrace.d(
+        traceMail,
+        "WV",
+        "WV_SCROLL_RESTORE_POSTED",
+        "loadKey=${document.key} scrollY=${runtimeState.savedScrollY.intValue}"
+    )
+    webView.post {
+        if (runtimeState.released.value || runtimeState.activeLoadKey.value != document.key) {
+            EmailRenderTrace.d(
+                traceMail,
+                "WV",
+                "WV_PAGE_RENDERED_IGNORED",
+                "loadKey=${document.key} reason=stale_after_post"
+            )
+            return@post
+        }
+        webView.scrollTo(0, runtimeState.savedScrollY.intValue)
+        webView.invalidate()
+        EmailRenderTrace.d(
+            traceMail,
+            "WV",
+            if (isProgressiveReload) "WV_PROGRESSIVE_SCROLL_RESTORE" else "WV_SCROLL_RESTORE_APPLIED",
+            "loadKey=${document.key} scrollY=${runtimeState.savedScrollY.intValue}"
+        )
+
+        if (!runtimeState.initialVisualReady.value) {
+            runtimeState.initialVisualReady.value = true
+            if (showImages) webView.settings.loadsImagesAutomatically = true
+        }
+
+        EmailRenderTrace.d(
+            traceMail,
+            "WV",
+            "WV_PAGE_RENDERED_DISPATCH",
+            "loadKey=${document.key}"
+        )
+        runtimeState.recoveryInProgress.value = false
+        onPageRendered?.invoke()
+    }
+}
+
 internal fun releaseEmailBodyWebView(
     webView: WebView,
     runtimeState: EmailBodyWebViewRuntimeState,
     traceMail: String
 ) {
+    if (runtimeState.webViewRef.value?.get() !== webView || runtimeState.released.value) {
+        EmailRenderTrace.d(traceMail, "WV", "WV_RELEASE_SKIPPED", "reason=already_released")
+        return
+    }
     EmailRenderTrace.d(
         traceMail,
         "WV",
@@ -172,6 +203,37 @@ internal fun releaseEmailBodyWebView(
     runtimeState.released.value = true
     runtimeState.activeLoadKey.value = null
     runtimeState.webViewRef.value = null
+    (webView.parent as? ViewGroup)?.removeView(webView)
     webView.stopLoading()
+    webView.clearHistory()
+    webView.destroy()
+}
+
+internal fun handleRenderProcessGone(
+    webView: WebView,
+    runtimeState: EmailBodyWebViewRuntimeState,
+    traceMail: String,
+    didCrash: Boolean
+) {
+    if (runtimeState.webViewRef.value?.get() !== webView || runtimeState.released.value) return
+    com.david.mailapp.core.perf.MailOpenPerformanceTrace.endSection(
+        com.david.mailapp.core.perf.MailOpenPerformanceTrace.SECTION_WEBVIEW_VISUAL,
+        traceMail
+    )
+    if (!runtimeState.initialVisualReady.value) {
+        com.david.mailapp.core.perf.MailOpenPerformanceTrace.onError(
+            traceMail,
+            "renderer_gone_before_visual"
+        )
+    }
+    runtimeState.released.value = true
+    runtimeState.activeLoadKey.value = null
+    runtimeState.webViewRef.value = null
+    runtimeState.recoveryInProgress.value = false
+    runtimeState.rendererFailure.value = RendererFailure(
+        didCrash = didCrash,
+        canRetry = runtimeState.rendererReloadAttempts.intValue == 0
+    )
+    (webView.parent as? ViewGroup)?.removeView(webView)
     webView.destroy()
 }

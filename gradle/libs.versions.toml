@@ -92,7 +92,7 @@ kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 browser = { group = "androidx.browser", name = "browser", version = "1.8.0" }
 
 # WebKit (algorithmic darkening for WebView)
-androidx-webkit = { group = "androidx.webkit", name = "webkit", version = "1.11.0" }
+androidx-webkit = { group = "androidx.webkit", name = "webkit", version = "1.16.0" }
 
 # AndroidX Core (FileProvider, Kotlin extensions)
 core-ktx = { group = "androidx.core", name = "core-ktx", version = "1.15.0" }

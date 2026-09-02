@@ -75,8 +75,13 @@ internal fun EmailDetailContent(
         "${email.id}_${email.bodyKind}_${email.cleanBody.hashCode()}"
     }
     var isBaseContentRendered by remember(baseContentKey) { mutableStateOf(false) }
+    var isWebViewUnavailable by remember(baseContentKey) { mutableStateOf(false) }
 
-    val showLoader = body == null || (email.bodyKind != EmailBodyKind.PLAIN_TEXT && !isBaseContentRendered)
+    val showLoader = body == null || (
+        email.bodyKind != EmailBodyKind.PLAIN_TEXT &&
+            !isBaseContentRendered &&
+            !isWebViewUnavailable
+        )
     val lastBodyLayout = remember { mutableStateOf<String?>(null) }
 
     DisposableEffect(traceMail, email.id) {
@@ -108,7 +113,7 @@ internal fun EmailDetailContent(
             if (showLoader) "UI_LOADER_SHOWN" else "UI_LOADER_HIDDEN",
             "reason=$reason baseContentKey=$baseContentKey"
         )
-        if (!showLoader) {
+        if (!showLoader && !isWebViewUnavailable) {
             com.david.mailapp.core.perf.MailOpenPerformanceTrace.onVisualReady(traceMail)
         }
         withFrameNanos { frameTimeNanos ->
@@ -182,6 +187,7 @@ internal fun EmailDetailContent(
                         isDark = isDark,
                         traceMail = traceMail,
                         onPageRendered = {
+                            isWebViewUnavailable = false
                             if (!isBaseContentRendered) {
                                 isBaseContentRendered = true
                                 EmailRenderTrace.d(
@@ -204,6 +210,13 @@ internal fun EmailDetailContent(
                                     "baseContentKey=$baseContentKey bodyKey=$bodyKey"
                                 )
                             }
+                        },
+                        onRenderUnavailable = { reason ->
+                            isWebViewUnavailable = true
+                            com.david.mailapp.core.perf.MailOpenPerformanceTrace.onError(
+                                traceMail,
+                                reason
+                            )
                         },
                         onImageLongPress = onImageLongPress,
                         modifier = Modifier

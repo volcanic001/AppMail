@@ -26,6 +26,7 @@ import com.david.mailapp.core.localization.UiText
 import com.david.mailapp.core.localization.resolve
 import com.david.mailapp.core.localization.toUiText
 import com.david.mailapp.feature.auth.LoginScreen
+import com.david.mailapp.core.webview.WebViewStartupAfterFirstSessionFrame
 import com.david.mailapp.feature.auth.toUiTextOrNull
 import com.david.mailapp.ui.navigation.MainScreen
 import com.david.mailapp.ui.theme.ColorPalette
@@ -117,6 +118,7 @@ class MainActivity : ComponentActivity() {
 
             MailAppTheme(darkTheme = isDark, palette = palette, useCustomFont = useCustomFont, isAmoled = isAmoled) {
                 if (isSignedIn) {
+                    WebViewStartupAfterFirstSessionFrame()
                     MainScreen(
                         currentPalette = palette,
                         isDarkMode = isDark,

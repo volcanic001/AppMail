@@ -258,6 +258,9 @@
     <string name="detail_body_pdfs_only">Este correo contiene PDF adjuntos pero no se pudo cargar el contenido del mensaje</string>
     <string name="detail_body_empty">Este correo no contiene un mensaje visible</string>
     <string name="detail_body_empty_with_pdfs">Este correo no contiene un mensaje visible. Revisa los PDF adjuntos.</string>
+    <string name="detail_webview_render_error">No se pudo mostrar el contenido HTML.</string>
+    <string name="detail_webview_repeated_error">El contenido HTML cerró el visor nuevamente.</string>
+    <string name="action_reload">Recargar</string>
     <string name="detail_subject_missing">(Sin asunto)</string>
 
     <!-- Imágenes -->

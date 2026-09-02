@@ -2,24 +2,21 @@ package com.david.mailapp.feature.emaildetail.components
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.net.Uri
-import android.util.Log
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import androidx.browser.customtabs.CustomTabsIntent
+import android.webkit.RenderProcessGoneDetail
 import com.david.mailapp.feature.emaildetail.EmailRenderTrace
 
 internal class CustomTabsWebViewClient(
     private val ctx: Context,
     private val traceMail: String,
     private val loadKey: String,
-    private val onPageReady: () -> Unit
+    private val onPageReady: () -> Unit,
+    private val onRendererGone: (WebView, Boolean) -> Unit
 ) : WebViewClient() {
-    companion object {
-        private const val TAG = "CustomTabsWebViewClient"
-    }
+    private var visualStateRequested = false
 
     override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
         super.onPageStarted(view, url, favicon)
@@ -29,13 +26,10 @@ internal class CustomTabsWebViewClient(
     override fun onPageCommitVisible(view: WebView?, url: String?) {
         super.onPageCommitVisible(view, url)
         EmailRenderTrace.d(traceMail, "WV", "WV_COMMIT_VISIBLE", "loadKey=$loadKey")
-    }
-
-    override fun onPageFinished(view: WebView?, url: String?) {
-        super.onPageFinished(view, url)
-        EmailRenderTrace.d(traceMail, "WV", "WV_PAGE_FINISHED", "loadKey=$loadKey")
-        EmailRenderTrace.d(traceMail, "WV", "WV_VISUAL_REQUESTED", "loadKey=$loadKey")
-        view?.postVisualStateCallback(
+        if (view == null || visualStateRequested) return
+        visualStateRequested = true
+        EmailRenderTrace.d(traceMail, "WV", "WV_VISUAL_REQUESTED", "loadKey=$loadKey source=commit_visible")
+        view.postVisualStateCallback(
             0L,
             object : WebView.VisualStateCallback() {
                 override fun onComplete(requestId: Long) {
@@ -45,14 +39,26 @@ internal class CustomTabsWebViewClient(
                         "WV_VISUAL_CALLBACK",
                         "loadKey=$loadKey requestId=$requestId"
                     )
-                    com.david.mailapp.core.perf.MailOpenPerformanceTrace.endSection(
-                        com.david.mailapp.core.perf.MailOpenPerformanceTrace.SECTION_WEBVIEW_VISUAL,
-                        traceMail
-                    )
                     onPageReady()
                 }
             }
         )
+    }
+
+    override fun onPageFinished(view: WebView?, url: String?) {
+        super.onPageFinished(view, url)
+        EmailRenderTrace.d(traceMail, "WV", "WV_PAGE_FINISHED", "loadKey=$loadKey")
+    }
+
+    override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
+        EmailRenderTrace.d(
+            traceMail,
+            "WV",
+            if (detail.didCrash()) "RENDERER_CRASHED" else "RENDERER_KILLED",
+            "loadKey=$loadKey priority=${detail.rendererPriorityAtExit()}"
+        )
+        onRendererGone(view, detail.didCrash())
+        return true
     }
 
     override fun shouldOverrideUrlLoading(
