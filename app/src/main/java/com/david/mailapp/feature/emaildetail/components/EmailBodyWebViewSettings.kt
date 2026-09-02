@@ -4,7 +4,11 @@ import android.webkit.WebSettings
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewFeature
 
-internal fun WebSettings.applyHardening(showImages: Boolean, isDark: Boolean) {
+internal fun WebSettings.applyHardening(
+    showImages: Boolean,
+    isDark: Boolean,
+    loadsImagesAutomatically: Boolean = false
+) {
     javaScriptEnabled = false
     domStorageEnabled = false
     allowFileAccess = false
@@ -15,6 +19,7 @@ internal fun WebSettings.applyHardening(showImages: Boolean, isDark: Boolean) {
     cacheMode = WebSettings.LOAD_NO_CACHE
     blockNetworkImage = !showImages
     blockNetworkLoads = !showImages
+    this.loadsImagesAutomatically = showImages && loadsImagesAutomatically
 
     // Configuración de zoom y viewport para que los correos (especialmente newsletters con tablas)
     // se adapten al ancho de la pantalla móvil en lugar de verse gigantes o hacer zoom por defecto.

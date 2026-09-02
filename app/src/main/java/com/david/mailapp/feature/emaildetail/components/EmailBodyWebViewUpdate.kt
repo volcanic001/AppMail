@@ -33,6 +33,18 @@ internal fun updateEmailBodyWebView(
             )
         }
     } else if (runtimeState.lastLoaded.value != document.key) {
+        val isProgressiveReload = runtimeState.lastLoaded.value != null
+        if (isProgressiveReload) {
+            val capturedScrollY = webView.scrollY
+            runtimeState.savedScrollY.intValue = capturedScrollY
+            EmailRenderTrace.d(
+                traceMail,
+                "WV",
+                "WV_PROGRESSIVE_SCROLL_CAPTURE",
+                "loadKey=${document.key} scrollY=$capturedScrollY"
+            )
+        }
+
         EmailRenderTrace.d(
             traceMail,
             "WV",
@@ -47,7 +59,10 @@ internal fun updateEmailBodyWebView(
         runtimeState.released.value = false
         runtimeState.webViewRef.value = WeakReference(webView)
         webView.setBackgroundColor(surfaceArgb)
-        webView.settings.applyHardening(showImages, isDark)
+
+        val enableAutoImages = runtimeState.initialVisualReady.value && showImages
+        webView.settings.applyHardening(showImages, isDark, loadsImagesAutomatically = enableAutoImages)
+
         webView.webChromeClient = TraceWebChromeClient(traceMail, document.key)
         webView.webViewClient = CustomTabsWebViewClient(
             context,
@@ -73,12 +88,29 @@ internal fun updateEmailBodyWebView(
                     }
                     webView.scrollTo(0, runtimeState.savedScrollY.intValue)
                     webView.invalidate()
-                    EmailRenderTrace.d(
-                        traceMail,
-                        "WV",
-                        "WV_SCROLL_RESTORE_APPLIED",
-                        "loadKey=${document.key} scrollY=${runtimeState.savedScrollY.intValue}"
-                    )
+                    if (isProgressiveReload) {
+                        EmailRenderTrace.d(
+                            traceMail,
+                            "WV",
+                            "WV_PROGRESSIVE_SCROLL_RESTORE",
+                            "loadKey=${document.key} scrollY=${runtimeState.savedScrollY.intValue}"
+                        )
+                    } else {
+                        EmailRenderTrace.d(
+                            traceMail,
+                            "WV",
+                            "WV_SCROLL_RESTORE_APPLIED",
+                            "loadKey=${document.key} scrollY=${runtimeState.savedScrollY.intValue}"
+                        )
+                    }
+
+                    if (!runtimeState.initialVisualReady.value) {
+                        runtimeState.initialVisualReady.value = true
+                        if (showImages) {
+                            webView.settings.loadsImagesAutomatically = true
+                        }
+                    }
+
                     EmailRenderTrace.d(
                         traceMail,
                         "WV",

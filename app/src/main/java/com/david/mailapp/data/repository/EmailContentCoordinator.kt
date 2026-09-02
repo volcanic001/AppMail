@@ -48,9 +48,10 @@ internal class EmailContentCoordinator(
         refs: List<com.david.mailapp.domain.model.EmailInlineReference>
     ): Map<String, String> {
         if (refs.isEmpty()) return emptyMap()
+        val deduplicatedRefs = refs.distinctBy { it.attachmentId to it.contentId }
         val startedAt = RepositoryTrace.now()
-        Log.d(RepositoryTrace.MAIL_PERF_TAG, "[REPO_INLINE] START emailId=$emailId count=${refs.size}")
-        val result = providerFactory()?.downloadInlineImages(emailId, refs) ?: emptyMap()
+        Log.d(RepositoryTrace.MAIL_PERF_TAG, "[REPO_INLINE] START emailId=$emailId count=${deduplicatedRefs.size}")
+        val result = providerFactory()?.downloadInlineImages(emailId, deduplicatedRefs) ?: emptyMap()
         Log.d(RepositoryTrace.MAIL_PERF_TAG, "[REPO_INLINE] DONE emailId=$emailId count=${result.size} totalMs=${RepositoryTrace.now() - startedAt}")
         return result
     }
@@ -60,9 +61,9 @@ internal class EmailContentCoordinator(
         var result = html
         for ((cid, dataUri) in inlineImages) {
             result = result
-                .replace("cid:$cid", dataUri)
-                .replace("cid:&lt;$cid&gt;", dataUri)
-                .replace("cid:<$cid>", dataUri)
+                .replace("cid:&lt;$cid&gt;", dataUri, ignoreCase = true)
+                .replace("cid:<$cid>", dataUri, ignoreCase = true)
+                .replace("cid:$cid", dataUri, ignoreCase = true)
         }
         return result
     }

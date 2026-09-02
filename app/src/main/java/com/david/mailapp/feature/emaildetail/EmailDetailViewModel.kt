@@ -268,58 +268,56 @@ class EmailDetailViewModel(
             return
         }
 
-        val needsInlineImages = displayBody.contains("cid:", ignoreCase = true) &&
+        val needsInlineImages = email.bodyKind == EmailBodyKind.HTML &&
+            displayBody.contains("cid:", ignoreCase = true) &&
             email.inlineReferences.isNotEmpty()
-        if (needsInlineImages && cachedInlineImages == null) {
-            if (!delivered) {
-                delivered = true
-                EmailRenderTrace.d(
-                    traceMail,
-                    "VM",
-                    "VM_STATE_READY",
-                    "source=persisted_refs_pending_inline bodyLen=${displayBody.length} " +
-                        "bodyKey=${EmailRenderTrace.bodyKey(displayBody)}"
-                )
-                _uiState.value = EmailDetailUiState.Ready(
-                    email.copy(body = displayBody),
-                    inlineImagesLoading = true
-                )
-            }
-            if (!isFetchingInlineImages) {
-                isFetchingInlineImages = true
-                viewModelScope.launch {
-                    resolveInlineImages(
-                        emailId,
-                        email.copy(body = displayBody),
-                        email.inlineReferences
-                    )
+
+        if (cachedInlineImages != null) {
+            val inlineImages = cachedInlineImages ?: emptyMap()
+            val injectedBody = if (inlineImages.isNotEmpty()) {
+                withContext(workerDispatcher) {
+                    source.injectInlineImages(displayBody, inlineImages)
                 }
+            } else {
+                displayBody
             }
+            val finalEmail = email.copy(body = injectedBody)
+            delivered = true
+            EmailRenderTrace.d(
+                traceMail,
+                "VM",
+                "VM_STATE_READY",
+                "source=ready_cached_inline bodyLen=${finalEmail.body.length} " +
+                    "bodyKey=${EmailRenderTrace.bodyKey(finalEmail.body)}"
+            )
+            _uiState.value = EmailDetailUiState.Ready(finalEmail, inlineImagesLoading = false)
             return
         }
 
-        if (delivered && !isFetchingInlineImages) {
-            EmailRenderTrace.d(traceMail, "VM", "VM_IGNORED_EMISSION", "reason=delivered")
-            return
-        }
-        val inlineImages = cachedInlineImages ?: emptyMap()
-        val injectedBody = if (inlineImages.isNotEmpty()) {
-            withContext(Dispatchers.Default) {
-                source.injectInlineImages(displayBody, inlineImages)
-            }
-        } else {
-            displayBody
-        }
-        val finalEmail = email.copy(body = injectedBody)
+        // Deliver initial textual Ready immediately (even with pending CID images)
         delivered = true
         EmailRenderTrace.d(
             traceMail,
             "VM",
             "VM_STATE_READY",
-            "source=ready_final bodyLen=${finalEmail.body.length} " +
-                "bodyKey=${EmailRenderTrace.bodyKey(finalEmail.body)}"
+            "source=ready_initial bodyLen=${displayBody.length} " +
+                "bodyKey=${EmailRenderTrace.bodyKey(displayBody)} inlineLoading=$needsInlineImages"
         )
-        _uiState.value = EmailDetailUiState.Ready(finalEmail, inlineImagesLoading = false)
+        _uiState.value = EmailDetailUiState.Ready(
+            email.copy(body = displayBody),
+            inlineImagesLoading = needsInlineImages
+        )
+
+        if (needsInlineImages && !isFetchingInlineImages) {
+            isFetchingInlineImages = true
+            viewModelScope.launch {
+                resolveInlineImages(
+                    emailId,
+                    email.copy(body = displayBody),
+                    email.inlineReferences
+                )
+            }
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -402,34 +400,43 @@ class EmailDetailViewModel(
         refs: List<com.david.mailapp.domain.model.EmailInlineReference>
     ) {
         val startedAt = EmailRenderTrace.now()
-        EmailRenderTrace.d(traceMail, "VM", "VM_INLINE_START",
-            "bodyLen=${email.body.length} bodyKey=${EmailRenderTrace.bodyKey(email.body)}")
+        val deduplicatedRefs = refs.distinctBy { it.attachmentId to it.contentId }
+        EmailRenderTrace.d(traceMail, "VM", "INLINE_PROGRESSIVE_START",
+            "refs=${deduplicatedRefs.size} bodyLen=${email.body.length}")
         try {
-            val images = if (refs.isNotEmpty()) {
-                withContext(workerDispatcher) { source.downloadInlineImages(emailId, refs) }
+            val images = if (deduplicatedRefs.isNotEmpty()) {
+                withContext(workerDispatcher) { source.downloadInlineImages(emailId, deduplicatedRefs) }
             } else emptyMap()
             currentCoroutineContext().ensureActive()
 
             val injectedBody = if (images.isNotEmpty()) {
-                withContext(Dispatchers.Default) { source.injectInlineImages(email.body, images) }
+                withContext(workerDispatcher) { source.injectInlineImages(email.body, images) }
             } else email.body
             currentCoroutineContext().ensureActive()
 
             cachedInlineImages = images
             val injectedEmail = email.copy(body = injectedBody)
-            EmailRenderTrace.d(traceMail, "VM", "VM_INLINE_SUCCESS",
-                "count=${images.size} finalLen=${injectedBody.length} " +
-                    "finalKey=${EmailRenderTrace.bodyKey(injectedBody)} " +
-                    "durationMs=${EmailRenderTrace.now() - startedAt}")
+
+            if (images.size == deduplicatedRefs.size && images.isNotEmpty()) {
+                EmailRenderTrace.d(traceMail, "VM", "INLINE_PROGRESSIVE_COMPLETE",
+                    "count=${images.size} durationMs=${EmailRenderTrace.now() - startedAt}")
+            } else if (images.isNotEmpty()) {
+                EmailRenderTrace.d(traceMail, "VM", "INLINE_PROGRESSIVE_PARTIAL",
+                    "resolved=${images.size} total=${deduplicatedRefs.size} durationMs=${EmailRenderTrace.now() - startedAt}")
+            } else {
+                EmailRenderTrace.d(traceMail, "VM", "INLINE_PROGRESSIVE_FAILURE",
+                    "reason=empty_or_failed durationMs=${EmailRenderTrace.now() - startedAt}")
+            }
+
             EmailRenderTrace.d(traceMail, "VM", "VM_STATE_READY",
-                "source=inline_success bodyLen=${injectedBody.length} " +
+                "source=inline_injected bodyLen=${injectedBody.length} " +
                     "bodyKey=${EmailRenderTrace.bodyKey(injectedBody)}")
             _uiState.value = EmailDetailUiState.Ready(injectedEmail, inlineImagesLoading = false)
         } catch (e: CancellationException) {
             throw e
         } catch (error: Exception) {
             cachedInlineImages = emptyMap()
-            EmailRenderTrace.d(traceMail, "VM", "VM_INLINE_FAILURE",
+            EmailRenderTrace.d(traceMail, "VM", "INLINE_PROGRESSIVE_FAILURE",
                 "reason=${error.javaClass.simpleName} durationMs=${EmailRenderTrace.now() - startedAt}")
             EmailRenderTrace.d(traceMail, "VM", "VM_STATE_READY",
                 "source=inline_fallback bodyLen=${email.body.length} " +
@@ -437,8 +444,6 @@ class EmailDetailViewModel(
             _uiState.value = EmailDetailUiState.Ready(email, inlineImagesLoading = false)
         } finally {
             isFetchingInlineImages = false
-            EmailRenderTrace.d(traceMail, "VM", "VM_INLINE_END",
-                "durationMs=${EmailRenderTrace.now() - startedAt}")
         }
     }
 

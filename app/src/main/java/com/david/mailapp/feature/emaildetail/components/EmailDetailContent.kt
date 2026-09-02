@@ -71,9 +71,12 @@ internal fun EmailDetailContent(
             "${colorScheme.surface.hashCode()}_${colorScheme.onSurface.hashCode()}_" +
             colorScheme.primary.hashCode()
     }
-    var isBodyRendered by remember(bodyKey) { mutableStateOf(false) }
+    val baseContentKey = remember(email.id, email.bodyKind, email.cleanBody) {
+        "${email.id}_${email.bodyKind}_${email.cleanBody.hashCode()}"
+    }
+    var isBaseContentRendered by remember(baseContentKey) { mutableStateOf(false) }
 
-    val showLoader = body == null || (email.bodyKind != EmailBodyKind.PLAIN_TEXT && !isBodyRendered)
+    val showLoader = body == null || (email.bodyKind != EmailBodyKind.PLAIN_TEXT && !isBaseContentRendered)
     val lastBodyLayout = remember { mutableStateOf<String?>(null) }
 
     DisposableEffect(traceMail, email.id) {
@@ -90,21 +93,20 @@ internal fun EmailDetailContent(
             "UI_BODY_INPUT",
             "present=${body != null} bodyLen=${body?.length ?: 0} bodyKey=$bodyKey"
         )
-        EmailRenderTrace.d(traceMail, "UI", "UI_RENDER_STATE_RESET", "bodyKey=$bodyKey")
     }
 
-    LaunchedEffect(showLoader, bodyKey) {
+    LaunchedEffect(showLoader, baseContentKey) {
         val reason = when {
             body == null -> "body_missing"
             email.bodyKind == EmailBodyKind.PLAIN_TEXT -> "plain_text_native"
-            !isBodyRendered -> "awaiting_visual_callback"
+            !isBaseContentRendered -> "awaiting_visual_callback"
             else -> "rendered"
         }
         EmailRenderTrace.d(
             traceMail,
             "UI",
             if (showLoader) "UI_LOADER_SHOWN" else "UI_LOADER_HIDDEN",
-            "reason=$reason bodyKey=$bodyKey"
+            "reason=$reason baseContentKey=$baseContentKey"
         )
         if (!showLoader) {
             com.david.mailapp.core.perf.MailOpenPerformanceTrace.onVisualReady(traceMail)
@@ -114,7 +116,7 @@ internal fun EmailDetailContent(
                 traceMail,
                 "UI",
                 "UI_FRAME",
-                "loaderVisible=$showLoader bodyKey=$bodyKey frameNanos=$frameTimeNanos"
+                "loaderVisible=$showLoader baseContentKey=$baseContentKey frameNanos=$frameTimeNanos"
             )
         }
     }
@@ -180,13 +182,28 @@ internal fun EmailDetailContent(
                         isDark = isDark,
                         traceMail = traceMail,
                         onPageRendered = {
-                            EmailRenderTrace.d(
-                                traceMail,
-                                "UI",
-                                "UI_RENDER_CALLBACK",
-                                "bodyKey=$bodyKey wasRendered=$isBodyRendered"
-                            )
-                            isBodyRendered = true
+                            if (!isBaseContentRendered) {
+                                isBaseContentRendered = true
+                                EmailRenderTrace.d(
+                                    traceMail,
+                                    "UI",
+                                    "UI_INITIAL_TEXT_VISIBLE",
+                                    "baseContentKey=$baseContentKey"
+                                )
+                                EmailRenderTrace.d(
+                                    traceMail,
+                                    "UI",
+                                    "UI_RENDER_CALLBACK",
+                                    "bodyKey=$bodyKey wasRendered=false"
+                                )
+                            } else {
+                                EmailRenderTrace.d(
+                                    traceMail,
+                                    "UI",
+                                    "UI_PROGRESSIVE_RELOAD",
+                                    "baseContentKey=$baseContentKey bodyKey=$bodyKey"
+                                )
+                            }
                         },
                         onImageLongPress = onImageLongPress,
                         modifier = Modifier

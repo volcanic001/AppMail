@@ -17,6 +17,7 @@ internal class EmailBodyWebViewRuntimeState {
     val savedScrollY: MutableIntState = mutableIntStateOf(0)
     val webViewRef: MutableState<WeakReference<WebView>?> = mutableStateOf(null)
     val released: MutableState<Boolean> = mutableStateOf(false)
+    val initialVisualReady: MutableState<Boolean> = mutableStateOf(false)
 }
 
 @Composable
