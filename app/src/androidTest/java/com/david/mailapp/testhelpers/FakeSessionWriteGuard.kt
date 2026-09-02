@@ -12,6 +12,7 @@ class FakeSessionWriteGuard : SessionWriteGuard {
     var commitReturnsNullByCall: List<Boolean> = emptyList()
     var commitCalls: Int = 0
     var commitError: Exception? = null
+    var commitErrorsByCall: Map<Int, Exception> = emptyMap()
     var eventLog: MutableList<String>? = null
 
     private var active = true
@@ -24,6 +25,7 @@ class FakeSessionWriteGuard : SessionWriteGuard {
     override suspend fun <T> commit(lease: SessionWriteLease, block: suspend () -> T): T? {
         eventLog?.add("room.commit")
         val callIndex = commitCalls++
+        commitErrorsByCall[callIndex]?.let { throw it }
         commitError?.let { throw it }
         val returnsNull = commitReturnsNullByCall.getOrNull(callIndex) ?: commitReturnsNull
         if (returnsNull) return null

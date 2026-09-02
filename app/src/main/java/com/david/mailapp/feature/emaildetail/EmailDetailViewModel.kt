@@ -270,24 +270,28 @@ class EmailDetailViewModel(
         EmailRenderTrace.d(traceMail, "VM", "VM_REMOTE_START")
         try {
             val fetchedOutcome = withContext(workerDispatcher) {
-                source.fetchAndCacheBody(emailId)
+                source.recoverContentById(emailId)
             }
             currentCoroutineContext().ensureActive()
-            
-            if (fetchedOutcome == null) {
+
+            if (fetchedOutcome is com.david.mailapp.data.repository.EmailContentRecoveryResult.NotFound) {
                 if (!delivered) {
                     delivered = true
-                    EmailRenderTrace.d(traceMail, "VM", "VM_REMOTE_FAILURE", "reason=null_result durationMs=${EmailRenderTrace.now() - startedAt}")
-                    _uiState.value = EmailDetailUiState.BodyError(email, UiErrorReason.EMAIL_BODY_LOAD_FAILED, retryable = true)
+                    _uiState.value = EmailDetailUiState.BodyError(email, UiErrorReason.EMAIL_NOT_FOUND, retryable = false)
                 }
                 return
             }
-            
-            val fetchedResult = when (fetchedOutcome) {
-                is com.david.mailapp.data.repository.EmailContentFetchOutcome.Persisted -> fetchedOutcome.remote
-                is com.david.mailapp.data.repository.EmailContentFetchOutcome.MemoryOnly -> fetchedOutcome.remote
+            if (fetchedOutcome is com.david.mailapp.data.repository.EmailContentRecoveryResult.Failure) {
+                if (!delivered) {
+                    delivered = true
+                    val (reason, retryable) = mapResolutionFailure(fetchedOutcome.reason)
+                    _uiState.value = EmailDetailUiState.BodyError(email, reason, retryable)
+                }
+                return
             }
-            
+            fetchedOutcome as com.david.mailapp.data.repository.EmailContentRecoveryResult.Found
+            val fetchedResult = fetchedOutcome.email
+
             val isRemoteEmpty = fetchedResult.contentState == com.david.mailapp.domain.model.EmailContentState.EMPTY
             if (isRemoteEmpty) {
                 if (!delivered) {
@@ -306,14 +310,14 @@ class EmailDetailViewModel(
             cachedInlineRefs = fetchedResult.inlineReferences
             EmailRenderTrace.d(traceMail, "VM", "VM_REMOTE_SUCCESS", "durationMs=${EmailRenderTrace.now() - startedAt} refs=${cachedInlineRefs?.size ?: 0}")
 
-            if (fetchedOutcome is com.david.mailapp.data.repository.EmailContentFetchOutcome.MemoryOnly) {
-                EmailRenderTrace.d(traceMail, "VM", "VM_MEMORY_ONLY", "bodyLen=${fetchedOutcome.cleanBody.length}")
+            if (fetchedOutcome.storage == com.david.mailapp.data.repository.EmailContentStorage.MEMORY_ONLY) {
+                EmailRenderTrace.d(traceMail, "VM", "VM_MEMORY_ONLY", "bodyLen=${fetchedResult.cleanBody.length}")
                 if (!hasRecordedAccess) {
                     hasRecordedAccess = true
                 }
                 val transientEmail = email.copy(
-                    body = fetchedOutcome.cleanBody,
-                    cleanBody = fetchedOutcome.cleanBody,
+                    body = fetchedResult.cleanBody,
+                    cleanBody = fetchedResult.cleanBody,
                     inlineReferences = fetchedResult.inlineReferences,
                     pdfAttachments = fetchedResult.pdfAttachments,
                     pdfMetadataScanned = true,
@@ -350,13 +354,10 @@ class EmailDetailViewModel(
             "bodyLen=${email.body.length} bodyKey=${EmailRenderTrace.bodyKey(email.body)}")
         try {
             val refs = cachedInlineRefs ?: withContext(workerDispatcher) {
-                val outcome = source.fetchAndCacheBody(emailId)
-                val remote = when (outcome) {
-                    is com.david.mailapp.data.repository.EmailContentFetchOutcome.Persisted -> outcome.remote
-                    is com.david.mailapp.data.repository.EmailContentFetchOutcome.MemoryOnly -> outcome.remote
-                    null -> null
-                }
-                remote?.inlineReferences
+                val outcome = source.recoverContentById(emailId)
+                (outcome as? com.david.mailapp.data.repository.EmailContentRecoveryResult.Found)
+                    ?.email
+                    ?.inlineReferences
             } ?: emptyList()
             currentCoroutineContext().ensureActive()
 

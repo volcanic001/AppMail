@@ -39,15 +39,18 @@ class EmailRepository(
     /** Remote-first mutators with local commit and reconciliation. */
     private val actionCoordinator = EmailActionCoordinator(dao, providerFactory, writeGuard)
 
-    /** Body fetch, HTML cleanup, PDF metadata encoding and Room persistence. */
-    private val contentCoordinator = EmailContentCoordinator(dao, providerFactory, writeGuard)
+    /** Shared individual recovery for resolution and content, deduplicated per session and id. */
+    private val remoteRecoveryCoordinator = EmailRemoteRecoveryCoordinator(dao, providerFactory, writeGuard)
+
+    /** Body recovery plus inline image and content-access operations. */
+    private val contentCoordinator = EmailContentCoordinator(dao, providerFactory, remoteRecoveryCoordinator, writeGuard)
 
     /** PDF download, cache queries and binary validation. */
     private val pdfCoordinator =
         EmailPdfCoordinator(pdfCacheManager, MAX_PDF_SIZE, providerFactory, writeGuard)
 
     /** Cache-first resolution with single-flight deduplication and session isolation. */
-    private val resolutionCoordinator = EmailResolutionCoordinator(dao, providerFactory, writeGuard)
+    private val resolutionCoordinator = EmailResolutionCoordinator(dao, remoteRecoveryCoordinator, writeGuard)
 
     // ── Resolution ──────────────────────────────────────────────
 
@@ -105,8 +108,8 @@ class EmailRepository(
      * Devuelve el resultado remoto (o MemoryOnly) si fue exitoso, o null en caso
      * de cancelación, pérdida de sesión o fallo de red.
      */
-    suspend fun fetchAndCacheBody(emailId: String): com.david.mailapp.data.repository.EmailContentFetchOutcome? =
-        contentCoordinator.fetchAndCacheBody(emailId)
+    suspend fun recoverContentById(emailId: String): EmailContentRecoveryResult =
+        contentCoordinator.recoverContentById(emailId)
 
     suspend fun recordContentAccess(emailId: String) {
         contentCoordinator.recordContentAccess(emailId)

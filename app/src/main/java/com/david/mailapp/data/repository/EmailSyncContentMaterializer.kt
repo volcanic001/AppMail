@@ -16,10 +16,10 @@ internal data class CleanedSyncContent(
 internal fun Email.materializeForMailboxSync(
     maxBudgetBytes: Long = EMAIL_CONTENT_CACHE_BUDGET_BYTES
 ): Email {
-    if (!pdfMetadataScanned) return asSummaryOnly()
+    if (!pdfMetadataScanned) return withoutCachedContent()
 
     return when (contentState) {
-        EmailContentState.NOT_FETCHED -> asSummaryOnly()
+        EmailContentState.NOT_FETCHED -> withoutCachedContent()
         EmailContentState.EMPTY -> copy(
             body = "",
             cleanBody = "",
@@ -30,13 +30,13 @@ internal fun Email.materializeForMailboxSync(
         )
         EmailContentState.READY -> {
             if (body.isBlank() || bodyKind == EmailBodyKind.UNKNOWN) {
-                return asSummaryOnly()
+                return withoutCachedContent()
             }
 
             val initialCleanBody = if (bodyKind == EmailBodyKind.PLAIN_TEXT) body else ""
             val cachedBytes = contentBytes(body, initialCleanBody, inlineReferences)
             if (cachedBytes > maxBudgetBytes) {
-                asSummaryOnly()
+                withoutCachedContent()
             } else {
                 copy(
                     cleanBody = initialCleanBody,

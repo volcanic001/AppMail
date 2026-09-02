@@ -246,7 +246,7 @@ class EmailDetailViewModelResolutionTest {
         source.resolveResult = EmailResolutionResult.Found(
             FakeEmailDetailSource.sampleEmail(bodyBlank = true)
         )
-        source.bodyFetchResult = null
+        source.bodyFetchResult = com.david.mailapp.data.repository.EmailContentRecoveryResult.Failure(EmailResolutionFailureReason.NO_CONNECTION)
         val vm = createViewModel(source)
 
         val firstFailure = vm.uiState.value as EmailDetailUiState.BodyError
@@ -258,7 +258,10 @@ class EmailDetailViewModelResolutionTest {
             bodyBlank = false,
             pdfScanned = true
         )
-        source.bodyFetchResult = com.david.mailapp.data.repository.EmailContentFetchOutcome.Persisted(recoveredEmail)
+        source.bodyFetchResult = com.david.mailapp.data.repository.EmailContentRecoveryResult.Found(
+            recoveredEmail,
+            com.david.mailapp.data.repository.EmailContentStorage.PERSISTED
+        )
         source.onBodyFetch = { callCount ->
             if (callCount == 2) source.emitRoomEmail(recoveredEmail)
         }
@@ -277,7 +280,7 @@ class EmailDetailViewModelResolutionTest {
         source.resolveResult = EmailResolutionResult.Found(
             FakeEmailDetailSource.sampleEmail(bodyBlank = true)
         )
-        source.bodyFetchResult = null
+        source.bodyFetchResult = com.david.mailapp.data.repository.EmailContentRecoveryResult.Failure(EmailResolutionFailureReason.NO_CONNECTION)
         val vm = createViewModel(source)
 
         assertTrue(vm.uiState.value is EmailDetailUiState.BodyError)
@@ -297,7 +300,7 @@ class EmailDetailViewModelResolutionTest {
         source.resolveResult = EmailResolutionResult.Found(
             FakeEmailDetailSource.sampleEmail(bodyBlank = true)
         )
-        source.bodyFetchResult = null
+        source.bodyFetchResult = com.david.mailapp.data.repository.EmailContentRecoveryResult.Failure(EmailResolutionFailureReason.NO_CONNECTION)
         val vm = createViewModel(source)
         assertEquals(1, source.bodyFetchCallCount)
 
@@ -323,12 +326,12 @@ class EmailDetailViewModelResolutionTest {
         source.resolveResult = EmailResolutionResult.Found(
             FakeEmailDetailSource.sampleEmail(bodyBlank = true)
         )
-        source.bodyFetchResult = com.david.mailapp.data.repository.EmailContentFetchOutcome.Persisted(
+        source.bodyFetchResult = com.david.mailapp.data.repository.EmailContentRecoveryResult.Found(
             FakeEmailDetailSource.sampleEmail(
             bodyBlank = true,
             contentState = com.david.mailapp.domain.model.EmailContentState.EMPTY,
             bodyKind = com.david.mailapp.domain.model.EmailBodyKind.UNKNOWN
-        ))
+        ), com.david.mailapp.data.repository.EmailContentStorage.PERSISTED)
         val vm = createViewModel(source)
 
         val error = vm.uiState.value as EmailDetailUiState.BodyError
@@ -348,7 +351,7 @@ class EmailDetailViewModelResolutionTest {
         source.resolveResult = EmailResolutionResult.Found(
             FakeEmailDetailSource.sampleEmail(bodyBlank = true)
         )
-        source.bodyFetchResult = com.david.mailapp.data.repository.EmailContentFetchOutcome.Persisted(
+        source.bodyFetchResult = com.david.mailapp.data.repository.EmailContentRecoveryResult.Found(
             FakeEmailDetailSource.sampleEmail(
             bodyBlank = true,
             pdfScanned = true,
@@ -359,7 +362,7 @@ class EmailDetailViewModelResolutionTest {
                     "doc.pdf", "application/pdf", "att1", 1024L
                 )
             )
-        ))
+        ), com.david.mailapp.data.repository.EmailContentStorage.PERSISTED)
         val vm = createViewModel(source)
 
         val error = vm.uiState.value as EmailDetailUiState.BodyError

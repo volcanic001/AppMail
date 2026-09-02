@@ -176,6 +176,37 @@ interface EmailDao {
         return getByIdOnce(entity.id) ?: merged
     }
 
+    /** Persist an authoritative individual recovery and enforce the content budget atomically. */
+    @Transaction
+    suspend fun upsertRecoveredEmailAndEnforceBudget(
+        entity: EmailEntity,
+        maxBudgetBytes: Long
+    ): EmailEntity {
+        val existing = getByIdOnce(entity.id)
+        val authoritative = entity.copy(
+            rfcMessageId = entity.rfcMessageId ?: existing?.rfcMessageId,
+            rfcReferences = entity.rfcReferences ?: existing?.rfcReferences,
+            contentLastAccessEpochMs = if (entity.contentState == "READY") {
+                existing?.contentLastAccessEpochMs ?: entity.contentLastAccessEpochMs
+            } else {
+                0L
+            }
+        )
+        upsertAll(listOf(authoritative))
+
+        if (authoritative.contentState == "READY") {
+            var currentSum = sumReadyContentBytes() ?: 0L
+            if (currentSum > maxBudgetBytes) {
+                for (candidate in getLruEvictionCandidates(authoritative.id)) {
+                    clearContent(candidate.id)
+                    currentSum -= candidate.cachedContentBytes
+                    if (currentSum <= maxBudgetBytes) break
+                }
+            }
+        }
+        return getByIdOnce(entity.id) ?: authoritative
+    }
+
     /**
      * Upsert a batch of emails while preserving any previously downloaded
      * data (HTML bodies, PDF metadata).

@@ -24,8 +24,8 @@ interface EmailDetailEmailSource {
     /** Mark as read, once. */
     suspend fun markAsRead(emailId: String): EmailActionResult
 
-    /** Remote body fetch, cached to Room. Returns null on failure. */
-    suspend fun fetchAndCacheBody(emailId: String): com.david.mailapp.data.repository.EmailContentFetchOutcome?
+    /** Cache-first content recovery with typed remote and persistence failures. */
+    suspend fun recoverContentById(emailId: String): com.david.mailapp.data.repository.EmailContentRecoveryResult
 
     /** Download inline images given the refs extracted from the body. */
     suspend fun downloadInlineImages(emailId: String, refs: List<com.david.mailapp.domain.model.EmailInlineReference>): Map<String, String>

@@ -51,13 +51,14 @@ class FakeEmailDetailSource(
     }
 
     // ── Body fetch ──────────────────────────────────────────────
-    var bodyFetchResult: com.david.mailapp.data.repository.EmailContentFetchOutcome? = null
+    var bodyFetchResult: com.david.mailapp.data.repository.EmailContentRecoveryResult =
+        com.david.mailapp.data.repository.EmailContentRecoveryResult.Failure(EmailResolutionFailureReason.NO_CONNECTION)
     var bodyFetchGate: CompletableDeferred<Unit>? = null
     var onBodyFetch: ((callCount: Int) -> Unit)? = null
     var bodyFetchCallCount = 0
     var recordAccessCallCount = 0
 
-    override suspend fun fetchAndCacheBody(emailId: String): com.david.mailapp.data.repository.EmailContentFetchOutcome? {
+    override suspend fun recoverContentById(emailId: String): com.david.mailapp.data.repository.EmailContentRecoveryResult {
         bodyFetchCallCount++
         bodyFetchGate?.await()
         onBodyFetch?.invoke(bodyFetchCallCount)

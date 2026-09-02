@@ -12,9 +12,22 @@ import com.david.mailapp.domain.model.EmailBodyKind
 import com.david.mailapp.domain.model.EmailContentState
 import com.david.mailapp.domain.model.PdfAttachmentMetadata
 import com.david.mailapp.data.remote.provider.ReplyContext
+import com.david.mailapp.data.remote.provider.gmail.GmailProvider
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.respond
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.headersOf
+import io.ktor.serialization.kotlinx.json.json
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.yield
+import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -22,6 +35,9 @@ import org.junit.Test
 class EmailContentCoordinatorBudgetTest {
 
     private class FakeDao : EmailDao {
+        var recovered: EmailEntity? = null
+        var recoveryBudget: Long? = null
+        var recoveryCommits = 0
         var lastUpdateBodyAndPdf: Map<String, Any?>? = null
         var lastApplyLru: Map<String, Any?>? = null
 
@@ -37,6 +53,12 @@ class EmailContentCoordinatorBudgetTest {
         override suspend fun getEntitiesByIdsSync(ids: List<String>): List<EmailEntity> = emptyList()
         override suspend fun replaceFolder(folder: String, emails: List<EmailEntity>) {}
         override suspend fun upsertWithMerge(entity: EmailEntity): EmailEntity = entity
+        override suspend fun upsertRecoveredEmailAndEnforceBudget(entity: EmailEntity, maxBudgetBytes: Long): EmailEntity {
+            recoveryCommits++
+            recovered = entity
+            recoveryBudget = maxBudgetBytes
+            return entity
+        }
         override suspend fun upsertPreservingCachedContent(emails: List<EmailEntity>) {}
         override suspend fun sumReadyContentBytes(): Long? = 0L
         override suspend fun getLruEvictionCandidates(protectedEmailId: String): List<EmailEntity> = emptyList()
@@ -135,25 +157,26 @@ class EmailContentCoordinatorBudgetTest {
         val guard = SessionWriteGuardImpl()
         guard.activate()
         
-        val coordinator = EmailContentCoordinator(dao, { provider }, guard)
+        val remoteRecovery = EmailRemoteRecoveryCoordinator(dao, { provider }, guard)
+        val coordinator = EmailContentCoordinator(dao, { provider }, remoteRecovery, guard)
 
-        val outcome = coordinator.fetchAndCacheBody("e1")
+        val outcome = coordinator.recoverContentById("e1")
         
-        assertTrue("Outcome should be MemoryOnly due to budget constraint", outcome is EmailContentFetchOutcome.MemoryOnly)
-        outcome as EmailContentFetchOutcome.MemoryOnly
-        assertEquals(oversizedBody, outcome.remote.body)
-        assertEquals(oversizedBody, outcome.cleanBody)
+        assertTrue("Outcome should be MemoryOnly due to budget constraint", outcome is EmailContentRecoveryResult.Found)
+        outcome as EmailContentRecoveryResult.Found
+        assertEquals(EmailContentStorage.MEMORY_ONLY, outcome.storage)
+        assertEquals(oversizedBody, outcome.email.body)
+        assertEquals(oversizedBody, outcome.email.cleanBody)
         
-        val updateArgs = dao.lastUpdateBodyAndPdf!!
-        assertEquals("e1", updateArgs["emailId"])
-        assertEquals("", updateArgs["body"])
-        assertEquals("", updateArgs["cleanBody"])
-        assertTrue((updateArgs["pdfAttachmentsJson"] as String).contains("f1.pdf"))
-        assertEquals(true, updateArgs["hasAttachments"])
-        assertEquals("NOT_FETCHED", updateArgs["contentState"])
-        assertEquals("UNKNOWN", updateArgs["bodyKind"])
-        assertEquals("[]", updateArgs["inlineReferencesJson"])
-        assertEquals(0L, updateArgs["cachedContentBytes"])
+        val persisted = dao.recovered!!
+        assertEquals("e1", persisted.id)
+        assertEquals("", persisted.body)
+        assertEquals("", persisted.cleanBody)
+        assertTrue(persisted.pdfAttachmentsJson.contains("f1.pdf"))
+        assertEquals("NOT_FETCHED", persisted.contentState)
+        assertEquals("UNKNOWN", persisted.bodyKind)
+        assertEquals("[]", persisted.inlineReferencesJson)
+        assertEquals(0L, persisted.cachedContentBytes)
     }
 
     @Test
@@ -172,25 +195,132 @@ class EmailContentCoordinatorBudgetTest {
         val guard = SessionWriteGuardImpl()
         guard.activate()
         
-        val coordinator = EmailContentCoordinator(dao, { provider }, guard)
+        val remoteRecovery = EmailRemoteRecoveryCoordinator(dao, { provider }, guard)
+        val coordinator = EmailContentCoordinator(dao, { provider }, remoteRecovery, guard)
 
-        val outcome = coordinator.fetchAndCacheBody("e2")
+        val outcome = coordinator.recoverContentById("e2")
         
-        assertTrue("Outcome should be Persisted", outcome is EmailContentFetchOutcome.Persisted)
-        outcome as EmailContentFetchOutcome.Persisted
-        assertEquals(validBody, outcome.remote.body)
+        assertTrue("Outcome should be Persisted", outcome is EmailContentRecoveryResult.Found)
+        outcome as EmailContentRecoveryResult.Found
+        assertEquals(EmailContentStorage.PERSISTED, outcome.storage)
+        assertEquals(validBody, outcome.email.body)
         
-        val lruArgs = dao.lastApplyLru!!
-        assertEquals("e2", lruArgs["emailId"])
-        assertEquals(validBody, lruArgs["body"])
-        assertEquals(validBody, lruArgs["cleanBody"])
-        assertEquals("[]", lruArgs["pdfAttachmentsJson"])
-        assertEquals(false, lruArgs["hasAttachments"])
-        assertEquals("READY", lruArgs["contentState"])
-        assertEquals("HTML", lruArgs["bodyKind"])
-        assertEquals("[]", lruArgs["inlineReferencesJson"])
-        assertEquals(validBody.toByteArray(Charsets.UTF_8).size.toLong() * 2 + 2L, lruArgs["cachedContentBytes"])
-        assertEquals(52_428_800L, lruArgs["maxBudgetBytes"])
+        val persisted = dao.recovered!!
+        assertEquals("e2", persisted.id)
+        assertEquals(validBody, persisted.body)
+        assertEquals(validBody, persisted.cleanBody)
+        assertEquals("READY", persisted.contentState)
+        assertEquals("HTML", persisted.bodyKind)
+        assertEquals(validBody.toByteArray(Charsets.UTF_8).size.toLong() * 2 + 2L, persisted.cachedContentBytes)
+        assertEquals(52_428_800L, dao.recoveryBudget)
+    }
+
+    @Test
+    fun concurrentRecovery_withKtorMockEngine_usesOneFullRequestAndOneCommit() = runTest {
+        val requestStarted = CompletableDeferred<Unit>()
+        val releaseResponse = CompletableDeferred<Unit>()
+        var requestCount = 0
+        val engine = MockEngine { request ->
+            requestCount++
+            assertEquals("full", request.url.parameters["format"])
+            requestStarted.complete(Unit)
+            releaseResponse.await()
+            respond(
+                content = """{
+                    "id":"shared","threadId":"thread-shared","labelIds":["INBOX"],
+                    "snippet":"snippet","internalDate":"1000",
+                    "payload":{"mimeType":"text/plain","headers":[
+                      {"name":"From","value":"sender@test.com"},
+                      {"name":"To","value":"me@test.com"},
+                      {"name":"Subject","value":"Shared"}
+                    ],"body":{"size":5,"data":"aGVsbG8"}}
+                }""".trimIndent(),
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, "application/json")
+            )
+        }
+        val client = HttpClient(engine) {
+            install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
+        }
+        val dao = FakeDao()
+        val guard = SessionWriteGuardImpl().also { it.activate() }
+        val remoteRecovery = EmailRemoteRecoveryCoordinator(
+            dao,
+            { GmailProvider(client, lookupBackoffMillis = emptyList()) },
+            guard
+        )
+        val resolution = EmailResolutionCoordinator(dao, remoteRecovery, guard)
+        val content = EmailContentCoordinator(
+            dao,
+            { GmailProvider(client, lookupBackoffMillis = emptyList()) },
+            remoteRecovery,
+            guard
+        )
+
+        val first = async { resolution.resolveEmailById("shared") }
+        requestStarted.await()
+        val second = async { content.recoverContentById("shared") }
+        yield()
+        releaseResponse.complete(Unit)
+
+        assertTrue(first.await() is EmailResolutionResult.Found)
+        assertTrue(second.await() is EmailContentRecoveryResult.Found)
+        assertEquals(1, requestCount)
+        assertEquals(1, dao.recoveryCommits)
+        assertEquals("shared", dao.recovered?.id)
+        client.close()
+    }
+
+    @Test
+    fun sameIdAcrossSessionGenerations_doesNotShareFlight() = runTest {
+        val twoRequestsStarted = CompletableDeferred<Unit>()
+        val releaseResponses = CompletableDeferred<Unit>()
+        var requestCount = 0
+        val engine = MockEngine {
+            requestCount++
+            if (requestCount == 2) twoRequestsStarted.complete(Unit)
+            releaseResponses.await()
+            respond(
+                content = """{
+                    "id":"session-mail","threadId":"thread-session","labelIds":["INBOX"],
+                    "snippet":"snippet","internalDate":"1000",
+                    "payload":{"mimeType":"text/plain","headers":[
+                      {"name":"From","value":"sender@test.com"},
+                      {"name":"To","value":"me@test.com"},
+                      {"name":"Subject","value":"Session"}
+                    ],"body":{"size":5,"data":"aGVsbG8"}}
+                }""".trimIndent(),
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, "application/json")
+            )
+        }
+        val client = HttpClient(engine) {
+            install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
+        }
+        val dao = FakeDao()
+        val guard = SessionWriteGuardImpl().also { it.activate() }
+        val coordinator = EmailRemoteRecoveryCoordinator(
+            dao,
+            { GmailProvider(client, lookupBackoffMillis = emptyList()) },
+            guard
+        )
+        val oldLease = checkNotNull(guard.capture())
+        val oldFlight = async { coordinator.recover("session-mail", oldLease) }
+        yield()
+
+        guard.invalidate()
+        guard.activate()
+        val newLease = checkNotNull(guard.capture())
+        val newFlight = async { coordinator.recover("session-mail", newLease) }
+        twoRequestsStarted.await()
+        assertEquals(2, requestCount)
+        releaseResponses.complete(Unit)
+
+        val oldResult = oldFlight.await() as EmailContentRecoveryResult.Failure
+        assertEquals(EmailResolutionFailureReason.SESSION_CHANGED, oldResult.reason)
+        assertTrue(newFlight.await() is EmailContentRecoveryResult.Found)
+        assertEquals(1, dao.recoveryCommits)
+        client.close()
     }
 
     private fun fullEmail(
