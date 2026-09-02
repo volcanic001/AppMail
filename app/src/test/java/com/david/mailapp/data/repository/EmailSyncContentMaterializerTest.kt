@@ -59,6 +59,38 @@ class EmailSyncContentMaterializerTest {
     }
 
     @Test
+    fun `content exactly at budget limit is persisted`() {
+        val exactSize = EMAIL_CONTENT_CACHE_BUDGET_BYTES
+        // The formula for HTML is raw + 2. We want raw to be exactSize - 2
+        val bodySize = (exactSize - 2).toInt()
+        val body = "a".repeat(bodySize)
+
+        val prepared = email(body = body, bodyKind = EmailBodyKind.HTML).materializeForMailboxSync(maxBudgetBytes = exactSize)
+        assertEquals(EmailContentState.READY, prepared.contentState)
+        assertEquals(exactSize, prepared.cachedContentBytes)
+    }
+
+    @Test
+    fun `content one byte above budget is not cached in sync route`() {
+        val limit = EMAIL_CONTENT_CACHE_BUDGET_BYTES
+        // HTML formula: raw + 2. We want raw to be limit - 1 so total is limit + 1
+        val bodySize = (limit - 1).toInt()
+        val body = "a".repeat(bodySize)
+
+        val prepared = email(body = body, bodyKind = EmailBodyKind.HTML).materializeForMailboxSync(maxBudgetBytes = limit)
+
+        assertEquals(EmailContentState.NOT_FETCHED, prepared.contentState)
+        assertEquals(EmailBodyKind.UNKNOWN, prepared.bodyKind)
+        assertEquals("", prepared.body)
+        assertTrue(prepared.pdfMetadataScanned)
+    }
+
+    @Test
+    fun `budget constant is exactly 50 MiB`() {
+        assertEquals(50L * 1024L * 1024L, EMAIL_CONTENT_CACHE_BUDGET_BYTES)
+    }
+
+    @Test
     fun `deferred HTML result includes raw clean and CID bytes`() {
         val refs = listOf(EmailInlineReference("image", "attachment", "image/png"))
         val source = email(

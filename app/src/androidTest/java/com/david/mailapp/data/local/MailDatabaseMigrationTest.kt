@@ -211,10 +211,15 @@ class MailDatabaseMigrationTest {
         assertEquals("[]", cursor1.getString(cursor1.getColumnIndexOrThrow("inline_references_json")))
         assertEquals(0L, cursor1.getLong(cursor1.getColumnIndexOrThrow("content_last_access_epoch_ms")))
 
-        // UTF-8 bytes for "<html><body>ñ😊</body></html>" (29 chars, ñ is 2, 😊 is 4) -> 6 + 6 + 2 + 4 + 7 + 7 = 32?
-        // Let's compute exact UTF-8 size:
         val bodyStr = "<html><body>ñ😊</body></html>"
         val cleanStr = "ñ😊"
+        assertEquals(bodyStr, cursor1.getString(cursor1.getColumnIndexOrThrow("body")))
+        assertEquals(cleanStr, cursor1.getString(cursor1.getColumnIndexOrThrow("clean_body")))
+        assertEquals("msg-1", cursor1.getString(cursor1.getColumnIndexOrThrow("rfc_message_id")))
+        assertEquals("[]", cursor1.getString(cursor1.getColumnIndexOrThrow("pdf_attachments_json")))
+
+        // UTF-8 bytes for "<html><body>ñ😊</body></html>" (29 chars, ñ is 2, 😊 is 4) -> 6 + 6 + 2 + 4 + 7 + 7 = 32?
+        // Let's compute exact UTF-8 size:
         val expectedBytes = bodyStr.toByteArray(Charsets.UTF_8).size + cleanStr.toByteArray(Charsets.UTF_8).size + 2
         assertEquals(expectedBytes.toLong(), cursor1.getLong(cursor1.getColumnIndexOrThrow("cached_content_bytes")))
         cursor1.close()

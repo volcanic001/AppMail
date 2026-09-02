@@ -141,5 +141,50 @@ class EmailDaoLruTest {
         assertEquals(EmailContentState.READY.name, dao.getByIdOnce("b")!!.contentState)
         assertEquals(EmailContentState.READY.name, dao.getByIdOnce("recent")!!.contentState)
         assertEquals(40_000_000L, dao.sumReadyContentBytes())
+    @Test
+    fun exactBudgetLimit_doesNotEvict() = runTest {
+        val budget = 50L * 1024L * 1024L
+        insertEmail("a", bytes = budget, accessEpoch = 100L)
+
+        dao.enforceContentBudget(budget)
+
+        assertEquals(EmailContentState.READY.name, dao.getByIdOnce("a")!!.contentState)
+        assertEquals(budget, dao.getByIdOnce("a")!!.cachedContentBytes)
     }
+
+    @Test
+    fun oneByteOverBudget_evictsLruCandidate() = runTest {
+        val budget = 50L * 1024L * 1024L
+        insertEmail("old", bytes = 2L, accessEpoch = 10L)
+        insertEmail("new", bytes = budget - 1L, accessEpoch = 20L)
+
+        // Total = budget + 1L
+        dao.enforceContentBudget(budget)
+
+        // old should be evicted
+        assertEquals(EmailContentState.NOT_FETCHED.name, dao.getByIdOnce("old")!!.contentState)
+        assertEquals(0L, dao.getByIdOnce("old")!!.cachedContentBytes)
+
+        // new should survive
+        assertEquals(EmailContentState.READY.name, dao.getByIdOnce("new")!!.contentState)
+        assertEquals(budget - 1L, dao.getByIdOnce("new")!!.cachedContentBytes)
+    }
+
+    @Test
+    fun eviction_preservesPdfAndLightMetadata() = runTest {
+        val budget = 50L * 1024L * 1024L
+        insertEmail("a", bytes = budget + 1L, accessEpoch = 10L, pdfJson = """[{"id":"pdf1"}]""")
+
+        dao.enforceContentBudget(budget)
+
+        val evicted = dao.getByIdOnce("a")!!
+        assertEquals(EmailContentState.NOT_FETCHED.name, evicted.contentState)
+        assertEquals("", evicted.body)
+        assertEquals("", evicted.cleanBody)
+        assertEquals(0L, evicted.cachedContentBytes)
+        assertEquals("""[{"id":"pdf1"}]""", evicted.pdfAttachmentsJson)
+        assertEquals(true, evicted.pdfMetadataScanned)
+        assertEquals(EmailFolder.Inbox.name, evicted.folder)
+    }
+}
 }
