@@ -38,6 +38,7 @@ internal suspend fun fetchGmailPage(
 ): PaginatedResult<Email> {
     // 1. List message IDs
     val listResponse: MessageListResponse = client.get("users/me/messages") {
+        parameter("fields", GmailProjections.LIST_FIELDS)
         if (labelId != null) parameter("labelIds", labelId)
         if (query != null) parameter("q", query)
         parameter("maxResults", maxResults)

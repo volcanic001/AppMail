@@ -13,5 +13,6 @@ internal suspend fun requestFullMessage(
 ): HttpResponse = MailOpenPerformanceTrace.traceNetworkFull(messageId) {
     client.get("users/me/messages/$messageId") {
         parameter("format", "full")
+        parameter("fields", GmailProjections.FULL_MESSAGE_FIELDS)
     }
 }

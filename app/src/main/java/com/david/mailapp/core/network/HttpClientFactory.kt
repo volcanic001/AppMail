@@ -17,6 +17,7 @@ import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logger
 import io.ktor.client.plugins.logging.Logging
+import io.ktor.client.request.header
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.URLProtocol
@@ -85,9 +86,14 @@ object HttpClientFactory {
                 })
             }
 
+            install(io.ktor.client.plugins.compression.ContentEncoding) {
+                gzip()
+            }
+
             defaultRequest {
                 url("https://$GMAIL_HOST/gmail/v1/")
                 contentType(ContentType.Application.Json)
+                header(HttpHeaders.UserAgent, "MailApp-Android/${BuildConfig.VERSION_NAME} (gzip)")
             }
 
             install(freshnessPlugin)
