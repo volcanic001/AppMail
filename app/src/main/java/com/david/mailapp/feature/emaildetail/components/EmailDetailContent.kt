@@ -21,12 +21,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.david.mailapp.BuildConfig
 import com.david.mailapp.data.pdf.PdfDownloadState
 import com.david.mailapp.domain.model.Email
+import com.david.mailapp.domain.model.EmailBodyKind
 import com.david.mailapp.domain.model.PdfAttachmentMetadata
 import com.david.mailapp.feature.emaildetail.EmailRenderTrace
 import com.david.mailapp.ui.theme.LocalThemeConfig
@@ -34,7 +36,11 @@ import kotlin.math.roundToInt
 
 // ─────────────────────────────────────────────────────────────────────────────
 // EmailDetailContent
-// WebView fills the full available space — no handle bar above it.
+// Fills the full available space — no handle bar above it.
+// Explicit routing for body:
+// 1) body == null: Compose indicator without creating WebView.
+// 2) bodyKind == PLAIN_TEXT: Native EmailPlainTextBody.
+// 3) HTML / UNKNOWN: EmailBodyWebView.
 // ─────────────────────────────────────────────────────────────────────────────
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,6 +55,7 @@ internal fun EmailDetailContent(
     onImageLongPress: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val isDark = LocalThemeConfig.current.darkTheme
     val showImages = true
     val colorScheme = MaterialTheme.colorScheme
@@ -66,7 +73,7 @@ internal fun EmailDetailContent(
     }
     var isBodyRendered by remember(bodyKey) { mutableStateOf(false) }
 
-    val showLoader = body == null || !isBodyRendered
+    val showLoader = body == null || (email.bodyKind != EmailBodyKind.PLAIN_TEXT && !isBodyRendered)
     val lastBodyLayout = remember { mutableStateOf<String?>(null) }
 
     DisposableEffect(traceMail, email.id) {
@@ -89,6 +96,7 @@ internal fun EmailDetailContent(
     LaunchedEffect(showLoader, bodyKey) {
         val reason = when {
             body == null -> "body_missing"
+            email.bodyKind == EmailBodyKind.PLAIN_TEXT -> "plain_text_native"
             !isBodyRendered -> "awaiting_visual_callback"
             else -> "rendered"
         }
@@ -111,7 +119,6 @@ internal fun EmailDetailContent(
         }
     }
 
-    // WebView fills the available vertical space, with PDF section below
     Column(
         modifier = modifier.fillMaxSize()
     ) {
@@ -130,54 +137,86 @@ internal fun EmailDetailContent(
                     }
                 }
         ) {
-            DisposableEffect(traceMail) {
-            EmailRenderTrace.d(traceMail, "UI", "UI_WEBVIEW_SLOT_ENTER", "bodyKey=$bodyKey")
-            onDispose {
-                EmailRenderTrace.d(traceMail, "UI", "UI_WEBVIEW_SLOT_DISPOSE", "bodyKey=$bodyKey")
+            when {
+                body == null -> {
+                    // Route 1: body == null (PreparingBody) — Compose loading indicator without WebView
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.surface),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(32.dp),
+                            strokeWidth = 3.dp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+
+                email.bodyKind == EmailBodyKind.PLAIN_TEXT -> {
+                    // Route 2: READY + PLAIN_TEXT — Native Compose text body without WebView
+                    EmailPlainTextBody(
+                        text = body,
+                        traceMail = traceMail,
+                        onOpenLink = { url ->
+                            SafeLinkPolicy.openSafeUrl(context, url)
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+
+                else -> {
+                    // Route 3: HTML / UNKNOWN — Existing EmailBodyWebView path
+                    DisposableEffect(traceMail) {
+                        EmailRenderTrace.d(traceMail, "UI", "UI_WEBVIEW_SLOT_ENTER", "bodyKey=$bodyKey")
+                        onDispose {
+                            EmailRenderTrace.d(traceMail, "UI", "UI_WEBVIEW_SLOT_DISPOSE", "bodyKey=$bodyKey")
+                        }
+                    }
+                    EmailBodyWebView(
+                        body = body,
+                        showImages = showImages,
+                        isDark = isDark,
+                        traceMail = traceMail,
+                        onPageRendered = {
+                            EmailRenderTrace.d(
+                                traceMail,
+                                "UI",
+                                "UI_RENDER_CALLBACK",
+                                "bodyKey=$bodyKey wasRendered=$isBodyRendered"
+                            )
+                            isBodyRendered = true
+                        },
+                        onImageLongPress = onImageLongPress,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .zIndex(0f)
+                    )
+
+                    if (showLoader) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.surface)
+                                .zIndex(1f),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(32.dp),
+                                strokeWidth = 3.dp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    } else if (BuildConfig.PERF_TRACE_ENABLED) {
+                        Box(
+                            modifier = Modifier
+                                .size(1.dp)
+                                .testTag("email_detail_visual_ready")
+                        )
+                    }
+                }
             }
-        }
-        EmailBodyWebView(
-            body = body,
-            showImages = showImages,
-            isDark = isDark,
-            traceMail = traceMail,
-            onPageRendered = {
-                EmailRenderTrace.d(
-                    traceMail,
-                    "UI",
-                    "UI_RENDER_CALLBACK",
-                    "bodyKey=$bodyKey wasRendered=$isBodyRendered"
-                )
-                isBodyRendered = true
-            },
-            onImageLongPress = onImageLongPress,
-            modifier = Modifier
-                .fillMaxSize()
-                .zIndex(0f)
-        )
-        // Loader overlay on top with solid surface background —
-        // hides intermediate WebView frames until postVisualStateCallback.
-        if (showLoader) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.surface)
-                    .zIndex(1f),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(32.dp),
-                    strokeWidth = 3.dp,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-        } else if (BuildConfig.PERF_TRACE_ENABLED) {
-            Box(
-                modifier = Modifier
-                    .size(1.dp)
-                    .testTag("email_detail_visual_ready")
-            )
-        }
         }
 
         // PDF attachments section below the body

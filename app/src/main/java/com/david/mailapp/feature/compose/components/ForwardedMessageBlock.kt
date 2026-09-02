@@ -38,8 +38,7 @@ fun ForwardedMessageBlock(
     modifier: Modifier = Modifier
 ) {
     var isExpanded by remember { mutableStateOf(false) }
-    val rawContent = email.cleanBody.ifBlank { email.snippet }
-    val displayBody = ComposeFormatUtils.htmlToPlainText(rawContent)
+    val displayBody = ComposeFormatUtils.getOriginalPlainText(email)
 
     Column(modifier = modifier.fillMaxWidth()) {
         Surface(

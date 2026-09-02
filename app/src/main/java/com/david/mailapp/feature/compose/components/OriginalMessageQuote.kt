@@ -35,8 +35,7 @@ fun OriginalMessageQuote(
     email: Email,
     modifier: Modifier = Modifier
 ) {
-    val rawContent = email.cleanBody.ifBlank { email.snippet }
-    val displayBody = ComposeFormatUtils.htmlToPlainText(rawContent)
+    val displayBody = ComposeFormatUtils.getOriginalPlainText(email)
     val sanitizedBody = displayBody.replace(Regex("[\\s\\u00A0\\u200B]+"), " ").trim()
 
     Surface(

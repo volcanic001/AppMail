@@ -3,6 +3,7 @@ package com.david.mailapp.feature.compose
 import com.david.mailapp.R
 import com.david.mailapp.core.localization.StringProvider
 import com.david.mailapp.domain.model.Email
+import com.david.mailapp.domain.model.EmailBodyKind
 import org.jsoup.Jsoup
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -57,7 +58,7 @@ class ComposeFormatUtils(
      * Resultado: [newBody]\n\nEl [fecha], [remitente] escribió:\n> [cita]
      */
     fun buildReplyBody(newBody: String, original: Email, cleanFallback: String): String {
-        val cleanText = htmlToPlainText(original.cleanBody.ifBlank { cleanFallback })
+        val cleanText = getOriginalPlainText(original, cleanFallback)
         val quoted = cleanText.lines().joinToString("\n> ")
         val dateStr = formatTimestamp(original.timestamp)
         val quotedSection = stringProvider.getString(
@@ -76,7 +77,7 @@ class ComposeFormatUtils(
      * De: [from]\nFecha: [date]\nAsunto: [subject]\nPara: [to]\n\n[body]
      */
     fun buildForwardBody(newBody: String, original: Email, cleanFallback: String): String {
-        val cleanText = htmlToPlainText(original.cleanBody.ifBlank { cleanFallback })
+        val cleanText = getOriginalPlainText(original, cleanFallback)
         val dateStr = formatTimestamp(original.timestamp)
         val header = stringProvider.getString(resComposeForwardHeader)
         val fromLine = stringProvider.getString(resComposeForwardFieldFrom, original.from)
@@ -92,6 +93,21 @@ class ComposeFormatUtils(
     // ── Funciones puras (compañera) ──────────────────────────────
 
     companion object {
+        /**
+         * Obtiene el texto plano original de un email:
+         * - PLAIN_TEXT: devuelve Email.body directamente, sin consultar cleanBody ni Jsoup.
+         * - HTML y UNKNOWN: conserva la conversión Jsoup desde cleanBody o fallback.
+         */
+        @JvmStatic
+        fun getOriginalPlainText(original: Email, cleanFallback: String = ""): String {
+            return if (original.bodyKind == EmailBodyKind.PLAIN_TEXT) {
+                original.body
+            } else {
+                val rawContent = original.cleanBody.ifBlank { cleanFallback.ifBlank { original.snippet } }
+                htmlToPlainText(rawContent)
+            }
+        }
+
         /**
          * Formatea un timestamp Long con patrón, locale y zona horaria explícitos.
          *
@@ -111,6 +127,7 @@ class ComposeFormatUtils(
             fmt.timeZone = timeZone
             return fmt.format(Date(millis))
         }
+
         /** Extrae la dirección pura de "John Doe <john@example.com>" → "john@example.com". */
         fun extractEmailAddress(from: String): String {
             val inBrackets = from.substringAfter("<").substringBefore(">").trim()

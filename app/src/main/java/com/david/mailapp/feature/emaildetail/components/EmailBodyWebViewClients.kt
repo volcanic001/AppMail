@@ -60,28 +60,14 @@ internal class CustomTabsWebViewClient(
         request: WebResourceRequest?
     ): Boolean {
         val url = request?.url?.toString() ?: return true
-        try {
-            CustomTabsIntent.Builder()
-                .setShowTitle(true)
-                .build()
-                .launchUrl(ctx, Uri.parse(url))
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to open link via modern WebView API", e)
-        }
+        SafeLinkPolicy.openSafeUrl(ctx, url)
         return true
     }
 
     @Deprecated("Deprecated in Java")
     override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
         val safeUrl = url ?: return true
-        try {
-            CustomTabsIntent.Builder()
-                .setShowTitle(true)
-                .build()
-                .launchUrl(ctx, Uri.parse(safeUrl))
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to open link via legacy WebView API", e)
-        }
+        SafeLinkPolicy.openSafeUrl(ctx, safeUrl)
         return true
     }
 }
