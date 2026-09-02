@@ -152,3 +152,18 @@ Los 3 archivos ajenos se conservaron intactos en el working tree sin incluirse e
 - **Captura Física Pendiente**: No se extrajeron mediciones físicas debido a la imposibilidad ya fundamentada en la Etapa 0R. La captura en el Pixel 9 GrapheneOS y en Huawei fue abortada debido a problemas profundos en la pila de `tracefs` / Macrobenchmark.
 - **Conclusión de Métricas**: P50, P95, métricas de red físicas y picos de memoria para este proyecto quedan registradas oficialmente como **NO MEDIDAS**. No se emite ninguna afirmación sintética o definitiva.
 - **Integridad de Pruebas**: Se invalidan permanentemente las líneas base sintéticas sin trazas reales subidas; la subfase 6.2 se cierra documentando la validación del marco de medición pero admitiendo una falla a nivel *hardware/entorno de ejecución*. Los archivos protegidos (`ComposeScreen.kt`, etc.) continúan intactos.
+
+---
+
+## Cierre de Subfase 6.3 (Auditoría maestra)
+
+### Estado: CERRADA CON EXCEPCIÓN METODOLÓGICA FÍSICA
+
+- **Auditoría estática:** una sola construcción productiva de `format=full`; listas limitadas a `messages(id,threadId),nextPageToken`; cero símbolos obsoletos; Room 7 con migración 6→7; presupuesto exacto de `52_428_800` bytes.
+- **JVM:** 684 pruebas, 0 fallos, 0 errores y 0 omitidas.
+- **Instrumentación:** 355 pruebas, 0 fallos, 0 errores y 0 omitidas en `Medium_Phone_API_36.1` / Android 16 / API 36.
+- **Build:** compilación de producción y androidTest, APK debug, lint y `git diff --check` en verde.
+- **Corrección de auditoría:** `75f34ba` actualiza fixtures y sincronización de tests instrumentados al contrato explícito de contenido; no modifica código de producción.
+- **Archivos protegidos:** `ComposeScreen.kt`, `MainNavHost.kt` y `gradle.properties` conservan sus hashes originales y permanecen fuera de los commits. El commit 6.2 fue enmendado a `ea403c8` para excluir `gradle.properties`.
+- **Rendimiento físico:** no medido. La VM valida funcionalidad e integración, no sustituye Macrobenchmark/Perfetto en dispositivo real.
+- **Acta reproducible:** `docs/verification/subphase_6_3.md`.
