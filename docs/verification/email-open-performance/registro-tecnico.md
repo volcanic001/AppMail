@@ -141,3 +141,14 @@ Los 3 archivos ajenos se conservaron intactos en el working tree sin incluirse e
 - `ComposeScreen.kt`: `2505050cf45aab8fc691a2b439d442a9b1a73c62c1d0a32c53bc3703469f5e69` (INTACTO)
 - `MainNavHost.kt`: `a6840cfc931e19185fbc29db02e11cc31152b9d719cd1b31fff564060feea088` (INTACTO)
 - `gradle.properties`: `3339808f9445e215b61f0e7a61ccaacc00f97ffc6e7ff0c6581ec0b79c55d476` (INTACTO)
+
+
+## Cierre Acumulado de la Etapa 6 (Estabilización y Benchmark)
+
+### Estado General: CERRADA CON EXCEPCIÓN METODOLÓGICA
+
+- **Etapa Funcional**: Completamente terminada y verificada. La infraestructura de transporte (subfase 5), caché de contenido (subfase 4), concurrencia (subfase 5.2) y pirámide de pruebas (subfase 6.1, >680 tests) han sido exitosamente desplegados y auditados.
+- **Infraestructura de Benchmark Automática**: Validada estáticamente. Los scripts físicos (`run_physical_benchmark.sh`, etc.) carecen de errores de sintaxis; el analizador pasa los unit tests (Python y JVM); el benchmark APK y el Macrobenchmark APK compilan correctamente en su configuración estipulada de iteraciones y secciones de rastreo.
+- **Captura Física Pendiente**: No se extrajeron mediciones físicas debido a la imposibilidad ya fundamentada en la Etapa 0R. La captura en el Pixel 9 GrapheneOS y en Huawei fue abortada debido a problemas profundos en la pila de `tracefs` / Macrobenchmark.
+- **Conclusión de Métricas**: P50, P95, métricas de red físicas y picos de memoria para este proyecto quedan registradas oficialmente como **NO MEDIDAS**. No se emite ninguna afirmación sintética o definitiva.
+- **Integridad de Pruebas**: Se invalidan permanentemente las líneas base sintéticas sin trazas reales subidas; la subfase 6.2 se cierra documentando la validación del marco de medición pero admitiendo una falla a nivel *hardware/entorno de ejecución*. Los archivos protegidos (`ComposeScreen.kt`, etc.) continúan intactos.
