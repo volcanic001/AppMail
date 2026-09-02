@@ -193,7 +193,9 @@ class SafeRefreshContractsTest {
                 rfcMessageId = "<m@x.com>", rfcReferences = "<r@x.com>",
                 pdfAttachments = listOf(com.david.mailapp.domain.model.PdfAttachmentMetadata(
                     "f.pdf", "application/pdf", "att1", 1024L)),
-                pdfMetadataScanned = true),
+                pdfMetadataScanned = true,
+                contentState = EmailContentState.READY,
+                bodyKind = EmailBodyKind.HTML),
             EmailFolder.Inbox
         )
         val richTrash = rich.copy(id = "rich-trash", folder = "trash")

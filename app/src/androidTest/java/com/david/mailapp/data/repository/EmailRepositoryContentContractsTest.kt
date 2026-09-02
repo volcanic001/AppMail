@@ -43,7 +43,7 @@ import org.junit.Test
  * de lease/proveedor/resultado, errores y cancelación remotos, cambio de sesión durante
  * la descarga y fallo local de commit (subfase 3.3); imágenes inline con delegación
  * exacta y las tres variantes CID, incluida la sensibilidad a prefijos y orden del mapa
- * como comportamiento heredado (subfase 3.4).
+ * con coincidencia case-insensitive y respetando el orden del mapa (subfase 3.4).
  */
 class EmailRepositoryContentContractsTest {
 
@@ -639,10 +639,11 @@ class EmailRepositoryContentContractsTest {
     // ═══════════════════════════════════════════════════════════════
 
     @Test
-    fun c18_injectInlineImages_no_match_and_case_mismatch_leave_html_unchanged() {
+    fun c18_injectInlineImages_matches_cid_case_insensitively() {
         val html = """<img src="cid:other"><img src="CID:img1"><img src="Cid:img1">"""
         val map = linkedMapOf("img1" to "data:image/png;base64,AAA")
-        assertEquals(html, repository.injectInlineImages(html, map))
+        val expected = """<img src="cid:other"><img src="data:image/png;base64,AAA"><img src="data:image/png;base64,AAA">"""
+        assertEquals(expected, repository.injectInlineImages(html, map))
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -699,10 +700,7 @@ class EmailRepositoryContentContractsTest {
         assertEquals(before.subject, after.subject)
         assertEquals(before.snippet, after.snippet)
         assertEquals(before.timestamp, after.timestamp)
-        assertEquals(before.isRead, after.isRead)
-        assertEquals(before.isStarred, after.isStarred)
-        assertEquals(before.labels, after.labels)
-        assertEquals(before.folder, after.folder)
+        // A full-message response is authoritative for mutable Gmail envelope fields.
         assertEquals(before.rfcMessageId, after.rfcMessageId)
         assertEquals(before.rfcReferences, after.rfcReferences)
     }

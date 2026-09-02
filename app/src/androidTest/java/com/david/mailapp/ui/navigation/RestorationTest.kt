@@ -50,7 +50,10 @@ class RestorationTest {
 
     private fun waitForText(text: String) {
         rule.waitUntil(timeoutMillis = 5_000) {
-            runCatching { rule.onNodeWithText(text).fetchSemanticsNode(); true }.getOrDefault(false)
+            runCatching {
+                rule.onNodeWithText(text).assertIsDisplayed()
+                true
+            }.getOrDefault(false)
         }
         rule.onNodeWithText(text).assertIsDisplayed()
     }
@@ -204,12 +207,12 @@ class RestorationTest {
 
         recreate(mode)
 
-        rule.onNodeWithText("SP:6:0").assertIsDisplayed()
+        waitForText("SP:6:0")
         Espresso.pressBack()
         rule.waitForIdle()
-        rule.onNodeWithText("IP:30:0").assertIsDisplayed()
+        waitForText("IP:30:0")
         rule.onNodeWithTag("nav_trash").performClick()
-        rule.onNodeWithText("TP:15:0").assertIsDisplayed()
+        waitForText("TP:15:0")
     }
 
     @Test fun searchCycle_preservedUnderDetail_resetOnClose_activity() = searchCycle(RecreateMode.ACTIVITY)

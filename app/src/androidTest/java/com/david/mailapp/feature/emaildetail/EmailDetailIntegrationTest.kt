@@ -7,6 +7,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.platform.app.InstrumentationRegistry
 import com.david.mailapp.core.localization.UiErrorReason
 import com.david.mailapp.core.session.SessionWriteGuardImpl
+import com.david.mailapp.data.cleaner.EmailHtmlCleaner
 import com.david.mailapp.data.local.MailDatabase
 import com.david.mailapp.data.local.entity.EmailEntity
 import com.david.mailapp.data.pdf.PdfCacheManager
@@ -17,12 +18,14 @@ import com.david.mailapp.domain.model.EmailFolder
 import com.david.mailapp.testhelpers.FakeEmailProvider
 import com.david.mailapp.testhelpers.FakeSessionWriteGuard
 import com.david.mailapp.testhelpers.testEmail
+import com.david.mailapp.testhelpers.testFetchedEmail
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -56,10 +59,13 @@ class EmailDetailIntegrationTest {
 
     @After
     fun tearDown() {
-        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        instrumentation.runOnMainSync {
             viewModelStores.forEach(ViewModelStore::clear)
             viewModelStores.clear()
         }
+        instrumentation.waitForIdleSync()
+        runBlocking { delay(100) }
         db.close()
     }
 
@@ -104,7 +110,7 @@ class EmailDetailIntegrationTest {
 
     @Test fun absentEmail_recovered_and_persisted() = runTest {
         provider.fetchEmailByIdResult = EmailLookupResult.Found(
-            testEmail("absent", folder = EmailFolder.Other, subject = "Recovered")
+            testFetchedEmail("absent", folder = EmailFolder.Other, subject = "Recovered")
         )
         val result = repository.resolveEmailById("absent")
         assertTrue(result is com.david.mailapp.data.repository.EmailResolutionResult.Found)
@@ -130,7 +136,7 @@ class EmailDetailIntegrationTest {
         assertTrue(first is com.david.mailapp.data.repository.EmailResolutionResult.Failure)
 
         provider.fetchEmailByIdResult = EmailLookupResult.Found(
-            testEmail("retry-me", folder = EmailFolder.Other)
+            testFetchedEmail("retry-me", folder = EmailFolder.Other)
         )
         val second = repository.resolveEmailById("retry-me")
         assertTrue(second is com.david.mailapp.data.repository.EmailResolutionResult.Found)
@@ -147,11 +153,12 @@ class EmailDetailIntegrationTest {
         emailFolder: EmailFolder,
         expectedPersistedFolder: String
     ) {
-        val remoteEmail = testEmail(id = id, folder = emailFolder, isRead = true).copy(
+        val remoteEmail = testFetchedEmail(id = id, folder = emailFolder, isRead = true).copy(
             labels = labels,
             body = "<html>ready-$id</html>",
             cleanBody = "<html>ready-$id</html>",
-            pdfMetadataScanned = true
+            contentState = com.david.mailapp.domain.model.EmailContentState.READY,
+            bodyKind = com.david.mailapp.domain.model.EmailBodyKind.HTML
         )
         provider.fetchEmailByIdResult = EmailLookupResult.Found(
             remoteEmail
@@ -163,7 +170,7 @@ class EmailDetailIntegrationTest {
         val email = (state as EmailDetailUiState.Ready).email
         assertEquals("folder preserved", emailFolder, email.folder)
         assertEquals("labels preserved", labels, email.labels)
-        assertEquals("body rendered", remoteEmail.body, email.body)
+        assertEquals("clean body rendered", EmailHtmlCleaner.clean(remoteEmail.body), email.body)
         assertEquals("one remote resolution", 1, provider.fetchEmailByIdCalls)
 
         // Persisted entity keeps the email's primary folder
@@ -195,7 +202,7 @@ class EmailDetailIntegrationTest {
         seed("existing-inbox", EmailFolder.Inbox)
         seed("existing-trash", EmailFolder.Trash)
         provider.fetchEmailByIdResult = EmailLookupResult.Found(
-            testEmail(id = "sent-email", folder = EmailFolder.Other).copy(labels = listOf("SENT"))
+            testFetchedEmail(id = "sent-email", folder = EmailFolder.Other).copy(labels = listOf("SENT"))
         )
         val result = repository.resolveEmailById("sent-email")
         assertTrue(result is com.david.mailapp.data.repository.EmailResolutionResult.Found)
@@ -220,7 +227,7 @@ class EmailDetailIntegrationTest {
         val gate = CompletableDeferred<Unit>()
         provider.fetchEmailByIdDeferred = gate
         provider.fetchEmailByIdResult = EmailLookupResult.Found(
-            testEmail("account-change", folder = EmailFolder.Other, subject = "old account")
+            testFetchedEmail("account-change", folder = EmailFolder.Other, subject = "old account")
         )
 
         val delegate = RepositoryEmailDetailSource(guardedRepository)

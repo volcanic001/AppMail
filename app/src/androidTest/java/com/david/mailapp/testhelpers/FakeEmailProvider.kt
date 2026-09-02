@@ -4,6 +4,8 @@ import com.david.mailapp.data.remote.provider.EmailLookupResult
 import com.david.mailapp.data.remote.provider.EmailProvider
 import com.david.mailapp.data.remote.provider.ReplyContext
 import com.david.mailapp.domain.model.Email
+import com.david.mailapp.domain.model.EmailBodyKind
+import com.david.mailapp.domain.model.EmailContentState
 import com.david.mailapp.domain.model.EmailFolder
 import com.david.mailapp.domain.model.PaginatedResult
 import kotlinx.coroutines.CancellationException
@@ -282,6 +284,20 @@ fun testEmail(
     hasAttachments = false, labels = emptyList(), folder = folder
 )
 
+fun testFetchedEmail(
+    id: String,
+    folder: EmailFolder = EmailFolder.Inbox,
+    from: String = "sender@test.com",
+    subject: String = "Subject $id",
+    snippet: String = "Snippet $id",
+    isRead: Boolean = false,
+    timestamp: Long = 1000L
+) = testEmail(id, folder, from, subject, snippet, isRead, timestamp).copy(
+    pdfMetadataScanned = true,
+    contentState = EmailContentState.EMPTY,
+    bodyKind = EmailBodyKind.UNKNOWN
+)
+
 fun testHeavyEmail(id: String, sizeBytes: Int = 1_000_000): Email {
     val largeBody = "A".repeat(sizeBytes)
     return testEmail(id).copy(
@@ -297,6 +313,13 @@ fun testHeavyEmail(id: String, sizeBytes: Int = 1_000_000): Email {
             )
         ),
         pdfMetadataScanned = true,
+        contentState = EmailContentState.READY,
+        bodyKind = EmailBodyKind.HTML,
+        cachedContentBytes = (
+            "<html><body>$largeBody</body></html>".toByteArray(Charsets.UTF_8).size +
+                largeBody.toByteArray(Charsets.UTF_8).size +
+                2
+            ).toLong(),
         rfcMessageId = "<$id@heavy.com>",
         rfcReferences = "<parent@heavy.com>"
     )

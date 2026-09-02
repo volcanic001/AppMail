@@ -15,6 +15,7 @@ import com.david.mailapp.domain.model.PdfAttachmentMetadata
 import com.david.mailapp.testhelpers.FakeEmailProvider
 import com.david.mailapp.testhelpers.FakeSessionWriteGuard
 import com.david.mailapp.testhelpers.testEmail
+import com.david.mailapp.testhelpers.testFetchedEmail
 import java.io.IOException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -77,7 +78,17 @@ class EmailResolutionContractsTest {
         val email = testEmail(id = id, folder = folder).copy(
             body = body, cleanBody = cleanBody,
             rfcMessageId = rfcMessageId, rfcReferences = rfcReferences,
-            pdfAttachments = pdfs, pdfMetadataScanned = pdfs.isNotEmpty()
+            pdfAttachments = pdfs, pdfMetadataScanned = pdfs.isNotEmpty(),
+            contentState = if (body.isNotBlank()) {
+                com.david.mailapp.domain.model.EmailContentState.READY
+            } else {
+                com.david.mailapp.domain.model.EmailContentState.NOT_FETCHED
+            },
+            bodyKind = if (body.isNotBlank()) {
+                com.david.mailapp.domain.model.EmailBodyKind.HTML
+            } else {
+                com.david.mailapp.domain.model.EmailBodyKind.UNKNOWN
+            }
         )
         db.emailDao().upsertAll(listOf(EmailEntity.fromDomain(email, folder)))
     }
@@ -110,7 +121,7 @@ class EmailResolutionContractsTest {
 
     @Test fun cacheMiss_remote_found_persists_and_returns_email() = runTest {
         provider.fetchEmailByIdResult = EmailLookupResult.Found(
-            testEmail("e2", folder = EmailFolder.Inbox)
+            testFetchedEmail("e2", folder = EmailFolder.Inbox)
         )
         val result = repository.resolveEmailById("e2")
 
@@ -131,7 +142,7 @@ class EmailResolutionContractsTest {
 
     @Test fun remoteResolution_thenReopen_usesCacheWithoutSecondRemoteCall() = runTest {
         provider.fetchEmailByIdResult = EmailLookupResult.Found(
-            testEmail("reopen", folder = EmailFolder.Other, subject = "Remote then cached")
+            testFetchedEmail("reopen", folder = EmailFolder.Other, subject = "Remote then cached")
         )
 
         val first = repository.resolveEmailById("reopen")
@@ -209,7 +220,7 @@ class EmailResolutionContractsTest {
     @Test fun localWriteFailure_differentiated_from_other_failures() = runTest {
         val gate = CompletableDeferred<Unit>()
         provider.fetchEmailByIdResult = EmailLookupResult.Found(
-            testEmail("we", folder = EmailFolder.Inbox)
+            testFetchedEmail("we", folder = EmailFolder.Inbox)
         )
         provider.fetchEmailByIdDeferred = gate
 
@@ -370,7 +381,7 @@ class EmailResolutionContractsTest {
     @Test fun invalidateSession_during_request_prevents_write() = runTest {
         val gate = CompletableDeferred<Unit>()
         provider.fetchEmailByIdResult = EmailLookupResult.Found(
-            testEmail("sess", folder = EmailFolder.Inbox)
+            testFetchedEmail("sess", folder = EmailFolder.Inbox)
         )
         provider.fetchEmailByIdDeferred = gate
 
@@ -388,7 +399,7 @@ class EmailResolutionContractsTest {
     @Test fun singleFlight_sameIdSingleRemoteCall_andBothReceiveSameResult() = runTest {
         val gate = CompletableDeferred<Unit>()
         provider.fetchEmailByIdResult = EmailLookupResult.Found(
-            testEmail("sf", folder = EmailFolder.Other, subject = "shared")
+            testFetchedEmail("sf", folder = EmailFolder.Other, subject = "shared")
         )
         provider.fetchEmailByIdDeferred = gate
 
@@ -428,8 +439,8 @@ class EmailResolutionContractsTest {
         val gate = CompletableDeferred<Unit>()
         provider.fetchEmailByIdDeferredByCall = listOf(gate, gate)
         provider.fetchEmailByIdResultsByCall = listOf(
-            EmailLookupResult.Found(testEmail("da", folder = EmailFolder.Other, subject = "A")),
-            EmailLookupResult.Found(testEmail("db", folder = EmailFolder.Other, subject = "B"))
+            EmailLookupResult.Found(testFetchedEmail("da", folder = EmailFolder.Other, subject = "A")),
+            EmailLookupResult.Found(testFetchedEmail("db", folder = EmailFolder.Other, subject = "B"))
         )
 
         val r1 = async { localRepo.resolveEmailById("da") }
@@ -454,7 +465,7 @@ class EmailResolutionContractsTest {
 
     @Test fun cancelFollower_doesNotCancelLeader() = runTest {
         val gate = CompletableDeferred<Unit>()
-        provider.fetchEmailByIdResult = EmailLookupResult.Found(testEmail("cf", folder = EmailFolder.Other))
+        provider.fetchEmailByIdResult = EmailLookupResult.Found(testFetchedEmail("cf", folder = EmailFolder.Other))
         provider.fetchEmailByIdDeferred = gate
 
         val leader = async { repository.resolveEmailById("cf") }
@@ -472,7 +483,7 @@ class EmailResolutionContractsTest {
 
     @Test fun cancelLeader_cleansUp_singleFlight_andAllowsRetry() = runTest {
         val gate = CompletableDeferred<Unit>()
-        provider.fetchEmailByIdResult = EmailLookupResult.Found(testEmail("cl", folder = EmailFolder.Other))
+        provider.fetchEmailByIdResult = EmailLookupResult.Found(testFetchedEmail("cl", folder = EmailFolder.Other))
         provider.fetchEmailByIdDeferred = gate
 
         val leader = async { repository.resolveEmailById("cl") }
@@ -508,8 +519,8 @@ class EmailResolutionContractsTest {
         val gate = CompletableDeferred<Unit>()
         provider.fetchEmailByIdDeferredByCall = listOf(gate, gate)
         provider.fetchEmailByIdResultsByCall = listOf(
-            EmailLookupResult.Found(testEmail("gen", folder = EmailFolder.Other, subject = "old-session")),
-            EmailLookupResult.Found(testEmail("gen", folder = EmailFolder.Other, subject = "new-session"))
+            EmailLookupResult.Found(testFetchedEmail("gen", folder = EmailFolder.Other, subject = "old-session")),
+            EmailLookupResult.Found(testFetchedEmail("gen", folder = EmailFolder.Other, subject = "new-session"))
         )
 
         // Start old-generation resolution
@@ -548,12 +559,12 @@ class EmailResolutionContractsTest {
     @Test fun provider_is_resolved_fresh_for_each_cache_miss() = runTest {
         val firstProvider = FakeEmailProvider().apply {
             fetchEmailByIdResult = EmailLookupResult.Found(
-                testEmail("fresh-a", folder = EmailFolder.Other, subject = "first-provider")
+                testFetchedEmail("fresh-a", folder = EmailFolder.Other, subject = "first-provider")
             )
         }
         val secondProvider = FakeEmailProvider().apply {
             fetchEmailByIdResult = EmailLookupResult.Found(
-                testEmail("fresh-b", folder = EmailFolder.Other, subject = "second-provider")
+                testFetchedEmail("fresh-b", folder = EmailFolder.Other, subject = "second-provider")
             )
         }
         var currentProvider: FakeEmailProvider? = firstProvider
@@ -621,7 +632,7 @@ class EmailResolutionContractsTest {
         val gate = CompletableDeferred<Unit>()
         provider.fetchEmailByIdDeferred = gate
         provider.fetchEmailByIdResult = EmailLookupResult.Found(
-            testEmail("joined-cancel", folder = EmailFolder.Other, subject = "retry")
+            testFetchedEmail("joined-cancel", folder = EmailFolder.Other, subject = "retry")
         )
 
         val leader = async { localRepository.resolveEmailById("joined-cancel") }

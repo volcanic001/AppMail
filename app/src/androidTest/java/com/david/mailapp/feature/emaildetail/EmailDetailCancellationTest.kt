@@ -103,6 +103,7 @@ class EmailDetailCancellationTest {
         val bodyWithCid = "<html><body><img src=\"cid:image-1\"></body></html>"
         provider.fetchEmailByIdResult = EmailLookupResult.Found(email.copy(
             body = bodyWithCid,
+            pdfMetadataScanned = true,
             contentState = com.david.mailapp.domain.model.EmailContentState.READY,
             bodyKind = com.david.mailapp.domain.model.EmailBodyKind.HTML,
             inlineReferences = listOf(
@@ -153,6 +154,7 @@ class EmailDetailCancellationTest {
         provider.fetchEmailByIdDeferred = bodyGate
         provider.fetchEmailByIdResult = EmailLookupResult.Found(email.copy(
             body = "Fetched Body",
+            pdfMetadataScanned = true,
             contentState = com.david.mailapp.domain.model.EmailContentState.READY,
             bodyKind = com.david.mailapp.domain.model.EmailBodyKind.PLAIN_TEXT
         ))
@@ -187,6 +189,7 @@ class EmailDetailCancellationTest {
 
         provider.fetchEmailByIdResult = EmailLookupResult.Found(email.copy(
             body = bodyWithCid,
+            pdfMetadataScanned = true,
             contentState = com.david.mailapp.domain.model.EmailContentState.READY,
             bodyKind = com.david.mailapp.domain.model.EmailBodyKind.HTML,
             inlineReferences = listOf(
