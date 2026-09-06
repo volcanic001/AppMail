@@ -39,43 +39,47 @@ fun ActionFeedbackEffect(
     LaunchedEffect(feedback?.id) {
         val current = feedback ?: return@LaunchedEffect
 
-        val result = when (current) {
-            is ActionFeedback.MovedToTrashBatch -> {
-                val message = if (current.count == 1) movedSingle
-                              else movedPlural.format(current.count)
-                val canUndo = onUndoBatch != null && current.emailIds.isNotEmpty()
-                snackbarHostState.showSnackbar(
-                    message = message,
-                    actionLabel = if (canUndo) undoLabel else null,
+        try {
+            val result = when (current) {
+                is ActionFeedback.MovedToTrashBatch -> {
+                    val message = if (current.count == 1) movedSingle
+                                  else movedPlural.format(current.count)
+                    val canUndo = onUndoBatch != null && current.emailIds.isNotEmpty()
+                    snackbarHostState.showSnackbar(
+                        message = message,
+                        actionLabel = if (canUndo) undoLabel else null,
+                        duration = SnackbarDuration.Short
+                    )
+                }
+                is ActionFeedback.RestoredToInbox -> snackbarHostState.showSnackbar(
+                    message = restoredMessage,
+                    duration = SnackbarDuration.Short
+                )
+                is ActionFeedback.DeletedPermanently -> snackbarHostState.showSnackbar(
+                    message = deletedMessage,
+                    duration = SnackbarDuration.Short
+                )
+                is ActionFeedback.TrashFailure -> {
+                    val message = if (current.failedCount == 1) failedSingle
+                                  else failedPlural.format(current.failedCount)
+                    snackbarHostState.showSnackbar(
+                        message = message,
+                        duration = SnackbarDuration.Short
+                    )
+                }
+                is ActionFeedback.Failure -> snackbarHostState.showSnackbar(
+                    message = requireNotNull(failureMessage),
                     duration = SnackbarDuration.Short
                 )
             }
-            is ActionFeedback.RestoredToInbox -> snackbarHostState.showSnackbar(
-                message = restoredMessage,
-                duration = SnackbarDuration.Short
-            )
-            is ActionFeedback.DeletedPermanently -> snackbarHostState.showSnackbar(
-                message = deletedMessage,
-                duration = SnackbarDuration.Short
-            )
-            is ActionFeedback.TrashFailure -> {
-                val message = if (current.failedCount == 1) failedSingle
-                              else failedPlural.format(current.failedCount)
-                snackbarHostState.showSnackbar(
-                    message = message,
-                    duration = SnackbarDuration.Short
-                )
+
+            if (current is ActionFeedback.MovedToTrashBatch && result == SnackbarResult.ActionPerformed) {
+                onUndoBatch?.invoke(current.emailIds)
             }
-            is ActionFeedback.Failure -> snackbarHostState.showSnackbar(
-                message = requireNotNull(failureMessage),
-                duration = SnackbarDuration.Short
-            )
+        } finally {
+            // Leaving this destination cancels showSnackbar(). Consume the event
+            // on that path too so returning to the same ViewModel cannot replay it.
+            onConsumed(current.id)
         }
-
-        if (current is ActionFeedback.MovedToTrashBatch && result == SnackbarResult.ActionPerformed) {
-            onUndoBatch?.invoke(current.emailIds)
-        }
-
-        onConsumed(current.id)
     }
 }

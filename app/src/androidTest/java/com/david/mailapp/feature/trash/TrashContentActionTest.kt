@@ -232,6 +232,47 @@ class TrashContentActionTest {
         assertEquals(true, queue.isEmpty())
     }
 
+    @Test
+    fun visible_feedback_is_consumed_when_destination_leaves_composition() {
+        var queue by mutableStateOf<List<ActionFeedback>>(
+            listOf(ActionFeedback.MovedToTrashBatch(emailIds = listOf(email.id)))
+        )
+        var destinationVisible by mutableStateOf(true)
+        val consumedCount = AtomicInteger(0)
+        val snackbarHostState = SnackbarHostState()
+
+        composeRule.setContent {
+            MaterialTheme {
+                Box {
+                    if (destinationVisible) {
+                        ActionFeedbackEffect(
+                            feedback = queue.firstOrNull(),
+                            snackbarHostState = snackbarHostState,
+                            onConsumed = { id ->
+                                queue = queue.filterNot { it.id == id }
+                                consumedCount.incrementAndGet()
+                            },
+                            onUndoBatch = {}
+                        )
+                        SnackbarHost(hostState = snackbarHostState)
+                    }
+                }
+            }
+        }
+
+        composeRule.onNodeWithText("Movido a la papelera").assertExists()
+        composeRule.runOnIdle { destinationVisible = false }
+        composeRule.waitUntil(timeoutMillis = 2_000) {
+            queue.isEmpty() && consumedCount.get() == 1
+        }
+
+        composeRule.runOnIdle { destinationVisible = true }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText("Movido a la papelera").assertDoesNotExist()
+        assertEquals(1, consumedCount.get())
+    }
+
     private fun setTrashContent(
         initialState: TrashUiState.Success = TrashUiState.Success(emails = listOf(email)),
         stateProvider: (() -> TrashUiState.Success)? = null,
