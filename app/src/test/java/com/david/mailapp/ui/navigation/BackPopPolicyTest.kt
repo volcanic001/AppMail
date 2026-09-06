@@ -19,6 +19,13 @@ class BackPopPolicyTest {
         )
     }
 
+    @Test
+    fun authorized_currentEntry_started_hasPrevious() {
+        assertTrue(
+            canPopBackFrom(entryId, entryId, Lifecycle.State.STARTED, true)
+        )
+    }
+
     // ── Stale ID ──────────────────────────────────────────────────
 
     @Test
@@ -54,9 +61,9 @@ class BackPopPolicyTest {
     }
 
     @Test
-    fun blocked_started() {
+    fun blocked_started_staleId() {
         assertFalse(
-            canPopBackFrom(entryId, entryId, Lifecycle.State.STARTED, true)
+            canPopBackFrom(entryId, differentId, Lifecycle.State.STARTED, true)
         )
     }
 

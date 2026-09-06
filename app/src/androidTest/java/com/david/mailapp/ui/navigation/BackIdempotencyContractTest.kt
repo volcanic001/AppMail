@@ -65,6 +65,22 @@ class BackIdempotencyContractTest {
     }
 
     @Test
+    fun popBackStackFrom_currentStartedEntry_duringEnterTransition_returnsTrue() {
+        val navController = setup()
+
+        composeTestRule.runOnUiThread {
+            navController.navigateToOverlay(MainRoute.EmailDetail("e-transitioning"))
+            val entry = checkNotNull(navController.currentBackStackEntry)
+
+            assertEquals(Lifecycle.State.STARTED, entry.lifecycle.currentState)
+            assertTrue(navController.popBackStackFrom(entry))
+        }
+
+        composeTestRule.waitForIdle()
+        assertTrue(navController.currentBackStackEntry?.destination?.hasRoute<MainRoute.Inbox>() == true)
+    }
+
+    @Test
     fun popBackStackFrom_sameEntryTwice_secondReturnsFalse() {
         val navController = setup()
         composeTestRule.runOnUiThread {

@@ -18,7 +18,8 @@ internal const val KEY_CLOSED_EMAIL_ID = "closed_email_id"
  *
  * Returns true exclusively when:
  * - The originating entry is still the current destination (IDs match).
- * - Its lifecycle state is exactly [Lifecycle.State.RESUMED].
+ * - Its lifecycle has reached at least [Lifecycle.State.STARTED], which also covers an entry
+ *   that is already visible but still completing its enter transition.
  * - There is a previous back stack entry to pop to.
  */
 internal fun canPopBackFrom(
@@ -28,12 +29,12 @@ internal fun canPopBackFrom(
     hasPreviousEntry: Boolean
 ): Boolean {
     return originatingEntryId == currentEntryId &&
-            originatingLifecycleState == Lifecycle.State.RESUMED &&
+            originatingLifecycleState.isAtLeast(Lifecycle.State.STARTED) &&
             hasPreviousEntry
 }
 
 /**
- * Pop the back stack only if [originatingEntry] is still the current RESUMED entry.
+ * Pop the back stack only if [originatingEntry] is still the current visible entry.
  *
  * This is the idempotent primitive: a stale or forwarded entry never consumes
  * another destination.
