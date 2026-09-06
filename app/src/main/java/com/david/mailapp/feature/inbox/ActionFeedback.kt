@@ -25,7 +25,7 @@ class ActionFeedbackId private constructor(val value: Long) {
  * Typed, UI-only action feedback. No exceptions, no technical messages.
  *
  * Each instance carries a unique [id] so consumers can observe
- * exactly that feedback and no other — even two [MovedToTrash] or
+ * exactly that feedback and no other — even two [MovedToTrashBatch] or
  * two [RestoredToInbox] for different actions are distinguishable.
  * The id is a data-class component so Compose also treats repeated
  * feedback with identical payloads as distinct values.
@@ -33,8 +33,15 @@ class ActionFeedbackId private constructor(val value: Long) {
 sealed class ActionFeedback {
     abstract val id: ActionFeedbackId
 
-    data class MovedToTrash(
-        val emailId: String,
+    /**
+     * One or more emails moved to trash as a single optimistic batch.
+     * [emailIds] are the IDs in this group — used for batch UNDO.
+     * [count] is pre-computed for display; equals [emailIds].size but
+     * kept explicit so the UI does not need to re-compute it.
+     */
+    data class MovedToTrashBatch(
+        val emailIds: List<String>,
+        val count: Int = emailIds.size,
         override val id: ActionFeedbackId = ActionFeedbackId.next()
     ) : ActionFeedback()
 
@@ -45,6 +52,16 @@ sealed class ActionFeedback {
 
     data class DeletedPermanently(
         val emailId: String,
+        override val id: ActionFeedbackId = ActionFeedbackId.next()
+    ) : ActionFeedback()
+
+    /**
+     * Remote trash operation failed for [failedCount] emails.
+     * Distinct from the generic [Failure] so the UI can show a
+     * context-specific message ("Could not move N email(s) to trash").
+     */
+    data class TrashFailure(
+        val failedCount: Int,
         override val id: ActionFeedbackId = ActionFeedbackId.next()
     ) : ActionFeedback()
 

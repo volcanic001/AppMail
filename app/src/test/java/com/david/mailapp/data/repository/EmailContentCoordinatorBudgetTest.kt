@@ -61,8 +61,8 @@ class EmailContentCoordinatorBudgetTest {
         }
         override suspend fun upsertPreservingCachedContent(emails: List<EmailEntity>) {}
         override suspend fun sumReadyContentBytes(): Long? = 0L
-        override suspend fun getLruEvictionCandidates(protectedEmailId: String): List<EmailEntity> = emptyList()
-        override suspend fun getGlobalLruEvictionCandidates(): List<EmailEntity> = emptyList()
+        override suspend fun getLruEvictionCandidates(protectedEmailId: String): List<com.david.mailapp.data.local.entity.LruCandidateProjection> = emptyList()
+        override suspend fun getGlobalLruEvictionCandidates(): List<com.david.mailapp.data.local.entity.LruCandidateProjection> = emptyList()
         override suspend fun clearContent(emailId: String) {}
         override suspend fun enforceContentBudget(maxBudgetBytes: Long) {}
         override suspend fun updateCleanBodyIfCurrent(

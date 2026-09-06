@@ -38,6 +38,9 @@ import com.david.mailapp.ui.theme.ColorPalette
 import com.david.mailapp.ui.theme.MotionTokens
 import kotlinx.coroutines.launch
 
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.derivedStateOf
+
 @Composable
 fun MainScreen(
     currentPalette: ColorPalette = ColorPalette.Blue,

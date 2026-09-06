@@ -300,28 +300,28 @@ interface EmailDao {
         }
         return false
     }
-    
+
     // LRU Policy Methods (Subfase 2.3)
 
     @Query("SELECT SUM(cached_content_bytes) FROM emails WHERE content_state = 'READY'")
     suspend fun sumReadyContentBytes(): Long?
 
     @Query("""
-        SELECT * FROM emails 
+        SELECT id, cached_content_bytes, content_last_access_epoch_ms FROM emails
         WHERE content_state = 'READY' AND id != :protectedEmailId
         ORDER BY content_last_access_epoch_ms ASC, id ASC
     """)
-    suspend fun getLruEvictionCandidates(protectedEmailId: String): List<EmailEntity>
+    suspend fun getLruEvictionCandidates(protectedEmailId: String): List<com.david.mailapp.data.local.entity.LruCandidateProjection>
 
     @Query("""
-        SELECT * FROM emails
+        SELECT id, cached_content_bytes, content_last_access_epoch_ms FROM emails
         WHERE content_state = 'READY'
         ORDER BY content_last_access_epoch_ms ASC, id ASC
     """)
-    suspend fun getGlobalLruEvictionCandidates(): List<EmailEntity>
+    suspend fun getGlobalLruEvictionCandidates(): List<com.david.mailapp.data.local.entity.LruCandidateProjection>
 
     @Query("""
-        UPDATE emails SET 
+        UPDATE emails SET
             body = '',
             clean_body = '',
             inline_references_json = '[]',

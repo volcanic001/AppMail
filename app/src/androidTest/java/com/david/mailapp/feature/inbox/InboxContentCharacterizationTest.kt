@@ -141,7 +141,7 @@ class InboxContentCharacterizationTest {
                     onLoadNextPage = {},
                     onMoveToTrash = {},
                     onFeedbackConsumed = {},
-                    onUndoMoveToTrash = {},
+                    onUndoBatch = {},
                     snackbarHostState = SnackbarHostState()
                 )
             }
@@ -176,7 +176,7 @@ class InboxContentCharacterizationTest {
                     onLoadNextPage = {},
                     onMoveToTrash = {},
                     onFeedbackConsumed = {},
-                    onUndoMoveToTrash = {},
+                    onUndoBatch = {},
                     snackbarHostState = SnackbarHostState()
                 )
             }
@@ -214,7 +214,7 @@ class InboxContentCharacterizationTest {
                     onLoadNextPage = {},
                     onMoveToTrash = {},
                     onFeedbackConsumed = {},
-                    onUndoMoveToTrash = {},
+                    onUndoBatch = {},
                     snackbarHostState = SnackbarHostState()
                 )
             }
@@ -251,7 +251,7 @@ class InboxContentCharacterizationTest {
                     onLoadNextPage = {},
                     onMoveToTrash = {},
                     onFeedbackConsumed = {},
-                    onUndoMoveToTrash = {},
+                    onUndoBatch = {},
                     snackbarHostState = SnackbarHostState()
                 )
             }
@@ -270,9 +270,9 @@ class InboxContentCharacterizationTest {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val undoLabel = context.getString(R.string.action_undo)
         var consumedId: ActionFeedbackId? = null
-        var undoId: String? = null
+        var undoneIds: List<String>? = null
 
-        val feedback = ActionFeedback.MovedToTrash(emailId = "e1")
+        val feedback = ActionFeedback.MovedToTrashBatch(emailIds = listOf("e1"))
 
         composeRule.setContent {
             MaterialTheme {
@@ -292,7 +292,7 @@ class InboxContentCharacterizationTest {
                     onLoadNextPage = {},
                     onMoveToTrash = {},
                     onFeedbackConsumed = { consumedId = it },
-                    onUndoMoveToTrash = { undoId = it },
+                    onUndoBatch = { undoneIds = it },
                     snackbarHostState = remember { SnackbarHostState() }
                 )
             }
@@ -301,7 +301,7 @@ class InboxContentCharacterizationTest {
         composeRule.onNodeWithText(undoLabel).performClick()
 
         assertEquals(feedback.id, consumedId)
-        assertEquals("e1", undoId)
+        assertEquals(listOf("e1"), undoneIds)
     }
 
     @Test
@@ -344,7 +344,7 @@ class InboxContentCharacterizationTest {
                     onLoadNextPage = {},
                     onMoveToTrash = { trashedId = it },
                     onFeedbackConsumed = {},
-                    onUndoMoveToTrash = {},
+                    onUndoBatch = {},
                     snackbarHostState = SnackbarHostState()
                 )
             }
@@ -353,6 +353,7 @@ class InboxContentCharacterizationTest {
         composeRule.onNodeWithText("Asunto e1").performTouchInput {
             swipeLeft()
         }
+        composeRule.waitForIdle()
 
         assertEquals("e1", trashedId)
     }
@@ -380,7 +381,7 @@ class InboxContentCharacterizationTest {
                     onLoadNextPage = {},
                     onMoveToTrash = { trashedId = it },
                     onFeedbackConsumed = {},
-                    onUndoMoveToTrash = {},
+                    onUndoBatch = {},
                     snackbarHostState = SnackbarHostState()
                 )
             }
@@ -430,7 +431,7 @@ class InboxContentCharacterizationTest {
                     onLoadNextPage = {},
                     onMoveToTrash = {},
                     onFeedbackConsumed = {},
-                    onUndoMoveToTrash = {},
+                    onUndoBatch = {},
                     snackbarHostState = SnackbarHostState()
                 )
             }
@@ -467,7 +468,7 @@ class InboxContentCharacterizationTest {
                     onLoadNextPage = { loadNextPageCalls++ },
                     onMoveToTrash = {},
                     onFeedbackConsumed = {},
-                    onUndoMoveToTrash = {},
+                    onUndoBatch = {},
                     snackbarHostState = SnackbarHostState()
                 )
             }
@@ -500,7 +501,7 @@ class InboxContentCharacterizationTest {
                     onLoadNextPage = { loadNextPageCalls++ },
                     onMoveToTrash = {},
                     onFeedbackConsumed = {},
-                    onUndoMoveToTrash = {},
+                    onUndoBatch = {},
                     snackbarHostState = SnackbarHostState()
                 )
             }
@@ -530,7 +531,7 @@ class InboxContentCharacterizationTest {
                     onLoadNextPage = {},
                     onMoveToTrash = {},
                     onFeedbackConsumed = {},
-                    onUndoMoveToTrash = {},
+                    onUndoBatch = {},
                     snackbarHostState = SnackbarHostState()
                 )
             }

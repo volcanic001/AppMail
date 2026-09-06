@@ -16,11 +16,32 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.david.mailapp.R
 import com.david.mailapp.feature.inbox.components.EmailListItem
 import com.david.mailapp.ui.components.ContainedLoadingIndicator
 import kotlinx.coroutines.flow.distinctUntilChanged
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.TimeZone
+
+internal class InboxTimeFormatter(
+    private val pattern: String,
+    private val locale: java.util.Locale,
+    private val timeZone: TimeZone = TimeZone.getDefault()
+) {
+    private val simpleDateFormat = SimpleDateFormat(pattern, locale).apply {
+        timeZone = this@InboxTimeFormatter.timeZone
+    }
+
+    @Synchronized
+    fun format(timestamp: Long): String {
+        return simpleDateFormat.format(Date(timestamp))
+    }
+}
 
 @Composable
 internal fun InboxEmailList(
@@ -35,12 +56,23 @@ internal fun InboxEmailList(
     contentPadding: PaddingValues,
     modifier: Modifier = Modifier
 ) {
+    val timePattern = stringResource(R.string.date_pattern_time)
+    val locale = LocalLocale.current.platformLocale
+    val timeZoneId = TimeZone.getDefault().id
+    val formatter = remember(timePattern, locale, timeZoneId) {
+        InboxTimeFormatter(
+            pattern = timePattern,
+            locale = locale,
+            timeZone = TimeZone.getTimeZone(timeZoneId)
+        )
+    }
+
     LazyColumn(
         state = listState,
         modifier = modifier.testTag("inbox_list"),
         contentPadding = contentPadding
     ) {
-        if (state.emails.isEmpty()) {
+        if (state.visibleEmails.isEmpty()) {
             item(key = "empty") {
                 Box(
                     modifier = Modifier.fillParentMaxSize().testTag("inbox_empty"),
@@ -48,7 +80,10 @@ internal fun InboxEmailList(
                 ) { EmptyInbox() }
             }
         } else {
-            items(items = state.emails, key = { it.id }) { email ->
+            items(items = state.visibleEmails, key = { it.id }) { email ->
+                val formattedTime = remember(email.timestamp, formatter) {
+                    formatter.format(email.timestamp)
+                }
                 val onClickRemembered = remember(email.id) {
                     {
                         com.david.mailapp.core.perf.MailOpenPerformanceTrace.onInboxItemClicked(email.id)
@@ -64,13 +99,17 @@ internal fun InboxEmailList(
                     showDivider = showEmailDividers,
                     isHighlighted = email.id == highlightedEmailId,
                     onClearHighlight = onClearHighlight,
+                    formattedTimeOverride = formattedTime,
                     modifier = Modifier.animateItem(
                         fadeInSpec = tween(durationMillis = 280),
                         placementSpec = spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            dampingRatio = Spring.DampingRatioNoBouncy,
                             stiffness = Spring.StiffnessMediumLow
                         ),
-                        fadeOutSpec = tween(durationMillis = 180)
+                        // Swipe dismissal already owns the horizontal exit.
+                        // Retaining a second disappearing layer can replay a stale
+                        // frame while the remaining rows are being repositioned.
+                        fadeOutSpec = null
                     )
                 )
             }
@@ -101,7 +140,7 @@ private fun InboxPaginationEffect(
     listState: LazyListState,
     onLoadNextPage: () -> Unit
 ) {
-    LaunchedEffect(listState, state.emails.isEmpty()) {
+    LaunchedEffect(listState, state.visibleEmails.isEmpty()) {
         snapshotFlow {
             val layout = listState.layoutInfo
             val lastIndex = layout.visibleItemsInfo.lastOrNull()?.index ?: 0
@@ -109,7 +148,7 @@ private fun InboxPaginationEffect(
         }
             .distinctUntilChanged()
             .collect { (lastVisible, total) ->
-                if (state.emails.isNotEmpty() && total > 0 && lastVisible >= total - 3) {
+                if (state.visibleEmails.isNotEmpty() && total > 0 && lastVisible >= total - 3) {
                     onLoadNextPage()
                 }
             }

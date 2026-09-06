@@ -45,7 +45,7 @@ object ThemeDebug {
         Log.d(TAG, "   • surfaceContainer:   ${colorScheme.surfaceContainer.toHex()}")
         
         // Check for tonal palette glitch (where primary changes but primaryContainer/secondary remain default purple)
-        if (!isDynamic && palette != ColorPalette.Dynamic && palette != ColorPalette.Purple) {
+        if (!isDynamic && palette != ColorPalette.Dynamic) {
             val defaultPurpleContainer = Color(0xFFE8DEF8).toHex()
             if (colorScheme.primaryContainer.toHex() == defaultPurpleContainer) {
                 Log.w(TAG, "⚠️ [GLITCH DETECTED] primaryContainer is still Material 3 default purple ($defaultPurpleContainer) while primary is ${colorScheme.primary.toHex()}! Tonal palette scheme generation is required!")

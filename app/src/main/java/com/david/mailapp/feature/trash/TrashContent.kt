@@ -35,6 +35,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -164,18 +165,20 @@ fun TrashContent(
                         val onRestoreRemembered = remember(email.id) {
                             { onRestoreToInbox(email.id) }
                         }
-                        EmailListItem(
-                            email = email,
-                            onClick = onClickRemembered,
-                            onDelete = onDeleteRemembered,
-                            onRestore = onRestoreRemembered,
-                            actionsEnabled = email.id !in state.activeActionEmailIds &&
-                                email.id != pendingDeleteEmailId,
-                            showDivider = showEmailDividers,
-                            isHighlighted = (email.id == highlightedEmailId),
-                            onClearHighlight = onClearHighlight,
-                            modifier = Modifier.animateItem(placementSpec = MotionTokens.listReorganize)
-                        )
+                        key(pendingDeleteEmailId == email.id) {
+                            EmailListItem(
+                                email = email,
+                                onClick = onClickRemembered,
+                                onDelete = onDeleteRemembered,
+                                onRestore = onRestoreRemembered,
+                                actionsEnabled = email.id !in state.activeActionEmailIds &&
+                                    email.id != pendingDeleteEmailId,
+                                showDivider = showEmailDividers,
+                                isHighlighted = (email.id == highlightedEmailId),
+                                onClearHighlight = onClearHighlight,
+                                modifier = Modifier.animateItem(placementSpec = MotionTokens.listReorganize)
+                            )
+                        }
                     }
 
                     if (state.isLoadingNextPage) {
@@ -213,7 +216,7 @@ fun TrashContent(
             hostState = snackbarHostState,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 24.dp)
+                .padding(bottom = 88.dp, start = 16.dp, end = 16.dp)
         )
     }
 

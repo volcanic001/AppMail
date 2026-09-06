@@ -25,8 +25,8 @@ class EmailInlineImageInjectionTest {
         override suspend fun updateBodyAndPdfMetadata(emailId: String, body: String, cleanBody: String, pdfAttachmentsJson: String, hasAttachments: Boolean, contentState: String, bodyKind: String, inlineReferencesJson: String, cachedContentBytes: Long) {}
         override suspend fun updateCleanBodyIfCurrent(emailId: String, expectedRawBody: String, cleanBody: String, cachedContentBytes: Long): Int = 1
         override suspend fun sumReadyContentBytes(): Long? = 0L
-        override suspend fun getLruEvictionCandidates(protectedEmailId: String): List<EmailEntity> = emptyList()
-        override suspend fun getGlobalLruEvictionCandidates(): List<EmailEntity> = emptyList()
+        override suspend fun getLruEvictionCandidates(protectedEmailId: String): List<com.david.mailapp.data.local.entity.LruCandidateProjection> = emptyList()
+        override suspend fun getGlobalLruEvictionCandidates(): List<com.david.mailapp.data.local.entity.LruCandidateProjection> = emptyList()
         override suspend fun clearContent(emailId: String) {}
         override suspend fun getMaxContentLastAccess(): Long? = 0L
         override suspend fun updateContentLastAccess(emailId: String, newTimestamp: Long) {}

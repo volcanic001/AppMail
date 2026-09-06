@@ -72,9 +72,11 @@ fun MainNavHost(
     ) {
         composable<MainRoute.Inbox>(
             enterTransition = { fadeIn(spring(dampingRatio = 0.65f, stiffness = 350f)) },
-            exitTransition = { fadeOut(spring(dampingRatio = 0.65f, stiffness = 350f)) }
+            exitTransition = { fadeOut(spring(dampingRatio = 0.65f, stiffness = 350f)) },
+            popEnterTransition = { EnterTransition.None },
+            popExitTransition = { ExitTransition.None }
         ) { backStackEntry ->
-            val inboxListState = rememberLazyListState()
+            val inboxListState = androidx.compose.foundation.lazy.rememberLazyListState()
             val highlightedEmailId by backStackEntry.savedStateHandle
                 .getStateFlow<String?>(KEY_CLOSED_EMAIL_ID, null)
                 .collectAsStateWithLifecycle()
@@ -97,9 +99,11 @@ fun MainNavHost(
 
         composable<MainRoute.Trash>(
             enterTransition = { fadeIn(spring(dampingRatio = 0.65f, stiffness = 350f)) },
-            exitTransition = { fadeOut(spring(dampingRatio = 0.65f, stiffness = 350f)) }
+            exitTransition = { fadeOut(spring(dampingRatio = 0.65f, stiffness = 350f)) },
+            popEnterTransition = { EnterTransition.None },
+            popExitTransition = { ExitTransition.None }
         ) { backStackEntry ->
-            val trashListState = rememberLazyListState()
+            val trashListState = androidx.compose.foundation.lazy.rememberLazyListState()
             val highlightedEmailId by backStackEntry.savedStateHandle
                 .getStateFlow<String?>(KEY_CLOSED_EMAIL_ID, null)
                 .collectAsStateWithLifecycle()

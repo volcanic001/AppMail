@@ -40,7 +40,8 @@ internal fun InboxContent(
     onLoadNextPage: () -> Unit,
     onMoveToTrash: (String) -> Unit,
     onFeedbackConsumed: (ActionFeedbackId) -> Unit,
-    onUndoMoveToTrash: (String) -> Unit,
+    /** Restores a batch of emails from trash. Receives the full list of IDs in the batch. */
+    onUndoBatch: (List<String>) -> Unit,
     snackbarHostState: SnackbarHostState,
     modifier: Modifier = Modifier
 ) {
@@ -52,7 +53,7 @@ internal fun InboxContent(
         feedback = pendingFeedback,
         snackbarHostState = snackbarHostState,
         onConsumed = onFeedbackConsumed,
-        onUndoMoveToTrash = onUndoMoveToTrash
+        onUndoBatch = onUndoBatch
     )
 
     var wasAtTopWhenRefreshStarted by remember { mutableStateOf(false) }
@@ -122,7 +123,9 @@ internal fun InboxContent(
 
             SnackbarHost(
                 hostState = snackbarHostState,
-                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp)
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 88.dp, start = 16.dp, end = 16.dp)
             )
         }
     }

@@ -77,6 +77,7 @@ fun EmailListItem(
     showDivider: Boolean = true,
     isHighlighted: Boolean = false,
     onClearHighlight: () -> Unit = {},
+    formattedTimeOverride: String? = null,
     modifier: Modifier = Modifier
 ) {
     val scope = rememberCoroutineScope()
@@ -135,19 +136,22 @@ fun EmailListItem(
                         scope.launch {
                             if (abs(offsetX.value) > threshold) {
                                 isDismissed = true
-                                try {
-                                    val direction = sign(offsetX.value)
+                                val direction = sign(offsetX.value)
+                                var actionDispatched = false
+                                offsetX.animateTo(
+                                    targetValue = direction * screenWidth * 1.2f,
+                                    animationSpec = MotionTokens.swipeDismiss
+                                ) {
+                                    if (!actionDispatched && abs(value) >= screenWidth) {
+                                        actionDispatched = true
+                                        if (direction < 0f) onDelete() else onRestore?.invoke()
+                                    }
+                                }
+                                // The target is beyond the screen edge, so the animation
+                                // normally dispatches above. Keep a fallback for unusual
+                                // animation completion/rounding behavior.
+                                if (!actionDispatched) {
                                     if (direction < 0f) onDelete() else onRestore?.invoke()
-                                    offsetX.animateTo(
-                                        targetValue = direction * screenWidth * 1.2f,
-                                        animationSpec = MotionTokens.swipeDismiss
-                                    )
-                                    // Room owns removal. If the row is still composed
-                                    // (failure or confirmation pending), return it safely.
-                                    offsetX.animateTo(0f, MotionTokens.swipeReturn)
-                                } finally {
-                                    isDismissed = false
-                                    thresholdWasCrossed = false
                                 }
                             } else {
                                 // RETURN — rubber band overshoot
@@ -215,7 +219,7 @@ fun EmailListItem(
     ) {
         val timePattern = stringResource(R.string.date_pattern_time)
         val locale = LocalLocale.current.platformLocale
-        val formattedTime = remember(email.timestamp, timePattern, locale) {
+        val formattedTime = formattedTimeOverride ?: remember(email.timestamp, timePattern, locale) {
             SimpleDateFormat(timePattern, locale).format(Date(email.timestamp))
         }
         val parsedSender = remember(email.from) { parseEmailSender(email.from) }

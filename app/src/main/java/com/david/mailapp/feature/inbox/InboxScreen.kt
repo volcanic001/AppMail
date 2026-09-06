@@ -42,7 +42,7 @@ fun InboxScreen(
         onLoadNextPage = viewModel::loadNextPage,
         onMoveToTrash = viewModel::moveToTrash,
         onFeedbackConsumed = viewModel::consumeFeedback,
-        onUndoMoveToTrash = viewModel::undoMoveToTrash,
+        onUndoBatch = viewModel::undoMoveToTrash,
         snackbarHostState = snackbarHostState,
         modifier = modifier
     )

@@ -6,9 +6,10 @@ data class ParsedSender(
     val email: String
 )
 
+private val EMAIL_REGEX = Regex("<([^>]+)>")
+
 fun parseEmailSender(from: String): ParsedSender {
-    val emailRegex = Regex("<([^>]+)>")
-    val matchResult = emailRegex.find(from)
+    val matchResult = EMAIL_REGEX.find(from)
     val parsed = if (matchResult != null) {
         val email = matchResult.groupValues[1].trim()
         var name = from.substring(0, matchResult.range.first).trim()

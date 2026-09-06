@@ -144,10 +144,10 @@ class TrashContentActionTest {
     }
 
     @Test
-    fun inbox_feedback_is_absent_until_confirmed_event_then_undo_is_remote_action() {
+    fun inbox_batch_feedback_undoes_full_batch() {
         var feedback: ActionFeedback? by mutableStateOf(null)
         var consumed = false
-        var undoneEmailId: String? = null
+        var undoneEmailIds: List<String>? = null
 
         composeRule.setContent {
             MaterialTheme {
@@ -157,7 +157,7 @@ class TrashContentActionTest {
                         feedback = feedback,
                         snackbarHostState = host,
                         onConsumed = { consumed = true },
-                        onUndoMoveToTrash = { undoneEmailId = it }
+                        onUndoBatch = { undoneEmailIds = it }
                     )
                     SnackbarHost(hostState = host)
                 }
@@ -165,12 +165,14 @@ class TrashContentActionTest {
         }
 
         composeRule.onNodeWithText("Movido a la papelera").assertDoesNotExist()
-        composeRule.runOnIdle { feedback = ActionFeedback.MovedToTrash(email.id) }
+        composeRule.runOnIdle {
+            feedback = ActionFeedback.MovedToTrashBatch(emailIds = listOf(email.id))
+        }
         composeRule.onNodeWithText("Movido a la papelera").assertExists()
         composeRule.onNodeWithText("Deshacer").performClick()
         composeRule.waitForIdle()
 
-        assertEquals(email.id, undoneEmailId)
+        assertEquals(listOf(email.id), undoneEmailIds)
         assertEquals(true, consumed)
     }
 

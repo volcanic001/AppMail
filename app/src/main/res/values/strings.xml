@@ -112,9 +112,9 @@
     <string name="palette_dynamic">Dinámico</string>
     <string name="palette_blue">Azul</string>
     <string name="palette_green">Verde</string>
-    <string name="palette_purple">Morado</string>
-    <string name="palette_orange">Naranja</string>
-    <string name="palette_pink">Rosa</string>
+    <string name="palette_sepia">Sepia</string>
+    <string name="palette_nord">Nord</string>
+    <string name="palette_gruvbox">Gruvbox</string>
     <string name="palette_teal">Cian</string>
     <string name="palette_yellow">Amarillo</string>
     <string name="palette_monochrome">Neutro</string>
@@ -154,8 +154,11 @@
 
     <!-- Snackbars -->
     <string name="snackbar_moved_to_trash">Movido a la papelera</string>
+    <string name="snackbar_moved_to_trash_plural">%d correos movidos a la papelera</string>
     <string name="snackbar_deleted_permanently">Eliminado permanentemente</string>
     <string name="snackbar_restored_to_inbox">Restaurado en la bandeja</string>
+    <string name="snackbar_trash_failed_single">No se pudo mover 1 correo</string>
+    <string name="snackbar_trash_failed_plural">No se pudieron mover %d correos</string>
 
     <!-- Confirmación de borrado permanente -->
     <string name="trash_delete_dialog_title">¿Eliminar permanentemente?</string>

@@ -1,5 +1,6 @@
 package com.david.mailapp.ui.theme
 
+import android.os.Build
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
@@ -28,7 +29,7 @@ val GoogleSansFamily = FontFamily(
 )
 
 @OptIn(androidx.compose.ui.text.ExperimentalTextApi::class)
-val GoogleSansRoundedFamily = FontFamily(
+val GoogleSansRoundedFlexFamily = FontFamily(
     Font(R.font.google_sans_flex, weight = FontWeight.Normal, variationSettings = FontVariation.Settings(FontVariation.weight(400), FontVariation.Setting("ROND", 100f))),
     Font(R.font.google_sans_flex, weight = FontWeight.Medium, variationSettings = FontVariation.Settings(FontVariation.weight(500), FontVariation.Setting("ROND", 100f))),
     Font(R.font.google_sans_flex, weight = FontWeight.SemiBold, variationSettings = FontVariation.Settings(FontVariation.weight(600), FontVariation.Setting("ROND", 100f))),
@@ -37,8 +38,22 @@ val GoogleSansRoundedFamily = FontFamily(
     Font(R.font.google_sans_flex, weight = FontWeight.Black, variationSettings = FontVariation.Settings(FontVariation.weight(900), FontVariation.Setting("ROND", 100f)))
 )
 
+val GoogleSansRoundedStaticFamily = FontFamily(
+    Font(R.font.google_sans_rounded_bold, weight = FontWeight.Normal),
+    Font(R.font.google_sans_rounded_bold, weight = FontWeight.Medium),
+    Font(R.font.google_sans_rounded_bold, weight = FontWeight.SemiBold),
+    Font(R.font.google_sans_rounded_bold, weight = FontWeight.Bold),
+    Font(R.font.google_sans_rounded_bold, weight = FontWeight.ExtraBold),
+    Font(R.font.google_sans_rounded_bold, weight = FontWeight.Black)
+)
+
+// Legacy alias for compatibility
+val GoogleSansRoundedFamily = GoogleSansRoundedFlexFamily
+
 fun getMailAppTypography(useCustomFont: Boolean): Typography {
-    val family = if (useCustomFont) GoogleSansRoundedFamily else FontFamily.Default
+    val isPixelDevice = Build.MANUFACTURER.equals("Google", ignoreCase = true)
+    val roundedFamily = if (isPixelDevice) GoogleSansRoundedFlexFamily else GoogleSansRoundedStaticFamily
+    val family = if (useCustomFont) roundedFamily else FontFamily.Default
 
     return Typography(
         displayLarge = TextStyle(
