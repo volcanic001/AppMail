@@ -120,6 +120,10 @@ dependencies {
     // Coil
     implementation(libs.coil.compose)
 
+    // Haze (glassmorphism background blur for top bars)
+    implementation(libs.haze)
+    implementation(libs.haze.materials)
+
     // Navigation
     implementation(libs.navigation.compose)
 

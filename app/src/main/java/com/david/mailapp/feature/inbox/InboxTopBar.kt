@@ -1,9 +1,7 @@
 package com.david.mailapp.feature.inbox
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.background
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -20,17 +18,24 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import com.david.mailapp.R
 import com.david.mailapp.ui.theme.MotionTokens
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeEffect
+import dev.chrisbanes.haze.materials.HazeMaterials
 import kotlinx.coroutines.launch
 
-/** Internal visual extraction of the Inbox app bar; behavior and animation values are unchanged. */
+/**
+ * Inbox app bar rendered as a glass (haze) surface: its background blurs the
+ * list scrolling behind it while the title and icons stay fully opaque.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun InboxTopBar(
     onMenuClick: () -> Unit,
-    onSearchClick: () -> Unit
+    onSearchClick: () -> Unit,
+    hazeState: HazeState,
+    modifier: Modifier = Modifier
 ) {
     val scope = rememberCoroutineScope()
     val searchIconScale = remember { Animatable(1f) }
@@ -42,8 +47,6 @@ internal fun InboxTopBar(
         }
         onSearchClick()
     }
-
-    val glassColor = MaterialTheme.colorScheme.background.copy(alpha = 0.75f)
 
     TopAppBar(
         title = { androidx.compose.material3.Text(stringResource(R.string.inbox_title), style = MaterialTheme.typography.titleLarge) },
@@ -62,8 +65,9 @@ internal fun InboxTopBar(
             }
         },
         colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = glassColor,
-            scrolledContainerColor = glassColor
-        )
+            containerColor = Color.Transparent,
+            scrolledContainerColor = Color.Transparent
+        ),
+        modifier = modifier.hazeEffect(state = hazeState, style = HazeMaterials.thin())
     )
 }

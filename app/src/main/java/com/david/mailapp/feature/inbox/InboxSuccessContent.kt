@@ -9,6 +9,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.david.mailapp.ui.components.ContainedLoadingIndicator
 
@@ -21,6 +22,8 @@ internal fun InboxSuccessContent(
     isRefreshing: Boolean,
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Pushes the refresh indicator below the glass top bar so it stays visible. */
+    indicatorTopOffset: Dp = 0.dp,
     content: @Composable () -> Unit
 ) {
     val ptrState = rememberPullToRefreshState()
@@ -38,7 +41,8 @@ internal fun InboxSuccessContent(
                         .testTag("inbox_refresh_indicator")
                         .graphicsLayer {
                             val fraction = ptrState.distanceFraction.coerceIn(0f, 1.5f)
-                            translationY = if (isRefreshing) 24.dp.toPx() else fraction * 40.dp.toPx()
+                            val base = indicatorTopOffset.toPx()
+                            translationY = base + if (isRefreshing) 24.dp.toPx() else fraction * 40.dp.toPx()
                             val scale = if (isRefreshing) 1f else (fraction * 1.2f).coerceIn(0f, 1f)
                             scaleX = scale
                             scaleY = scale

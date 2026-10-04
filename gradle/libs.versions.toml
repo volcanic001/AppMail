@@ -25,6 +25,9 @@ navigation = "2.9.3"
 # Image loading
 coil = "2.7.0"
 
+# Haze (glassmorphism background blur)
+haze = "1.5.3"
+
 # Lifecycle
 lifecycle = "2.9.0"
 
@@ -84,6 +87,10 @@ navigation-testing = { group = "androidx.navigation", name = "navigation-testing
 
 # Coil
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
+
+# Haze (glassmorphism background blur)
+haze = { group = "dev.chrisbanes.haze", name = "haze", version.ref = "haze" }
+haze-materials = { group = "dev.chrisbanes.haze", name = "haze-materials", version.ref = "haze" }
 
 # Kotlin stdlib (needed because we don't apply kotlin-android plugin directly)
 kotlin-stdlib = { group = "org.jetbrains.kotlin", name = "kotlin-stdlib", version.ref = "kotlin" }

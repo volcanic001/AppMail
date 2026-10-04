@@ -2,10 +2,14 @@ package com.david.mailapp.feature.inbox
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
@@ -18,6 +22,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
 import kotlinx.coroutines.delay
 
 /**
@@ -79,16 +85,21 @@ internal fun InboxContent(
         }
     }
 
-    Scaffold(
-        modifier = modifier.fillMaxSize().testTag("inbox_root"),
-        topBar = {
-            InboxTopBar(onMenuClick = onMenuClick, onSearchClick = onSearchClick)
-        }
-    ) { paddingValues ->
+    val hazeState = remember { HazeState() }
+    val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    // Small Material3 top app bar is 64.dp tall; add the status bar it sits under.
+    val topBarHeight = statusBarTop + 64.dp
+
+    Box(
+        modifier = modifier.fillMaxSize().testTag("inbox_root")
+    ) {
+        // Content fills the whole screen and scrolls *behind* the glass bar,
+        // acting as the haze source that the bar blurs.
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = paddingValues.calculateTopPadding())
+                .hazeSource(state = hazeState)
         ) {
             when (val state = uiState) {
                 InboxUiState.Loading -> ShimmerLoading()
@@ -103,6 +114,7 @@ internal fun InboxContent(
                     InboxSuccessContent(
                         isRefreshing = state.isRefreshing,
                         onRefresh = onRefresh,
+                        indicatorTopOffset = topBarHeight,
                         modifier = Modifier.fillMaxSize()
                     ) {
                         InboxEmailList(
@@ -114,19 +126,28 @@ internal fun InboxContent(
                             onEmailClick = onEmailClick,
                             onLoadNextPage = onLoadNextPage,
                             onMoveToTrash = onMoveToTrash,
-                            contentPadding = PaddingValues(bottom = paddingValues.calculateBottomPadding() + 24.dp),
+                            contentPadding = PaddingValues(top = topBarHeight, bottom = bottomInset + 24.dp),
                             modifier = Modifier.fillMaxSize()
                         )
                     }
                 }
             }
-
-            SnackbarHost(
-                hostState = snackbarHostState,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 88.dp, start = 16.dp, end = 16.dp)
-            )
         }
+
+        InboxTopBar(
+            onMenuClick = onMenuClick,
+            onSearchClick = onSearchClick,
+            hazeState = hazeState,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+        )
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 88.dp, start = 16.dp, end = 16.dp)
+        )
     }
 }
