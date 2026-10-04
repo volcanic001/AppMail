@@ -16,6 +16,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.david.mailapp.R
@@ -37,7 +38,7 @@ fun ComposeTopBar(
         ComposeMode.FORWARD -> R.string.compose_title_forward
     }
 
-    val glassColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.75f)
+    val glassColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f)
 
     TopAppBar(
         title = {
@@ -75,6 +76,6 @@ fun ComposeTopBar(
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor = glassColor
         ),
-        modifier = modifier
+        modifier = modifier.blur(1.5.dp)
     )
 }

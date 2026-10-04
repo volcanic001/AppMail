@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
@@ -43,7 +44,7 @@ internal fun InboxTopBar(
         onSearchClick()
     }
 
-    val glassColor = MaterialTheme.colorScheme.background.copy(alpha = 0.75f)
+    val glassColor = MaterialTheme.colorScheme.background.copy(alpha = 0.8f)
 
     TopAppBar(
         title = { androidx.compose.material3.Text(stringResource(R.string.inbox_title), style = MaterialTheme.typography.titleLarge) },
@@ -64,6 +65,7 @@ internal fun InboxTopBar(
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor = glassColor,
             scrolledContainerColor = glassColor
-        )
+        ),
+        modifier = Modifier.blur(1.5.dp)
     )
 }

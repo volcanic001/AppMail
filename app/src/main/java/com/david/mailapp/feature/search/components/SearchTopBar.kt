@@ -29,6 +29,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -77,7 +78,7 @@ fun SearchTopBar(
         focusRequester.requestFocus()
     }
 
-    val glassColor = MaterialTheme.colorScheme.background.copy(alpha = 0.75f)
+    val glassColor = MaterialTheme.colorScheme.background.copy(alpha = 0.8f)
 
     Surface(
         tonalElevation = 2.dp,
@@ -86,6 +87,7 @@ fun SearchTopBar(
         modifier = modifier
             .fillMaxWidth()
             .statusBarsPadding()
+            .blur(1.5.dp)
     ) {
         Row(
             modifier = Modifier
