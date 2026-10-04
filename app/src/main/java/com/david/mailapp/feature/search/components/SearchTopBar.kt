@@ -77,9 +77,11 @@ fun SearchTopBar(
         focusRequester.requestFocus()
     }
 
+    val glassColor = MaterialTheme.colorScheme.background.copy(alpha = 0.75f)
+
     Surface(
         tonalElevation = 2.dp,
-        color = MaterialTheme.colorScheme.background,
+        color = glassColor,
         shape = RoundedCornerShape(bottomStart = cornerRadius, bottomEnd = cornerRadius),
         modifier = modifier
             .fillMaxWidth()

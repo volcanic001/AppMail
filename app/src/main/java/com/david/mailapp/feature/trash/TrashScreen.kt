@@ -69,6 +69,8 @@ fun TrashScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     val snackbarHostState = remember { SnackbarHostState() }
+    val glassColor = MaterialTheme.colorScheme.background.copy(alpha = 0.75f)
+
     Scaffold(
         modifier = modifier.fillMaxSize(),
         topBar = {
@@ -80,8 +82,8 @@ fun TrashScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    scrolledContainerColor = MaterialTheme.colorScheme.background
+                    containerColor = glassColor,
+                    scrolledContainerColor = glassColor
                 )
             )
         }

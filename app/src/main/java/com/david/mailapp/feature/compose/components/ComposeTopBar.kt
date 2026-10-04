@@ -37,6 +37,8 @@ fun ComposeTopBar(
         ComposeMode.FORWARD -> R.string.compose_title_forward
     }
 
+    val glassColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.75f)
+
     TopAppBar(
         title = {
             Text(stringResource(titleRes), style = MaterialTheme.typography.titleLarge)
@@ -71,7 +73,7 @@ fun ComposeTopBar(
             }
         },
         colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = glassColor
         ),
         modifier = modifier
     )
