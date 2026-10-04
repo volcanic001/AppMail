@@ -3,6 +3,7 @@ package com.david.mailapp.feature.emaildetail
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.david.mailapp.core.html.ensureInlineImageTags
 import com.david.mailapp.core.localization.UiErrorReason
 import com.david.mailapp.data.pdf.PdfDownloadFailure
 import com.david.mailapp.data.pdf.PdfDownloadState
@@ -55,6 +56,8 @@ class EmailDetailViewModel(
     private var isResolving = false
     private var isFetchingRemoteBody = false
     private var isFetchingInlineImages = false
+    private var isRecoveringInlineMetadata = false
+    private var hasAttemptedInlineMetadataRecovery = false
     private var cachedInlineImages: Map<String, String>? = null
     private var delivered = false
     private var hasRecordedAccess = false
@@ -88,6 +91,36 @@ class EmailDetailViewModel(
         delivered = false
         _uiState.value = EmailDetailUiState.PreparingBody(email)
         viewModelScope.launch { fetchRemoteBody(emailId, email) }
+    }
+
+    /** Toggle the favourite (starred) flag for the currently shown email. */
+    fun onToggleStar() {
+        val email = currentEmailOrNull() ?: return
+        val newValue = !email.isStarred
+        // Optimistic: flip the icon immediately; Room observation keeps it consistent.
+        applyStarredToState(newValue)
+        viewModelScope.launch(workerDispatcher) {
+            val result = source.setStarred(email.id, newValue)
+            if (result is com.david.mailapp.data.repository.EmailActionResult.Failure) {
+                applyStarredToState(!newValue)
+            }
+        }
+    }
+
+    private fun currentEmailOrNull(): Email? = when (val s = _uiState.value) {
+        is EmailDetailUiState.Ready -> s.email
+        is EmailDetailUiState.Empty -> s.email
+        else -> null
+    }
+
+    private fun applyStarredToState(starred: Boolean) {
+        when (val s = _uiState.value) {
+            is EmailDetailUiState.Ready ->
+                _uiState.value = s.copy(email = s.email.copy(isStarred = starred))
+            is EmailDetailUiState.Empty ->
+                _uiState.value = s.copy(email = s.email.copy(isStarred = starred))
+            else -> {}
+        }
     }
 
     private fun resolve() {
@@ -250,10 +283,22 @@ class EmailDetailViewModel(
             return
         }
 
-        val displayBody = if (email.bodyKind == EmailBodyKind.PLAIN_TEXT) {
+        val storedDisplayBody = if (email.bodyKind == EmailBodyKind.PLAIN_TEXT) {
             email.body
         } else {
             email.cleanBody.ifBlank { email.body }
+        }
+
+        // Legacy mixed messages can already contain downloadable image
+        // metadata while their cached HTML has no cid: element. Normalize the
+        // display copy so those images are downloaded without another sync.
+        val displayBody = if (
+            email.bodyKind == EmailBodyKind.HTML &&
+            email.inlineReferences.isNotEmpty()
+        ) {
+            ensureInlineImageTags(storedDisplayBody, email.inlineReferences)
+        } else {
+            storedDisplayBody
         }
 
         if (displayBody.isEmpty()) {
@@ -264,6 +309,37 @@ class EmailDetailViewModel(
                     UiErrorReason.EMAIL_BODY_LOAD_FAILED,
                     retryable = true
                 )
+            }
+            return
+        }
+
+        val isMissingInlineMetadata = email.bodyKind == EmailBodyKind.HTML &&
+            displayBody.contains("cid:", ignoreCase = true) &&
+            email.inlineReferences.isEmpty()
+
+        if (isMissingInlineMetadata) {
+            val shouldRecover = !hasAttemptedInlineMetadataRecovery
+            if (shouldRecover) {
+                hasAttemptedInlineMetadataRecovery = true
+                isRecoveringInlineMetadata = true
+                EmailRenderTrace.d(
+                    traceMail,
+                    "VM",
+                    "INLINE_METADATA_RECOVERY_START",
+                    "bodyLen=${displayBody.length}"
+                )
+            }
+
+            delivered = true
+            _uiState.value = EmailDetailUiState.Ready(
+                email.copy(body = displayBody),
+                inlineImagesLoading = isRecoveringInlineMetadata
+            )
+
+            if (shouldRecover) {
+                viewModelScope.launch {
+                    recoverMissingInlineMetadata()
+                }
             }
             return
         }
@@ -393,6 +469,66 @@ class EmailDetailViewModel(
     // ═══════════════════════════════════════════════════════════════
     // Inline image resolution
     // ═══════════════════════════════════════════════════════════════
+
+    /**
+     * Repairs legacy READY rows whose HTML survived the v6→v7 migration but
+     * whose CID metadata could not be reconstructed. The cached body remains
+     * visible while the authoritative message is recovered in the background.
+     */
+    private suspend fun recoverMissingInlineMetadata() {
+        val startedAt = EmailRenderTrace.now()
+        try {
+            when (val outcome = withContext(workerDispatcher) {
+                source.recoverContentById(emailId)
+            }) {
+                is com.david.mailapp.data.repository.EmailContentRecoveryResult.Found -> {
+                    currentCoroutineContext().ensureActive()
+                    EmailRenderTrace.d(
+                        traceMail,
+                        "VM",
+                        "INLINE_METADATA_RECOVERY_COMPLETE",
+                        "refs=${outcome.email.inlineReferences.size} " +
+                            "durationMs=${EmailRenderTrace.now() - startedAt}"
+                    )
+                    handleEmail(outcome.email)
+                }
+                com.david.mailapp.data.repository.EmailContentRecoveryResult.NotFound -> {
+                    EmailRenderTrace.d(
+                        traceMail,
+                        "VM",
+                        "INLINE_METADATA_RECOVERY_FAILURE",
+                        "reason=not_found durationMs=${EmailRenderTrace.now() - startedAt}"
+                    )
+                }
+                is com.david.mailapp.data.repository.EmailContentRecoveryResult.Failure -> {
+                    EmailRenderTrace.d(
+                        traceMail,
+                        "VM",
+                        "INLINE_METADATA_RECOVERY_FAILURE",
+                        "reason=${outcome.reason.name} durationMs=${EmailRenderTrace.now() - startedAt}"
+                    )
+                }
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (error: Exception) {
+            EmailRenderTrace.d(
+                traceMail,
+                "VM",
+                "INLINE_METADATA_RECOVERY_FAILURE",
+                "reason=${error.javaClass.simpleName} durationMs=${EmailRenderTrace.now() - startedAt}"
+            )
+        } finally {
+            isRecoveringInlineMetadata = false
+            val current = _uiState.value
+            if (!isFetchingInlineImages &&
+                current is EmailDetailUiState.Ready &&
+                current.inlineImagesLoading
+            ) {
+                _uiState.value = current.copy(inlineImagesLoading = false)
+            }
+        }
+    }
 
     private suspend fun resolveInlineImages(
         emailId: String,

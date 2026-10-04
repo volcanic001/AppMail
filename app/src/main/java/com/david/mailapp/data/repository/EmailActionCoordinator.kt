@@ -94,6 +94,25 @@ internal class EmailActionCoordinator(
         }
     }
 
+    suspend fun setStarred(emailId: String, starred: Boolean): EmailActionResult {
+        val lease = writeGuard.capture() ?: return EmailActionResult.Failure(
+            UiErrorReason.NO_ACTIVE_ACCOUNT, remoteApplied = false)
+        val p = providerFactory() ?: return EmailActionResult.Failure(
+            UiErrorReason.NO_ACTIVE_ACCOUNT, remoteApplied = false)
+
+        try {
+            p.setStarred(emailId, starred)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return EmailActionResult.Failure(e.toUiErrorReason(), remoteApplied = false)
+        }
+
+        return commitWithReconcile(lease, p, folders = listOf("inbox", "trash")) {
+            dao.updateStarredStatus(emailId, isStarred = starred)
+        }
+    }
+
     // ── Commit helper (best-effort reconciliation on local failure) ──
 
     /**

@@ -50,6 +50,9 @@ class FakeEmailDetailSource(
         return markAsReadResult
     }
 
+    override suspend fun setStarred(emailId: String, starred: Boolean): EmailActionResult =
+        EmailActionResult.Success
+
     // ── HTML preparation ────────────────────────────────────────
     var prepareHtmlBodyResult: com.david.mailapp.data.cleaner.HtmlCleanResult =
         com.david.mailapp.data.cleaner.HtmlCleanResult.Cleaned("<div style=\"margin:0 16px;\"><p>Cleaned</p></div>")

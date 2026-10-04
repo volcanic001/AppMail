@@ -129,6 +129,9 @@ interface EmailDao {
     @Query("UPDATE emails SET is_read = :isRead WHERE id = :emailId")
     suspend fun updateReadStatus(emailId: String, isRead: Boolean)
 
+    @Query("UPDATE emails SET is_starred = :isStarred WHERE id = :emailId")
+    suspend fun updateStarredStatus(emailId: String, isStarred: Boolean)
+
     /** Permanent delete from local cache. */
     @Query("DELETE FROM emails WHERE id = :emailId")
     suspend fun deleteById(emailId: String)

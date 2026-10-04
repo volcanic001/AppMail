@@ -101,6 +101,7 @@ internal fun EmailDetailRoute(
         onBack = onBack,
         onReply = onReply,
         onForward = onForward,
+        onToggleStar = viewModel::onToggleStar,
         onRetry = viewModel::onRetry,
         onRetryBody = viewModel::onRetryBody,
         onPdfAttachmentClick = viewModel::onPdfAttachmentClick,

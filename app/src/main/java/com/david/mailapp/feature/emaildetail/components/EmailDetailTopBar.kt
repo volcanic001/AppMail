@@ -2,6 +2,8 @@ package com.david.mailapp.feature.emaildetail.components
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -22,7 +24,8 @@ internal fun EmailDetailTopBar(
     uiState: EmailDetailUiState,
     onBack: () -> Unit,
     onReply: (String) -> Unit,
-    onForward: (String) -> Unit
+    onForward: (String) -> Unit,
+    onToggleStar: () -> Unit
 ) {
     TopAppBar(
         title = { Text(stringResource(R.string.detail_title), style = MaterialTheme.typography.titleLarge) },
@@ -39,6 +42,23 @@ internal fun EmailDetailTopBar(
                 is EmailDetailUiState.Ready -> uiState.email
                 is EmailDetailUiState.Empty -> uiState.email
                 else -> null
+            }
+            val isStarred = currentEmail?.isStarred == true
+            IconButton(
+                onClick = onToggleStar,
+                enabled = currentEmail != null
+            ) {
+                Icon(
+                    imageVector = if (isStarred) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                    contentDescription = stringResource(
+                        if (isStarred) R.string.detail_remove_favorite else R.string.detail_add_favorite
+                    ),
+                    tint = when {
+                        currentEmail == null -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                        isStarred -> MaterialTheme.colorScheme.tertiary
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+                )
             }
             IconButton(
                 onClick = {

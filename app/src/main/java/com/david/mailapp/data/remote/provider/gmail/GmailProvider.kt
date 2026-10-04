@@ -259,6 +259,15 @@ class GmailProvider(
         }
     }
 
+    override suspend fun setStarred(emailId: String, starred: Boolean) {
+        client.post("users/me/messages/$emailId/modify") {
+            setBody(
+                if (starred) ModifyRequest(addLabelIds = listOf("STARRED"))
+                else ModifyRequest(removeLabelIds = listOf("STARRED"))
+            )
+        }
+    }
+
     // ── attachment download ──────────────────────────────────────
 
     override suspend fun downloadAttachment(

@@ -24,6 +24,9 @@ interface EmailDetailEmailSource {
     /** Mark as read, once. */
     suspend fun markAsRead(emailId: String): EmailActionResult
 
+    /** Add or remove the favourite (starred) flag. */
+    suspend fun setStarred(emailId: String, starred: Boolean): EmailActionResult
+
     /** Single-flight HTML cleaning and persistence for READY HTML emails. */
     suspend fun prepareHtmlBody(email: Email): com.david.mailapp.data.cleaner.HtmlCleanResult
 

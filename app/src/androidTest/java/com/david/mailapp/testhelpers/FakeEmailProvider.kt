@@ -205,6 +205,8 @@ class FakeEmailProvider : EmailProvider {
         markAsReadError?.let { throw it }
     }
 
+    override suspend fun setStarred(emailId: String, starred: Boolean) {}
+
     override suspend fun downloadInlineImages(emailId: String, refs: List<com.david.mailapp.domain.model.EmailInlineReference>): Map<String, String> {
         inlineImagesCalls++
         receivedInlineImageRequests += emailId to refs

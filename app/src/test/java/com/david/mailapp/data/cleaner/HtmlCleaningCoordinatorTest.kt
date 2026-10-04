@@ -38,6 +38,7 @@ class HtmlCleaningCoordinatorTest {
         override suspend fun upsertAll(emails: List<EmailEntity>) {}
         override suspend fun moveToFolder(emailId: String, newFolder: String) {}
         override suspend fun updateReadStatus(emailId: String, isRead: Boolean) {}
+        override suspend fun updateStarredStatus(emailId: String, isStarred: Boolean) {}
         override suspend fun deleteById(emailId: String) {}
         override suspend fun clearFolder(folder: String) {}
         override suspend fun getEntitiesByFolderSync(folder: String): List<EmailEntity> = emptyList()

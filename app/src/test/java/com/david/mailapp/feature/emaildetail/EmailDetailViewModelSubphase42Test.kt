@@ -74,6 +74,7 @@ class EmailDetailViewModelSubphase42Test {
         override fun observe(emailId: String): Flow<Email?> = flow
         override suspend fun resolveById(emailId: String) = EmailResolutionResult.Found(email)
         override suspend fun markAsRead(emailId: String) = EmailActionResult.Success
+        override suspend fun setStarred(emailId: String, starred: Boolean) = EmailActionResult.Success
         override suspend fun prepareHtmlBody(email: Email): HtmlCleanResult = prepareResult
         override suspend fun recoverContentById(emailId: String) = EmailContentRecoveryResult.NotFound
         override suspend fun downloadInlineImages(emailId: String, refs: List<com.david.mailapp.domain.model.EmailInlineReference>) = emptyMap<String, String>()

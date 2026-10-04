@@ -44,6 +44,7 @@ internal fun EmailDetailPresentation(
     onBack: () -> Unit,
     onReply: (String) -> Unit,
     onForward: (String) -> Unit,
+    onToggleStar: () -> Unit,
     onRetry: () -> Unit,
     onRetryBody: () -> Unit,
     onPdfAttachmentClick: (PdfAttachmentMetadata) -> Unit,
@@ -71,7 +72,8 @@ internal fun EmailDetailPresentation(
                 uiState = uiState,
                 onBack = onBack,
                 onReply = onReply,
-                onForward = onForward
+                onForward = onForward,
+                onToggleStar = onToggleStar
             )
         },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) }

@@ -109,6 +109,9 @@ class EmailRepository(
     suspend fun markAsRead(emailId: String): EmailActionResult =
         actionCoordinator.markAsRead(emailId)
 
+    suspend fun setStarred(emailId: String, starred: Boolean): EmailActionResult =
+        actionCoordinator.setStarred(emailId, starred)
+
     /** 
      * Fetch the full HTML body along with inline image refs and PDF metadata from the provider.
      * Devuelve el resultado remoto (o MemoryOnly) si fue exitoso, o null en caso

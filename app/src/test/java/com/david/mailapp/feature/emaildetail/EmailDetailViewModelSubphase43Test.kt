@@ -82,6 +82,7 @@ class EmailDetailViewModelSubphase43Test {
         override fun observe(emailId: String): Flow<Email?> = flow
         override suspend fun resolveById(emailId: String) = EmailResolutionResult.Found(email)
         override suspend fun markAsRead(emailId: String) = EmailActionResult.Success
+        override suspend fun setStarred(emailId: String, starred: Boolean) = EmailActionResult.Success
         override suspend fun prepareHtmlBody(email: Email): HtmlCleanResult = HtmlCleanResult.Cleaned(email.cleanBody)
         override suspend fun recoverContentById(emailId: String) = EmailContentRecoveryResult.NotFound
         override suspend fun recordContentAccess(emailId: String) {}

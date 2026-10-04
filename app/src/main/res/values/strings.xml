@@ -243,6 +243,8 @@
     <string name="detail_back">Volver</string>
     <string name="detail_reply">Responder</string>
     <string name="detail_forward">Reenviar</string>
+    <string name="detail_add_favorite">Agregar a favoritos</string>
+    <string name="detail_remove_favorite">Quitar de favoritos</string>
     <string name="detail_field_from_label">De</string>
     <string name="detail_field_to_label">Para</string>
     <string name="detail_field_date_label">Fecha</string>

@@ -36,6 +36,9 @@ interface EmailProvider {
     /** Mark an email as read on the server. */
     suspend fun markAsRead(emailId: String)
 
+    /** Add or remove the favourite (starred) flag on the server. */
+    suspend fun setStarred(emailId: String, starred: Boolean)
+
     /**
      * Recovers a single message by its id, independent of search and cache.
      *
