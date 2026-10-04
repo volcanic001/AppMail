@@ -84,6 +84,8 @@ fun TrashContent(
     onLoadNextPage: () -> Unit,
     onClearHighlight: () -> Unit,
     bottomPadding: androidx.compose.ui.unit.Dp = 0.dp,
+    /** Offsets the list and refresh indicator below the glass top bar. */
+    topPadding: androidx.compose.ui.unit.Dp = 0.dp,
     modifier: Modifier = Modifier
 ) {
     val currentDeleteCallback by rememberUpdatedState(onDeletePermanently)
@@ -124,7 +126,8 @@ fun TrashContent(
                                 .align(Alignment.TopCenter)
                                 .graphicsLayer {
                                     val fraction = ptrState.distanceFraction.coerceIn(0f, 1.5f)
-                                    translationY = if (state.isRefreshing) 24.dp.toPx() else (fraction * 40.dp.toPx())
+                                    val base = topPadding.toPx()
+                                    translationY = base + if (state.isRefreshing) 24.dp.toPx() else (fraction * 40.dp.toPx())
                                     val scale = if (state.isRefreshing) 1f else (fraction * 1.2f).coerceIn(0f, 1f)
                                     scaleX = scale
                                     scaleY = scale
@@ -146,6 +149,7 @@ fun TrashContent(
                         .fillMaxSize()
                         .testTag("trash_list"),
                     contentPadding = PaddingValues(
+                        top = topPadding,
                         bottom = bottomPadding + 24.dp
                     )
                 ) {

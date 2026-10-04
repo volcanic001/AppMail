@@ -39,6 +39,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.david.mailapp.ui.theme.MotionTokens
 import com.david.mailapp.R
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeEffect
+import dev.chrisbanes.haze.materials.HazeMaterials
 import kotlinx.coroutines.delay
 
 /**
@@ -54,6 +57,7 @@ fun SearchTopBar(
     onQueryChange: (String) -> Unit,
     onBack: () -> Unit,
     onClear: () -> Unit,
+    hazeState: HazeState,
     modifier: Modifier = Modifier,
     entryKey: Any = Unit
 ) {
@@ -77,19 +81,18 @@ fun SearchTopBar(
         focusRequester.requestFocus()
     }
 
-    val glassColor = MaterialTheme.colorScheme.background.copy(alpha = 0.75f)
-
     Surface(
-        tonalElevation = 2.dp,
-        color = glassColor,
+        tonalElevation = 0.dp,
+        color = Color.Transparent,
         shape = RoundedCornerShape(bottomStart = cornerRadius, bottomEnd = cornerRadius),
         modifier = modifier
             .fillMaxWidth()
-            .statusBarsPadding()
+            .hazeEffect(state = hazeState, style = HazeMaterials.thin())
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .statusBarsPadding()
                 .height(56.dp)
                 .padding(horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically

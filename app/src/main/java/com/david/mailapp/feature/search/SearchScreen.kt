@@ -5,12 +5,17 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -18,18 +23,21 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import com.david.mailapp.ui.components.ContainedLoadingIndicator
-import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
 import com.david.mailapp.core.di.AppContainer
 import com.david.mailapp.feature.search.components.SearchEmptyState
 import com.david.mailapp.feature.search.components.SearchErrorState
@@ -84,54 +92,53 @@ fun SearchScreen(
         onBack()
     })
 
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-        topBar = {
-            SearchTopBar(
-                entryKey = entryKey,
-                query = query,
-                onQueryChange = viewModel::onQueryChange,
-                onBack = {
-                    Log.d("SearchDebug", "[SearchScreen] TopBar onBack clicked")
-                    keyboardController?.hide()
-                    focusManager.clearFocus()
-                    onBack()
-                },
-                onClear = viewModel::clearQuery
-            )
-        },
-        containerColor = MaterialTheme.colorScheme.background
-    ) { paddingValues ->
+    val hazeState = remember { HazeState() }
+    val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    // The search bar's inner Row is 56.dp tall; add the status bar it sits under.
+    val topBarHeight = statusBarTop + 56.dp
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        // Content fills the whole screen and scrolls *behind* the glass bar,
+        // acting as the haze source that the bar blurs.
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = paddingValues.calculateTopPadding())
+                .hazeSource(state = hazeState)
         ) {
             when (val state = uiState) {
                 is SearchUiState.Idle -> {
-                    SearchSuggestionChips(
-                        history = history,
-                        onQuerySelected = viewModel::onQueryChange,
-                        onClearHistory = viewModel::clearHistory
-                    )
+                    Box(modifier = Modifier.fillMaxSize().padding(top = topBarHeight)) {
+                        SearchSuggestionChips(
+                            history = history,
+                            onQuerySelected = viewModel::onQueryChange,
+                            onClearHistory = viewModel::clearHistory
+                        )
+                    }
                 }
 
                 is SearchUiState.Loading -> {
-                    AnimatedVisibility(
-                        visible = true,
-                        enter = fadeIn(MotionTokens.tweenShort()),
-                        exit = fadeOut(MotionTokens.tweenShort())
-                    ) {
-                        LinearProgressIndicator(
-                            modifier = Modifier.fillMaxWidth()
+                    Box(modifier = Modifier.fillMaxSize().padding(top = topBarHeight)) {
+                        AnimatedVisibility(
+                            visible = true,
+                            enter = fadeIn(MotionTokens.tweenShort()),
+                            exit = fadeOut(MotionTokens.tweenShort())
+                        ) {
+                            LinearProgressIndicator(
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                        // Keep showing results or chips underneath
+                        SearchSuggestionChips(
+                            history = history,
+                            onQuerySelected = viewModel::onQueryChange,
+                            onClearHistory = viewModel::clearHistory
                         )
                     }
-                    // Keep showing results or chips underneath
-                    SearchSuggestionChips(
-                        history = history,
-                        onQuerySelected = viewModel::onQueryChange,
-                        onClearHistory = viewModel::clearHistory
-                    )
                 }
 
                 is SearchUiState.Results -> {
@@ -142,22 +149,43 @@ fun SearchScreen(
                         highlightedEmailId = highlightedEmailId,
                         showEmailDividers = showEmailDividers,
                         onClearHighlight = onClearHighlight,
-                        onEmailClick = onEmailClick
+                        onEmailClick = onEmailClick,
+                        topPadding = topBarHeight,
+                        bottomPadding = bottomInset
                     )
                 }
 
                 is SearchUiState.Empty -> {
-                    SearchEmptyState(query = state.query)
+                    Box(modifier = Modifier.fillMaxSize().padding(top = topBarHeight)) {
+                        SearchEmptyState(query = state.query)
+                    }
                 }
 
                 is SearchUiState.Error -> {
-                    SearchErrorState(
-                        reason = state.reason,
-                        onRetry = viewModel::retry
-                    )
+                    Box(modifier = Modifier.fillMaxSize().padding(top = topBarHeight)) {
+                        SearchErrorState(
+                            reason = state.reason,
+                            onRetry = viewModel::retry
+                        )
+                    }
                 }
             }
         }
+
+        SearchTopBar(
+            entryKey = entryKey,
+            query = query,
+            onQueryChange = viewModel::onQueryChange,
+            onBack = {
+                Log.d("SearchDebug", "[SearchScreen] TopBar onBack clicked")
+                keyboardController?.hide()
+                focusManager.clearFocus()
+                onBack()
+            },
+            onClear = viewModel::clearQuery,
+            hazeState = hazeState,
+            modifier = Modifier.align(Alignment.TopCenter)
+        )
     }
 }
 
@@ -169,11 +197,13 @@ private fun ResultList(
     highlightedEmailId: String? = null,
     showEmailDividers: Boolean = true,
     onClearHighlight: () -> Unit = {},
-    onEmailClick: (String) -> Unit
+    onEmailClick: (String) -> Unit,
+    topPadding: Dp = 0.dp,
+    bottomPadding: Dp = 0.dp
 ) {
     LazyColumn(
         state = listState,
-        contentPadding = PaddingValues(bottom = 24.dp)
+        contentPadding = PaddingValues(top = topPadding, bottom = bottomPadding + 24.dp)
     ) {
         itemsIndexed(
             items = state.emails,
