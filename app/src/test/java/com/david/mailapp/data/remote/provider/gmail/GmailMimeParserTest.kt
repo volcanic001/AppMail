@@ -4,6 +4,7 @@ import com.david.mailapp.domain.model.EmailBodyKind
 import com.david.mailapp.domain.model.EmailContentState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertFalse
 import org.junit.Test
 import java.util.Base64
 
@@ -77,7 +78,8 @@ class GmailMimeParserTest {
             )
         )
         val result = GmailMimeParser.parse(msg(root))
-        assertEquals("body", result.body)
+        assertTrue(result.body.orEmpty().contains("body"))
+        assertTrue(result.body.orEmpty().contains("src=\"cid:cid1\""))
         assertEquals(1, result.inlineReferences.size)
         assertEquals("cid1", result.inlineReferences[0].contentId)
         assertEquals(1, result.pdfAttachments.size)
@@ -147,6 +149,125 @@ class GmailMimeParserTest {
     }
 
     @Test
+    fun `image only CID attachment becomes visible HTML`() {
+        val root = payload(
+            mimeType = "multipart/related",
+            parts = listOf(
+                part(
+                    mimeType = "image/png",
+                    attachmentId = "image-att-1",
+                    filename = "photo.png",
+                    contentId = "<image-1>"
+                )
+            )
+        )
+
+        val result = GmailMimeParser.parse(msg(root))
+
+        assertEquals(EmailContentState.READY, result.contentState)
+        assertEquals(EmailBodyKind.HTML, result.bodyKind)
+        assertEquals("<div><img src=\"cid:image-1\" alt=\"\"></div>", result.body)
+        assertEquals(1, result.inlineReferences.size)
+        assertEquals("image-att-1", result.inlineReferences.single().attachmentId)
+    }
+
+    @Test
+    fun `image only attachment without CID gets synthetic reference`() {
+        val root = part(
+            mimeType = "image/png",
+            attachmentId = "image-att-2",
+            filename = "photo.png",
+            headers = listOf(Header("Content-Disposition", "inline"))
+        )
+
+        val result = GmailMimeParser.parse(msg(root))
+
+        assertEquals(EmailContentState.READY, result.contentState)
+        assertEquals(EmailBodyKind.HTML, result.bodyKind)
+        assertTrue(result.body.orEmpty().contains("src=\"cid:mailapp-inline-image-1\""))
+        assertEquals("mailapp-inline-image-1", result.inlineReferences.single().contentId)
+    }
+
+    @Test
+    fun `image only embedded data becomes visible data URI HTML`() {
+        val root = part(
+            mimeType = "image/png",
+            data = b64("png"),
+            filename = "photo.png"
+        )
+
+        val result = GmailMimeParser.parse(msg(root))
+
+        assertEquals(EmailContentState.READY, result.contentState)
+        assertEquals(EmailBodyKind.HTML, result.bodyKind)
+        assertEquals(
+            "<div><img src=\"data:image/png;base64,cG5n\" alt=\"\"></div>",
+            result.body
+        )
+        assertTrue(result.inlineReferences.isEmpty())
+    }
+
+    @Test
+    fun `plain text plus image attachment renders both as HTML`() {
+        val root = payload(
+            mimeType = "multipart/mixed",
+            parts = listOf(
+                part("text/plain", data = b64("caption <safe>")),
+                part("image/png", attachmentId = "image-att-3", contentId = "image-3")
+            )
+        )
+
+        val result = GmailMimeParser.parse(msg(root))
+
+        assertEquals(EmailBodyKind.HTML, result.bodyKind)
+        assertTrue(result.body.orEmpty().contains("caption &lt;safe&gt;"))
+        assertTrue(result.body.orEmpty().contains("src=\"cid:image-3\""))
+    }
+
+    @Test
+    fun `HTML plus image without CID keeps text and appends downloadable image`() {
+        val root = payload(
+            mimeType = "multipart/related",
+            parts = listOf(
+                part("text/html", data = b64("<p>Visible text</p>")),
+                part(
+                    "image/png",
+                    attachmentId = "image-att-4",
+                    filename = "inline.png",
+                    headers = listOf(Header("Content-Disposition", "inline"))
+                )
+            )
+        )
+
+        val result = GmailMimeParser.parse(msg(root))
+
+        assertEquals(EmailContentState.READY, result.contentState)
+        assertEquals(EmailBodyKind.HTML, result.bodyKind)
+        assertTrue(result.body.orEmpty().contains("<p>Visible text</p>"))
+        assertTrue(result.body.orEmpty().contains("src=\"cid:mailapp-inline-image-1\""))
+        assertEquals("image-att-4", result.inlineReferences.single().attachmentId)
+    }
+
+    @Test
+    fun `HTML plus PDF and CID image preserves all visible content`() {
+        val root = payload(
+            mimeType = "multipart/mixed",
+            parts = listOf(
+                part("text/html", data = b64("<p>Message</p>")),
+                part("application/pdf", attachmentId = "pdf-2", filename = "document.pdf"),
+                part("image/jpeg", attachmentId = "image-att-5", contentId = "mixed-image")
+            )
+        )
+
+        val result = GmailMimeParser.parse(msg(root))
+
+        assertTrue(result.body.orEmpty().contains("<p>Message</p>"))
+        assertTrue(result.body.orEmpty().contains("src=\"cid:mixed-image\""))
+        assertEquals("pdf-2", result.pdfAttachments.single().attachmentId)
+        assertEquals("image-att-5", result.inlineReferences.single().attachmentId)
+    }
+
+    @Test
     fun `PDF deduplicated and respects disposition`() {
         val root = payload(
             parts = listOf(
@@ -166,5 +287,40 @@ class GmailMimeParserTest {
         val result = GmailMimeParser.parse(msg(root))
         assertEquals(EmailContentState.EMPTY, result.contentState)
         assertEquals(1, result.pdfAttachments.size)
+    }
+
+    @Test
+    fun `malformed MIME type is sanitized to fallback`() {
+        val root = part(
+            mimeType = "image/png\" onclick=\"alert('xss')",
+            data = b64("png"),
+            filename = "photo.png"
+        )
+
+        val result = GmailMimeParser.parse(msg(root))
+
+        assertEquals(EmailContentState.READY, result.contentState)
+        assertEquals(EmailBodyKind.HTML, result.bodyKind)
+        assertEquals(
+            "<div><img src=\"data:image/png;base64,cG5n\" alt=\"\"></div>",
+            result.body
+        )
+    }
+
+    @Test
+    fun `MIME type with special characters is sanitized`() {
+        val root = part(
+            mimeType = "image/png>script<alert",
+            data = b64("png"),
+            filename = "photo.png"
+        )
+
+        val result = GmailMimeParser.parse(msg(root))
+
+        assertEquals(EmailContentState.READY, result.contentState)
+        assertEquals(EmailBodyKind.HTML, result.bodyKind)
+        assertTrue(result.body.orEmpty().contains("data:image/png;base64,"))
+        assertFalse(result.body.orEmpty().contains("script"))
+        assertFalse(result.body.orEmpty().contains("alert"))
     }
 }
