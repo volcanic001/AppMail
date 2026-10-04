@@ -66,7 +66,8 @@ fun EmailAvatar(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = initials.uppercase(),
+                // Always a single letter, even for cached rows stored with two initials.
+                text = initials.take(1).uppercase(),
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Medium,
                 color = textColor

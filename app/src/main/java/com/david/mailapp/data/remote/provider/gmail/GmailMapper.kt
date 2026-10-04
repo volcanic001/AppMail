@@ -45,7 +45,7 @@ internal fun MessageResponse.toDomainEmail(): Email {
     )
 }
 
-/** Extract initials from "John Doe <john@example.com>" → "JD". */
+/** Extract a single initial from "John Doe <john@example.com>" → "J". */
 internal fun extractInitials(from: String): String {
     val name = from.substringBefore("<").trim()
     if (name.isEmpty() || (name == from && name.contains("@"))) {
@@ -54,7 +54,7 @@ internal fun extractInitials(from: String): String {
     }
     val initials = name.split(Regex("[^\\p{L}\\p{Nd}]+"))
         .filter { it.isNotBlank() }
-        .take(2)
+        .take(1)
         .map { it.first().uppercase() }
         .joinToString("")
     if (initials.isEmpty()) {
