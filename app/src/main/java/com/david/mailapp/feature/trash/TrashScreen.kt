@@ -38,7 +38,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -70,7 +69,7 @@ fun TrashScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     val snackbarHostState = remember { SnackbarHostState() }
-    val glassColor = MaterialTheme.colorScheme.background.copy(alpha = 0.8f)
+    val glassColor = MaterialTheme.colorScheme.background.copy(alpha = 0.75f)
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -85,8 +84,7 @@ fun TrashScreen(
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = glassColor,
                     scrolledContainerColor = glassColor
-                ),
-                modifier = Modifier.blur(1.5.dp)
+                )
             )
         }
     ) { paddingValues ->
