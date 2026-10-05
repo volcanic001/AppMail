@@ -48,6 +48,7 @@ import com.david.mailapp.R
 import com.david.mailapp.domain.model.Email
 import com.david.mailapp.domain.model.parseEmailSender
 import com.david.mailapp.ui.theme.MotionTokens
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -99,6 +100,24 @@ fun EmailListItem(
     val offsetX = remember { Animatable(0f, Float.VectorConverter) }
     var isDismissed by remember { mutableStateOf(false) }
     var thresholdWasCrossed by remember { mutableStateOf(false) }
+
+    // A swipe dismisses the row optimistically before the action (delete / move /
+    // restore) runs remote-first. On success the row leaves the list and this
+    // composable is disposed; on failure (e.g. offline) the email stays, so the
+    // row would otherwise remain translated off-screen as a blank gap. When the
+    // action settles (actionsEnabled flips back to true) and we're still here,
+    // the action failed — snap the row back into view. The short grace lets a
+    // successful removal win the race so there is no bounce-back flicker.
+    LaunchedEffect(actionsEnabled) {
+        if (isDismissed && actionsEnabled) {
+            delay(250)
+            if (isDismissed && actionsEnabled) {
+                isDismissed = false
+                thresholdWasCrossed = false
+                offsetX.animateTo(0f, MotionTokens.swipeReturn)
+            }
+        }
+    }
 
     Box(
         modifier = modifier
