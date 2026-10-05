@@ -14,6 +14,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
 
 /**
@@ -116,7 +117,7 @@ fun MailAppTheme(
 private fun supportsDynamicColor(): Boolean = Build.VERSION.SDK_INT >= 31
 
 private fun generateScheme(palette: ColorPalette, dark: Boolean): ColorScheme {
-    return when (palette) {
+    val base = when (palette) {
         ColorPalette.Blue -> if (dark) {
             darkColorScheme(
                 primary = Color(0xFFA8C7FA),
@@ -471,4 +472,13 @@ private fun generateScheme(palette: ColorPalette, dark: Boolean): ColorScheme {
         
         ColorPalette.Dynamic -> if (dark) DefaultDarkColors else DefaultLightColors
     }
+
+    // The manual palettes above don't define outlineVariant (dividers) or
+    // surfaceContainerHighest, so they would fall back to the Material 3 default
+    // neutral — a purple-tinted grey that clashes with the warm palettes. Derive
+    // both from each palette's own neutrals so they always match the active theme.
+    return base.copy(
+        outlineVariant = lerp(base.surfaceVariant, base.outline, 0.35f),
+        surfaceContainerHighest = lerp(base.surfaceContainerHigh, base.onSurface, 0.05f),
+    )
 }
