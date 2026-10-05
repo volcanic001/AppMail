@@ -339,7 +339,7 @@ fun EmailListItem(
                             Icon(
                                 imageVector = Icons.Filled.Star,
                                 contentDescription = stringResource(R.string.accessibility_starred),
-                                tint = MaterialTheme.colorScheme.tertiary,
+                                tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(16.dp)
                             )
                         }

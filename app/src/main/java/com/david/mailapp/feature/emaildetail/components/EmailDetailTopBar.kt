@@ -55,7 +55,7 @@ internal fun EmailDetailTopBar(
                     ),
                     tint = when {
                         currentEmail == null -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
-                        isStarred -> MaterialTheme.colorScheme.tertiary
+                        isStarred -> MaterialTheme.colorScheme.primary
                         else -> MaterialTheme.colorScheme.onSurfaceVariant
                     }
                 )
