@@ -45,32 +45,16 @@ class TrashContentActionTest {
     )
 
     @Test
-    fun swipe_opens_confirmation_without_deleting_and_cancel_keeps_row() {
+    fun swipe_deletes_immediately_without_confirmation() {
         var deleteCalls = 0
         setTrashContent(onDelete = { deleteCalls++ })
 
         composeRule.onNodeWithText(email.subject).performTouchInput { swipeLeft() }
-
-        composeRule.onNodeWithText("¿Eliminar permanentemente?").assertExists()
-        assertEquals(0, deleteCalls)
-        composeRule.onNodeWithText("Cancelar").performClick()
-
-        composeRule.onNodeWithText("¿Eliminar permanentemente?").assertDoesNotExist()
-        composeRule.onNodeWithText(email.subject).assertExists()
-        assertEquals(0, deleteCalls)
-    }
-
-    @Test
-    fun confirm_deletes_exactly_once_and_closes_dialog() {
-        var deleteCalls = 0
-        setTrashContent(onDelete = { deleteCalls++ })
-
-        composeRule.onNodeWithText(email.subject).performTouchInput { swipeLeft() }
-        composeRule.onNodeWithText("Eliminar permanentemente").performClick()
         composeRule.waitForIdle()
 
-        assertEquals(1, deleteCalls)
+        // No confirmation dialog: the swipe deletes directly, exactly once.
         composeRule.onNodeWithText("¿Eliminar permanentemente?").assertDoesNotExist()
+        assertEquals(1, deleteCalls)
     }
 
     @Test
@@ -105,7 +89,6 @@ class TrashContentActionTest {
         )
 
         composeRule.onNodeWithText(email.subject).performTouchInput { swipeLeft() }
-        composeRule.onNodeWithText("Eliminar permanentemente").performClick()
 
         composeRule.onNodeWithText("Sin conexión a Internet").assertExists()
         composeRule.onNodeWithText("Eliminado permanentemente").assertDoesNotExist()
@@ -118,7 +101,6 @@ class TrashContentActionTest {
             state.pendingFeedbackQueue.isEmpty()
         }
         composeRule.onNodeWithText(email.subject).performTouchInput { swipeLeft() }
-        composeRule.onNodeWithText("Eliminar permanentemente").performClick()
 
         composeRule.onNodeWithText("Sin conexión a Internet").assertExists()
         composeRule.onNodeWithText(email.subject).assertExists()
@@ -139,7 +121,7 @@ class TrashContentActionTest {
         composeRule.onNodeWithText(email.subject).performTouchInput { swipeLeft() }
         composeRule.waitForIdle()
 
-        composeRule.onNodeWithText("¿Eliminar permanentemente?").assertDoesNotExist()
+        // Row has an action in flight → the swipe gesture is rejected, no delete fires.
         assertEquals(0, deleteCalls)
     }
 

@@ -160,12 +160,6 @@
     <string name="snackbar_trash_failed_single">No se pudo mover 1 correo</string>
     <string name="snackbar_trash_failed_plural">No se pudieron mover %d correos</string>
 
-    <!-- Confirmación de borrado permanente -->
-    <string name="trash_delete_dialog_title">¿Eliminar permanentemente?</string>
-    <string name="trash_delete_dialog_body">Esta acción no se puede deshacer.</string>
-    <string name="trash_delete_dialog_cancel">Cancelar</string>
-    <string name="trash_delete_dialog_confirm">Eliminar permanentemente</string>
-
     <!-- Búsqueda -->
     <string name="search_recent">Recientes</string>
     <string name="search_clear_history">Borrar</string>
