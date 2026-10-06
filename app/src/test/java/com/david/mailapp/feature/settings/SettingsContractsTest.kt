@@ -28,7 +28,7 @@ class SettingsContractsTest {
         assertEquals(ColorPalette.Green, values[2])
         assertEquals(ColorPalette.Sepia, values[3])
         assertEquals(ColorPalette.Nord, values[4])
-        assertEquals(ColorPalette.Gruvbox, values[5])
+        assertEquals(ColorPalette.Macchiato, values[5])
         assertEquals(ColorPalette.Teal, values[6])
         assertEquals(ColorPalette.Yellow, values[7])
         assertEquals(ColorPalette.Monochrome, values[8])

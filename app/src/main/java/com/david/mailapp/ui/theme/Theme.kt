@@ -163,46 +163,47 @@ private fun generateScheme(palette: ColorPalette, dark: Boolean): ColorScheme {
         }
         
         ColorPalette.Green -> if (dark) {
+            // Emerald/jade green — a cooler, more vivid green than the previous olive tone.
             darkColorScheme(
-                primary = Color(0xFF9CD592),
-                onPrimary = Color(0xFF0F3905),
-                primaryContainer = Color(0xFF1D520B),
-                onPrimaryContainer = Color(0xFFC2E7C9),
-                secondary = Color(0xFF8FD99C),
-                onSecondary = Color(0xFF003914),
-                secondaryContainer = Color(0xFF005322),
-                onSecondaryContainer = Color(0xFFD7F0DB),
+                primary = Color(0xFF5FDCA0),
+                onPrimary = Color(0xFF003822),
+                primaryContainer = Color(0xFF005134),
+                onPrimaryContainer = Color(0xFF7BF9BB),
+                secondary = Color(0xFFB3CCBB),
+                onSecondary = Color(0xFF1E3528),
+                secondaryContainer = Color(0xFF34493D),
+                onSecondaryContainer = Color(0xFFCFE9D7),
                 background = Color(0xFF0E150F),
-                onBackground = Color(0xFFE2E2E9),
+                onBackground = Color(0xFFDFE4DE),
                 surface = Color(0xFF0E150F),
-                onSurface = Color(0xFFE2E2E9),
+                onSurface = Color(0xFFDFE4DE),
                 surfaceVariant = Color(0xFF212722),
-                onSurfaceVariant = Color(0xFFC3C6CF),
-                surfaceContainer = Color(0xFF1B221B),
-                surfaceContainerLow = Color(0xFF131A13),
+                onSurfaceVariant = Color(0xFFC0C9C0),
+                surfaceContainer = Color(0xFF1A211B),
+                surfaceContainerLow = Color(0xFF121911),
                 surfaceContainerHigh = Color(0xFF252B24),
-                outline = Color(0xFF8D9199)
+                outline = Color(0xFF8A938B)
             )
         } else {
             lightColorScheme(
-                primary = Color(0xFF386A20),
+                primary = Color(0xFF00875A),
                 onPrimary = Color(0xFFFFFFFF),
-                primaryContainer = Color(0xFFC2E7C9),
-                onPrimaryContainer = Color(0xFF002204),
-                secondary = Color(0xFF1E8E3E),
+                primaryContainer = Color(0xFFA4F4C9),
+                onPrimaryContainer = Color(0xFF002115),
+                secondary = Color(0xFF406653),
                 onSecondary = Color(0xFFFFFFFF),
-                secondaryContainer = Color(0xFFD7F0DB),
-                onSecondaryContainer = Color(0xFF002208),
-                background = Color(0xFFF6FBF7),
-                onBackground = Color(0xFF191C20),
-                surface = Color(0xFFF6FBF7),
-                onSurface = Color(0xFF191C20),
-                surfaceVariant = Color(0xFFE0E2EC),
-                onSurfaceVariant = Color(0xFF43474E),
-                surfaceContainer = Color(0xFFEEF5EF),
-                surfaceContainerLow = Color(0xFFF6FAF6),
-                surfaceContainerHigh = Color(0xFFE7ECE7),
-                outline = Color(0xFF73777F)
+                secondaryContainer = Color(0xFFC2ECD2),
+                onSecondaryContainer = Color(0xFF002115),
+                background = Color(0xFFF5FBF7),
+                onBackground = Color(0xFF171D19),
+                surface = Color(0xFFF5FBF7),
+                onSurface = Color(0xFF171D19),
+                surfaceVariant = Color(0xFFDCE5DD),
+                onSurfaceVariant = Color(0xFF404943),
+                surfaceContainer = Color(0xFFE9F0EA),
+                surfaceContainerLow = Color(0xFFEFF6F0),
+                surfaceContainerHigh = Color(0xFFE3EAE4),
+                outline = Color(0xFF707973)
             )
         }
         
@@ -294,47 +295,56 @@ private fun generateScheme(palette: ColorPalette, dark: Boolean): ColorScheme {
             )
         }
 
-        ColorPalette.Gruvbox -> if (dark) {
+        // Catppuccin — Macchiato flavor in dark mode, Latte flavor in light mode.
+        // Accent is Mauve (Catppuccin's signature accent); the favourite star
+        // uses colorScheme.primary, so it renders in Mauve to match the theme.
+        ColorPalette.Macchiato -> if (dark) {
             darkColorScheme(
-                primary = Color(0xFFFABD2F),
-                onPrimary = Color(0xFF3C2E00),
-                primaryContainer = Color(0xFF504945),
-                onPrimaryContainer = Color(0xFFFBF1C7),
-                secondary = Color(0xFFA89984),
-                onSecondary = Color(0xFF282828),
-                secondaryContainer = Color(0xFF3C3836),
-                onSecondaryContainer = Color(0xFFEBDBB2),
-                background = Color(0xFF282828),
-                onBackground = Color(0xFFEBDBB2),
-                surface = Color(0xFF282828),
-                onSurface = Color(0xFFEBDBB2),
-                surfaceVariant = Color(0xFF3C3836),
-                onSurfaceVariant = Color(0xFFD5C4A1),
-                surfaceContainer = Color(0xFF3C3836),
-                surfaceContainerLow = Color(0xFF32302F),
-                surfaceContainerHigh = Color(0xFF504945),
-                outline = Color(0xFF928374)
+                primary = Color(0xFFC6A0F6),          // Mauve
+                onPrimary = Color(0xFF1E2030),         // Mantle
+                primaryContainer = Color(0xFF494D64),  // Surface1
+                onPrimaryContainer = Color(0xFFCAD3F5),// Text
+                secondary = Color(0xFFB7BDF8),         // Lavender
+                onSecondary = Color(0xFF1E2030),       // Mantle
+                secondaryContainer = Color(0xFF363A4F),// Surface0
+                onSecondaryContainer = Color(0xFFCAD3F5),
+                background = Color(0xFF24273A),         // Base
+                onBackground = Color(0xFFCAD3F5),       // Text
+                surface = Color(0xFF24273A),            // Base
+                onSurface = Color(0xFFCAD3F5),          // Text
+                surfaceVariant = Color(0xFF363A4F),     // Surface0
+                onSurfaceVariant = Color(0xFFB8C0E0),   // Subtext1
+                surfaceContainerLowest = Color(0xFF181926), // Crust
+                surfaceContainer = Color(0xFF363A4F),   // Surface0
+                surfaceContainerLow = Color(0xFF1E2030),// Mantle
+                surfaceContainerHigh = Color(0xFF494D64),// Surface1
+                outline = Color(0xFF8087A2),            // Overlay1
+                error = Color(0xFFED8796),              // Red
+                onError = Color(0xFF181926)
             )
         } else {
             lightColorScheme(
-                primary = Color(0xFFB57614),
+                primary = Color(0xFF8839EF),           // Latte Mauve
                 onPrimary = Color(0xFFFFFFFF),
-                primaryContainer = Color(0xFFFBF1C7),
-                onPrimaryContainer = Color(0xFF3C2E00),
-                secondary = Color(0xFF7C6F64),
+                primaryContainer = Color(0xFFCCD0DA),  // Surface0
+                onPrimaryContainer = Color(0xFF4C4F69),// Text
+                secondary = Color(0xFF7287FD),         // Latte Lavender
                 onSecondary = Color(0xFFFFFFFF),
-                secondaryContainer = Color(0xFFEBDBB2),
-                onSecondaryContainer = Color(0xFF282828),
-                background = Color(0xFFFBF1C7),
-                onBackground = Color(0xFF282828),
-                surface = Color(0xFFFBF1C7),
-                onSurface = Color(0xFF282828),
-                surfaceVariant = Color(0xFFEBDBB2),
-                onSurfaceVariant = Color(0xFF3C3836),
-                surfaceContainer = Color(0xFFF2E5BC),
-                surfaceContainerLow = Color(0xFFF9F5D7),
-                surfaceContainerHigh = Color(0xFFE5D5AA),
-                outline = Color(0xFF7C6F64)
+                secondaryContainer = Color(0xFFE6E9EF),// Mantle
+                onSecondaryContainer = Color(0xFF4C4F69),
+                background = Color(0xFFEFF1F5),         // Base
+                onBackground = Color(0xFF4C4F69),       // Text
+                surface = Color(0xFFEFF1F5),            // Base
+                onSurface = Color(0xFF4C4F69),          // Text
+                surfaceVariant = Color(0xFFCCD0DA),     // Surface0
+                onSurfaceVariant = Color(0xFF5C5F77),   // Subtext1
+                surfaceContainerLowest = Color(0xFFFFFFFF),
+                surfaceContainer = Color(0xFFDCE0E8),   // Crust
+                surfaceContainerLow = Color(0xFFE6E9EF),// Mantle
+                surfaceContainerHigh = Color(0xFFCCD0DA),// Surface0
+                outline = Color(0xFF8C8FA1),            // Overlay1
+                error = Color(0xFFD20F39),              // Latte Red
+                onError = Color(0xFFFFFFFF)
             )
         }
         
