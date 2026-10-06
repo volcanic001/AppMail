@@ -1,16 +1,8 @@
 package com.david.mailapp.feature.trash
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -18,13 +10,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Menu
@@ -46,9 +33,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -59,6 +43,7 @@ import com.david.mailapp.R
 import com.david.mailapp.core.di.AppContainer
 import com.david.mailapp.core.localization.asString
 import com.david.mailapp.core.localization.toUiText
+import com.david.mailapp.ui.components.ShimmerLoading
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
@@ -101,7 +86,10 @@ fun TrashScreen(
                 .hazeSource(state = hazeState)
         ) {
             when (val state = uiState) {
-                is TrashUiState.Loading -> ShimmerLoading()
+                is TrashUiState.Loading -> ShimmerLoading(
+                    topPadding = topBarHeight,
+                    bottomPadding = bottomInset
+                )
 
                 is TrashUiState.Error -> {
                     Column(
@@ -211,29 +199,5 @@ internal fun EmptyTrash() {
             style = MaterialTheme.typography.headlineSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-    }
-}
-
-@Composable
-private fun ShimmerLoading() {
-    val base = MaterialTheme.colorScheme.surfaceVariant
-    val colors = listOf(base.copy(alpha = 0.3f), base.copy(alpha = 0.6f), base.copy(alpha = 0.3f))
-    val transition = rememberInfiniteTransition(label = "s")
-    val tx = transition.animateFloat(0f, 1200f, infiniteRepeatable(tween(1200, easing = LinearEasing), RepeatMode.Restart), label = "sx")
-    val brush = Brush.linearGradient(colors, Offset(tx.value - 200f, 0f), Offset(tx.value + 200f, 0f))
-    Column(Modifier.padding(top = 16.dp)) {
-        repeat(8) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(40.dp).clip(CircleShape).background(brush))
-                Spacer(Modifier.width(16.dp))
-                Column(Modifier.weight(1f)) {
-                    Box(Modifier.fillMaxWidth(0.7f).height(14.dp).clip(RoundedCornerShape(4.dp)).background(brush))
-                    Spacer(Modifier.height(6.dp))
-                    Box(Modifier.fillMaxWidth(0.9f).height(12.dp).clip(RoundedCornerShape(4.dp)).background(brush))
-                    Spacer(Modifier.height(6.dp))
-                    Box(Modifier.fillMaxWidth(0.5f).height(10.dp).clip(RoundedCornerShape(4.dp)).background(brush))
-                }
-            }
-        }
     }
 }

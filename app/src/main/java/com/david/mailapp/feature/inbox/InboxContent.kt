@@ -21,6 +21,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import com.david.mailapp.ui.components.ShimmerLoading
 import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
@@ -102,7 +103,11 @@ internal fun InboxContent(
                 .hazeSource(state = hazeState)
         ) {
             when (val state = uiState) {
-                InboxUiState.Loading -> ShimmerLoading()
+                InboxUiState.Loading -> ShimmerLoading(
+                    modifier = Modifier.testTag("inbox_loading"),
+                    topPadding = topBarHeight,
+                    bottomPadding = bottomInset
+                )
                 is InboxUiState.Error -> {
                     InboxErrorContent(
                         reason = state.reason,
