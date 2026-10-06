@@ -1,8 +1,5 @@
 package com.david.mailapp.feature.inbox
 
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import com.david.mailapp.R
 import com.david.mailapp.feature.inbox.components.EmailListItem
 import com.david.mailapp.ui.components.ContainedLoadingIndicator
+import com.david.mailapp.ui.theme.MotionTokens
 import kotlinx.coroutines.flow.distinctUntilChanged
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -100,17 +98,10 @@ internal fun InboxEmailList(
                     isHighlighted = email.id == highlightedEmailId,
                     onClearHighlight = onClearHighlight,
                     formattedTimeOverride = formattedTime,
-                    modifier = Modifier.animateItem(
-                        fadeInSpec = tween(durationMillis = 280),
-                        placementSpec = spring(
-                            dampingRatio = Spring.DampingRatioNoBouncy,
-                            stiffness = Spring.StiffnessMediumLow
-                        ),
-                        // Swipe dismissal already owns the horizontal exit.
-                        // Retaining a second disappearing layer can replay a stale
-                        // frame while the remaining rows are being repositioned.
-                        fadeOutSpec = null
-                    )
+                    // Same reorganization motion as Trash/Spam: an underdamped
+                    // spring so the remaining rows settle with the elastic
+                    // overshoot, instead of the previous non-bouncy placement.
+                    modifier = Modifier.animateItem(placementSpec = MotionTokens.listReorganize)
                 )
             }
         }

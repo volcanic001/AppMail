@@ -50,6 +50,7 @@ class SpamViewModel(
     private fun observeRoom() {
         viewModelScope.launch {
             source.observeSpam().collect { emails ->
+                val persistedIds = emails.mapTo(mutableSetOf()) { it.id }
                 _uiState.update { current ->
                     when (current) {
                         is SpamUiState.Loading -> {
@@ -57,7 +58,13 @@ class SpamViewModel(
                                 SpamUiState.Success(emails = emails, isRefreshing = isInitialRefresh)
                             } else current
                         }
-                        is SpamUiState.Success -> current.copy(emails = emails)
+                        is SpamUiState.Success -> current.copy(
+                            emails = emails,
+                            // Drop optimistic removals once Room no longer holds
+                            // the email (the action's effect has landed).
+                            pendingOptimisticRemovalIds = current.pendingOptimisticRemovalIds
+                                .filterTo(mutableSetOf()) { it in persistedIds }
+                        )
                         is SpamUiState.Error -> current
                     }
                 }
@@ -162,14 +169,21 @@ class SpamViewModel(
     /** "No es spam": moves the email back to the inbox. */
     fun markNotSpam(emailId: String) {
         if (!guardAction(emailId)) return
+        optimisticallyRemove(emailId)
         viewModelScope.launch {
             try {
                 when (val r = source.markNotSpam(emailId)) {
                     is EmailActionResult.Success -> enqueueFeedback(ActionFeedback.MarkedNotSpam(emailId))
-                    is EmailActionResult.Failure -> enqueueFeedback(ActionFeedback.Failure(r.reason))
+                    is EmailActionResult.Failure -> {
+                        rollbackOptimisticRemoval(emailId)
+                        enqueueFeedback(ActionFeedback.Failure(r.reason))
+                    }
                 }
-            } catch (e: CancellationException) { throw e }
-            catch (e: Exception) { enqueueFeedback(ActionFeedback.Failure(e.toUiErrorReason())) }
+            } catch (e: CancellationException) { rollbackOptimisticRemoval(emailId); throw e }
+            catch (e: Exception) {
+                rollbackOptimisticRemoval(emailId)
+                enqueueFeedback(ActionFeedback.Failure(e.toUiErrorReason()))
+            }
             finally { releaseAction(emailId) }
         }
     }
@@ -177,15 +191,22 @@ class SpamViewModel(
     /** Deletes a spam email by moving it to the trash. */
     fun deleteToTrash(emailId: String) {
         if (!guardAction(emailId)) return
+        optimisticallyRemove(emailId)
         viewModelScope.launch {
             try {
                 when (val r = source.deleteToTrash(emailId)) {
                     is EmailActionResult.Success ->
                         enqueueFeedback(ActionFeedback.MovedToTrashBatch(listOf(emailId)))
-                    is EmailActionResult.Failure -> enqueueFeedback(ActionFeedback.Failure(r.reason))
+                    is EmailActionResult.Failure -> {
+                        rollbackOptimisticRemoval(emailId)
+                        enqueueFeedback(ActionFeedback.Failure(r.reason))
+                    }
                 }
-            } catch (e: CancellationException) { throw e }
-            catch (e: Exception) { enqueueFeedback(ActionFeedback.Failure(e.toUiErrorReason())) }
+            } catch (e: CancellationException) { rollbackOptimisticRemoval(emailId); throw e }
+            catch (e: Exception) {
+                rollbackOptimisticRemoval(emailId)
+                enqueueFeedback(ActionFeedback.Failure(e.toUiErrorReason()))
+            }
             finally { releaseAction(emailId) }
         }
     }
@@ -204,6 +225,20 @@ class SpamViewModel(
             if (current !is SpamUiState.Success) return false
             if (emailId in current.activeActionEmailIds) return false
             if (_uiState.compareAndSet(current, current.withActive(emailId))) return true
+        }
+    }
+
+    /** Hide the row immediately so the swipe feels instant. */
+    private fun optimisticallyRemove(emailId: String) {
+        _uiState.update { current ->
+            if (current is SpamUiState.Success) current.withOptimisticRemoval(emailId) else current
+        }
+    }
+
+    /** Bring the row back when the background operation fails or is cancelled. */
+    private fun rollbackOptimisticRemoval(emailId: String) {
+        _uiState.update { current ->
+            if (current is SpamUiState.Success) current.withoutOptimisticRemoval(emailId) else current
         }
     }
 

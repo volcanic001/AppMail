@@ -72,8 +72,9 @@ fun TrashContent(
         }
     }
 
+    val visibleEmails = state.visibleEmails
     Box(modifier = modifier.fillMaxSize()) {
-        if (state.emails.isEmpty() && !state.isRefreshing) {
+        if (visibleEmails.isEmpty() && !state.isRefreshing) {
             EmptyTrash()
         } else {
             val ptrState = rememberPullToRefreshState()
@@ -118,7 +119,7 @@ fun TrashContent(
                     )
                 ) {
                     items(
-                        items = state.emails,
+                        items = visibleEmails,
                         key = { it.id }
                     ) { email ->
                         val onClickRemembered = remember(email.id) {

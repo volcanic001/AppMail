@@ -51,6 +51,7 @@ class TrashViewModel(
     private fun observeRoom() {
         viewModelScope.launch {
             source.observeTrash().collect { emails ->
+                val persistedIds = emails.mapTo(mutableSetOf()) { it.id }
                 _uiState.update { current ->
                     when (current) {
                         is TrashUiState.Loading -> {
@@ -61,7 +62,13 @@ class TrashViewModel(
                                 TrashUiState.Success(emails = emails, isRefreshing = isInitialRefresh)
                             } else current
                         }
-                        is TrashUiState.Success -> current.copy(emails = emails)
+                        is TrashUiState.Success -> current.copy(
+                            emails = emails,
+                            // Drop optimistic removals once Room no longer holds
+                            // the email (the action's effect has landed).
+                            pendingOptimisticRemovalIds = current.pendingOptimisticRemovalIds
+                                .filterTo(mutableSetOf()) { it in persistedIds }
+                        )
                         is TrashUiState.Error -> current
                     }
                 }
@@ -165,28 +172,42 @@ class TrashViewModel(
 
     fun deletePermanently(emailId: String) {
         if (!guardAction(emailId)) return
+        optimisticallyRemove(emailId)
         viewModelScope.launch {
             try {
                 when (val r = source.deletePermanently(emailId)) {
                     is EmailActionResult.Success -> enqueueFeedback(ActionFeedback.DeletedPermanently(emailId))
-                    is EmailActionResult.Failure -> enqueueFeedback(ActionFeedback.Failure(r.reason))
+                    is EmailActionResult.Failure -> {
+                        rollbackOptimisticRemoval(emailId)
+                        enqueueFeedback(ActionFeedback.Failure(r.reason))
+                    }
                 }
-            } catch (e: CancellationException) { throw e }
-            catch (e: Exception) { enqueueFeedback(ActionFeedback.Failure(e.toUiErrorReason())) }
+            } catch (e: CancellationException) { rollbackOptimisticRemoval(emailId); throw e }
+            catch (e: Exception) {
+                rollbackOptimisticRemoval(emailId)
+                enqueueFeedback(ActionFeedback.Failure(e.toUiErrorReason()))
+            }
             finally { releaseAction(emailId) }
         }
     }
 
     fun restoreToInbox(emailId: String) {
         if (!guardAction(emailId)) return
+        optimisticallyRemove(emailId)
         viewModelScope.launch {
             try {
                 when (val r = source.restoreFromTrash(emailId)) {
                     is EmailActionResult.Success -> enqueueFeedback(ActionFeedback.RestoredToInbox(emailId))
-                    is EmailActionResult.Failure -> enqueueFeedback(ActionFeedback.Failure(r.reason))
+                    is EmailActionResult.Failure -> {
+                        rollbackOptimisticRemoval(emailId)
+                        enqueueFeedback(ActionFeedback.Failure(r.reason))
+                    }
                 }
-            } catch (e: CancellationException) { throw e }
-            catch (e: Exception) { enqueueFeedback(ActionFeedback.Failure(e.toUiErrorReason())) }
+            } catch (e: CancellationException) { rollbackOptimisticRemoval(emailId); throw e }
+            catch (e: Exception) {
+                rollbackOptimisticRemoval(emailId)
+                enqueueFeedback(ActionFeedback.Failure(e.toUiErrorReason()))
+            }
             finally { releaseAction(emailId) }
         }
     }
@@ -239,6 +260,20 @@ class TrashViewModel(
     private fun endEmptyTrash() {
         _uiState.update { current ->
             if (current is TrashUiState.Success) current.copy(isEmptyingTrash = false) else current
+        }
+    }
+
+    /** Hide the row immediately so the swipe feels instant. */
+    private fun optimisticallyRemove(emailId: String) {
+        _uiState.update { current ->
+            if (current is TrashUiState.Success) current.withOptimisticRemoval(emailId) else current
+        }
+    }
+
+    /** Bring the row back when the background operation fails or is cancelled. */
+    private fun rollbackOptimisticRemoval(emailId: String) {
+        _uiState.update { current ->
+            if (current is TrashUiState.Success) current.withoutOptimisticRemoval(emailId) else current
         }
     }
 

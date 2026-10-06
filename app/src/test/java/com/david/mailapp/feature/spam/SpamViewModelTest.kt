@@ -82,6 +82,32 @@ class SpamViewModelTest {
         assertEquals(1, src.deleteCalls)
     }
 
+    // ── Optimistic removal ──────────────────────────────────────
+
+    @Test fun markNotSpam_hides_row_immediately_and_restores_it_on_failure() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val src = FakeSpamSource(
+            notSpamResult = EmailActionResult.Failure(UiErrorReason.NO_CONNECTION, false),
+            actionGate = gate
+        )
+        src.room.value = listOf(email)
+        val vm = SpamViewModel(src)
+        advanceUntilIdle()
+        assertEquals(listOf("e1"), (vm.uiState.value as SpamUiState.Success).visibleEmails.map { it.id })
+
+        vm.markNotSpam("e1")
+        runCurrent()
+        // Hidden instantly while the remote call is still in flight (gate open).
+        assertTrue((vm.uiState.value as SpamUiState.Success).visibleEmails.isEmpty())
+
+        gate.complete(Unit)
+        advanceUntilIdle()
+        // Remote failed → row comes back + error feedback.
+        val state = vm.uiState.value as SpamUiState.Success
+        assertEquals(listOf("e1"), state.visibleEmails.map { it.id })
+        assertTrue(state.pendingFeedbackQueue.any { it is ActionFeedback.Failure })
+    }
+
     // ── Initial-load regression (mirrors Trash) ─────────────────
 
     @Test fun initial_load_empty_spam_stays_Loading_until_network_resolves() = runTest {
@@ -111,7 +137,8 @@ class SpamViewModelTest {
 private class FakeSpamSource(
     private val notSpamResult: EmailActionResult = EmailActionResult.Success,
     private val deleteResult: EmailActionResult = EmailActionResult.Success,
-    private val refreshGate: CompletableDeferred<Unit>? = null
+    private val refreshGate: CompletableDeferred<Unit>? = null,
+    private val actionGate: CompletableDeferred<Unit>? = null
 ) : SpamEmailSource {
     val room = MutableStateFlow<List<Email>>(emptyList())
     var markNotSpamCalls = 0
@@ -128,11 +155,13 @@ private class FakeSpamSource(
 
     override suspend fun markNotSpam(emailId: String): EmailActionResult {
         markNotSpamCalls++
+        actionGate?.await()
         return notSpamResult
     }
 
     override suspend fun deleteToTrash(emailId: String): EmailActionResult {
         deleteCalls++
+        actionGate?.await()
         return deleteResult
     }
 }

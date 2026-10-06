@@ -83,6 +83,32 @@ class TrashViewModelActionTest {
         assertTrue(state.pendingFeedbackQueue.any { it is ActionFeedback.RestoredToInbox })
     }
 
+    // ── Optimistic removal ──────────────────────────────────────
+
+    @Test fun delete_hides_row_immediately_and_restores_it_on_failure() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val src = FakeTrashSource(
+            deleteResult = EmailActionResult.Failure(UiErrorReason.NO_CONNECTION, false),
+            deleteGate = gate
+        )
+        src.room.value = listOf(email)
+        val vm = TrashViewModel(src)
+        advanceUntilIdle()
+        assertEquals(listOf("e1"), (vm.uiState.value as TrashUiState.Success).visibleEmails.map { it.id })
+
+        vm.deletePermanently("e1")
+        runCurrent()
+        // Hidden instantly while the remote call is still in flight (gate open).
+        assertTrue((vm.uiState.value as TrashUiState.Success).visibleEmails.isEmpty())
+
+        gate.complete(Unit)
+        advanceUntilIdle()
+        // Remote failed → row comes back + error feedback.
+        val state = vm.uiState.value as TrashUiState.Success
+        assertEquals(listOf("e1"), state.visibleEmails.map { it.id })
+        assertTrue(state.pendingFeedbackQueue.any { it is ActionFeedback.Failure })
+    }
+
     // ── Empty trash ─────────────────────────────────────────────
 
     @Test fun emptyTrash_success_enqueues_TrashEmptied_and_clears_flag() = runTest {

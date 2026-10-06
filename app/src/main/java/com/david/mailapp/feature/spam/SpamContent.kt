@@ -69,8 +69,9 @@ fun SpamContent(
         }
     }
 
+    val visibleEmails = state.visibleEmails
     Box(modifier = modifier.fillMaxSize()) {
-        if (state.emails.isEmpty() && !state.isRefreshing) {
+        if (visibleEmails.isEmpty() && !state.isRefreshing) {
             EmptySpam()
         } else {
             val ptrState = rememberPullToRefreshState()
@@ -115,7 +116,7 @@ fun SpamContent(
                     )
                 ) {
                     items(
-                        items = state.emails,
+                        items = visibleEmails,
                         key = { it.id }
                     ) { email ->
                         val onClickRemembered = remember(email.id) {
