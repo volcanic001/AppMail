@@ -79,6 +79,8 @@ class EmailRepository(
 
     fun getTrash(): Flow<List<Email>> = mailboxCoordinator.getTrash()
 
+    fun getSpam(): Flow<List<Email>> = mailboxCoordinator.getSpam()
+
     fun getEmailById(emailId: String): Flow<Email?> = mailboxCoordinator.getEmailById(emailId)
 
     // ── Write (remote → cache) ──────────────────────────────────
@@ -89,6 +91,9 @@ class EmailRepository(
 
     suspend fun refreshTrash(pageToken: String? = null): PaginatedResult<Email> =
         mailboxCoordinator.refreshTrash(pageToken)
+
+    suspend fun refreshSpam(pageToken: String? = null): PaginatedResult<Email> =
+        mailboxCoordinator.refreshSpam(pageToken)
 
     /**
      * Remote search — NOT cached in Room. Results are ephemeral
@@ -102,6 +107,10 @@ class EmailRepository(
 
     suspend fun restoreFromTrash(emailId: String): EmailActionResult =
         actionCoordinator.restoreFromTrash(emailId)
+
+    /** Mark a spam email as "not spam" (moves it back to the inbox). */
+    suspend fun markNotSpam(emailId: String): EmailActionResult =
+        actionCoordinator.markNotSpam(emailId)
 
     suspend fun deletePermanently(emailId: String): EmailActionResult =
         actionCoordinator.deletePermanently(emailId)

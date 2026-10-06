@@ -31,8 +31,10 @@ internal class EmailActionCoordinator(
             return EmailActionResult.Failure(e.toUiErrorReason(), remoteApplied = false)
         }
 
-        // 2. Local write with exception/rejection handling
-        return commitWithReconcile(lease, p, folders = listOf("inbox", "trash")) {
+        // 2. Local write with exception/rejection handling.
+        //    "spam" is reconciled too so that deleting from the Spam screen
+        //    (which reuses this path) recovers correctly on local failure.
+        return commitWithReconcile(lease, p, folders = listOf("inbox", "trash", "spam")) {
             dao.moveToFolder(emailId, "trash")
         }
     }
@@ -52,6 +54,25 @@ internal class EmailActionCoordinator(
         }
 
         return commitWithReconcile(lease, p, folders = listOf("trash", "inbox")) {
+            dao.moveToFolder(emailId, "inbox")
+        }
+    }
+
+    suspend fun markNotSpam(emailId: String): EmailActionResult {
+        val lease = writeGuard.capture() ?: return EmailActionResult.Failure(
+            UiErrorReason.NO_ACTIVE_ACCOUNT, remoteApplied = false)
+        val p = providerFactory() ?: return EmailActionResult.Failure(
+            UiErrorReason.NO_ACTIVE_ACCOUNT, remoteApplied = false)
+
+        try {
+            p.markNotSpam(emailId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return EmailActionResult.Failure(e.toUiErrorReason(), remoteApplied = false)
+        }
+
+        return commitWithReconcile(lease, p, folders = listOf("spam", "inbox")) {
             dao.moveToFolder(emailId, "inbox")
         }
     }
@@ -181,11 +202,18 @@ internal class EmailActionCoordinator(
         val result = when (folder) {
             "inbox" -> p.fetchInbox(null)
             "trash" -> p.fetchTrash(null)
+            "spam" -> p.fetchSpam(null)
+            else -> return
+        }
+        val targetFolder = when (folder) {
+            "inbox" -> EmailFolder.Inbox
+            "trash" -> EmailFolder.Trash
+            "spam" -> EmailFolder.Spam
             else -> return
         }
         writeGuard.commit(lease) {
             val entities = result.items.map {
-                EmailEntity.fromDomain(it, if (folder == "inbox") EmailFolder.Inbox else EmailFolder.Trash)
+                EmailEntity.fromDomain(it, targetFolder)
             }
             if (result.isComplete) {
                 dao.replaceFolder(folder, entities)

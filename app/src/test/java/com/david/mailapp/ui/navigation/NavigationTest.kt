@@ -24,12 +24,13 @@ class NavigationTest {
     }
 
     @Test
-    fun `drawer destinations conserva Inbox Trash Settings en ese orden`() {
+    fun `drawer destinations conserva Inbox Trash Spam Settings en ese orden`() {
         val all = DrawerDestination.all
-        assertEquals(3, all.size)
+        assertEquals(4, all.size)
         assertTrue(all[0].route is MainRoute.Inbox)
         assertTrue(all[1].route is MainRoute.Trash)
-        assertTrue(all[2].route is MainRoute.Settings)
+        assertTrue(all[2].route is MainRoute.Spam)
+        assertTrue(all[3].route is MainRoute.Settings)
     }
 
     @Test
@@ -83,6 +84,10 @@ class NavigationTest {
         val trashStr = json.encodeToString<MainRoute>(MainRoute.Trash)
         val trashDecoded = json.decodeFromString<MainRoute>(trashStr)
         assertTrue(trashDecoded is MainRoute.Trash)
+
+        val spamStr = json.encodeToString<MainRoute>(MainRoute.Spam)
+        val spamDecoded = json.decodeFromString<MainRoute>(spamStr)
+        assertTrue(spamDecoded is MainRoute.Spam)
 
         val settingsStr = json.encodeToString<MainRoute>(MainRoute.Settings)
         val settingsDecoded = json.decodeFromString<MainRoute>(settingsStr)

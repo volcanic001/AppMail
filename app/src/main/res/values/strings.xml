@@ -11,6 +11,7 @@
     <!-- Navegación -->
     <string name="nav_inbox">Bandeja</string>
     <string name="nav_trash">Papelera</string>
+    <string name="nav_spam">Spam</string>
     <string name="nav_settings">Ajustes</string>
     <string name="nav_search">Buscar</string>
     <string name="nav_email_detail">Detalle</string>
@@ -147,6 +148,7 @@
 
     <string name="inbox_title">Bandeja</string>
     <string name="trash_title">Papelera</string>
+    <string name="spam_title">Spam</string>
 
     <!-- Vaciar papelera -->
     <string name="trash_empty_action">Vaciar papelera</string>
@@ -158,12 +160,15 @@
     <!-- Estados vacíos -->
     <string name="inbox_empty">Tu bandeja está vacía</string>
     <string name="trash_empty">La papelera está vacía</string>
+    <string name="spam_empty">No hay spam</string>
+    <string name="spam_empty_symbol">🛡️</string>
 
     <!-- Snackbars -->
     <string name="snackbar_moved_to_trash">Movido a la papelera</string>
     <string name="snackbar_moved_to_trash_plural">%d correos movidos a la papelera</string>
     <string name="snackbar_deleted_permanently">Eliminado permanentemente</string>
     <string name="snackbar_trash_emptied">Papelera vaciada</string>
+    <string name="snackbar_not_spam">Movido a la bandeja</string>
     <string name="snackbar_restored_to_inbox">Restaurado en la bandeja</string>
     <string name="snackbar_trash_failed_single">No se pudo mover 1 correo</string>
     <string name="snackbar_trash_failed_plural">No se pudieron mover %d correos</string>

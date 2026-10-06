@@ -24,6 +24,9 @@ sealed interface MainRoute {
     data object Trash : MainRoute
 
     @Serializable
+    data object Spam : MainRoute
+
+    @Serializable
     data object Settings : MainRoute
 
     @Serializable

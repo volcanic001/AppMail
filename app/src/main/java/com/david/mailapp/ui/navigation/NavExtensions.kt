@@ -68,7 +68,7 @@ internal fun NavHostController.popBackStackFrom(
  * - Restore state when re-selecting a previously selected item.
  */
 internal fun NavHostController.navigateToTopLevel(route: MainRoute) {
-    require(route is MainRoute.Inbox || route is MainRoute.Trash || route is MainRoute.Settings) {
+    require(route is MainRoute.Inbox || route is MainRoute.Trash || route is MainRoute.Spam || route is MainRoute.Settings) {
         "Route $route is not a top-level destination"
     }
     navigate(route) {
@@ -122,6 +122,7 @@ internal fun NavHostController.closeEmailDetail(
         val dest = previousEntry.destination
         val isValidOrigin = dest.hasRoute<MainRoute.Inbox>() ||
                 dest.hasRoute<MainRoute.Trash>() ||
+                dest.hasRoute<MainRoute.Spam>() ||
                 dest.hasRoute<MainRoute.Search>()
         if (isValidOrigin) {
             previousEntry.savedStateHandle[KEY_CLOSED_EMAIL_ID] = emailId

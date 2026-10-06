@@ -32,6 +32,7 @@ fun ActionFeedbackEffect(
     val restoredMessage = stringResource(R.string.snackbar_restored_to_inbox)
     val deletedMessage  = stringResource(R.string.snackbar_deleted_permanently)
     val trashEmptiedMessage = stringResource(R.string.snackbar_trash_emptied)
+    val notSpamMessage = stringResource(R.string.snackbar_not_spam)
     val failedSingle = stringResource(R.string.snackbar_trash_failed_single)
     val failedPlural = stringResource(R.string.snackbar_trash_failed_plural)
     val undoLabel    = stringResource(R.string.action_undo)
@@ -62,6 +63,10 @@ fun ActionFeedbackEffect(
                 )
                 is ActionFeedback.TrashEmptied -> snackbarHostState.showSnackbar(
                     message = trashEmptiedMessage,
+                    duration = SnackbarDuration.Short
+                )
+                is ActionFeedback.MarkedNotSpam -> snackbarHostState.showSnackbar(
+                    message = notSpamMessage,
                     duration = SnackbarDuration.Short
                 )
                 is ActionFeedback.TrashFailure -> {

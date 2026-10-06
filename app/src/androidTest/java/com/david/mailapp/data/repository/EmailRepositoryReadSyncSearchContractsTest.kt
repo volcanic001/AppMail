@@ -375,6 +375,23 @@ class EmailRepositoryReadSyncSearchContractsTest {
     }
 
     @Test
+    fun refreshSpam_delegates_page_token_persists_to_room_and_getSpam_reflects() = runTest {
+        seedBaselineFolders()
+        val spamRemote = PaginatedResult(
+            items = listOf(testEmail("spam-page-2", folder = EmailFolder.Spam)),
+            nextPageToken = "spam-page-3",
+            isComplete = true
+        )
+        provider.fetchSpamResult = spamRemote
+
+        assertEquals(spamRemote, repository.refreshSpam("spam-page-2-token"))
+
+        assertEquals(listOf("spam-page-2-token"), provider.receivedSpamTokens)
+        assertEquals(setOf("spam-page-2"), folderIds("spam").toSet())
+        assertEquals(listOf("spam-page-2"), repository.getSpam().first().map(Email::id))
+    }
+
+    @Test
     fun refresh_provider_errors_propagate_same_instance_and_leave_room_unchanged() = runTest {
         seedBaselineFolders()
         val inboxError = IOException("inbox unavailable")

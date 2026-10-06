@@ -66,6 +66,7 @@ fun MainScreen(
         when {
             destination.hasRoute<MainRoute.Inbox>() -> MainRoute.Inbox
             destination.hasRoute<MainRoute.Trash>() -> MainRoute.Trash
+            destination.hasRoute<MainRoute.Spam>() -> MainRoute.Spam
             destination.hasRoute<MainRoute.Settings>() -> MainRoute.Settings
             destination.hasRoute<MainRoute.Search>() -> MainRoute.Search
             destination.hasRoute<MainRoute.EmailDetail>() -> entry.toRoute<MainRoute.EmailDetail>()
@@ -81,7 +82,7 @@ fun MainScreen(
         scope.launch { drawerState.open() }
     }
 
-    val gesturesEnabled = currentRoute is MainRoute.Inbox || currentRoute is MainRoute.Trash || currentRoute is MainRoute.Settings
+    val gesturesEnabled = currentRoute is MainRoute.Inbox || currentRoute is MainRoute.Trash || currentRoute is MainRoute.Spam || currentRoute is MainRoute.Settings
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -129,7 +130,7 @@ fun MainScreen(
             )
 
             // ── FAB "Redactar" (hidden on Search & Settings & Compose & Detail) ──────
-            val isFabVisible = currentRoute is MainRoute.Inbox || currentRoute is MainRoute.Trash
+            val isFabVisible = currentRoute is MainRoute.Inbox || currentRoute is MainRoute.Trash || currentRoute is MainRoute.Spam
             AnimatedVisibility(
                 visible = isFabVisible,
                 enter = fadeIn(MotionTokens.tweenShort()) + scaleIn(),

@@ -46,5 +46,6 @@ data class Email(
 enum class EmailFolder {
     Inbox,
     Trash,
+    Spam,
     Other
 }

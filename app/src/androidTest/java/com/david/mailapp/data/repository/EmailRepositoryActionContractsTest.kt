@@ -82,6 +82,17 @@ class EmailRepositoryActionContractsTest {
         assertEquals("trash", get("e1")?.folder)
     }
 
+    @Test fun c1_markNotSpam_Gmail_fails_returns_Failure_room_unchanged() = runTest {
+        seed("e1", EmailFolder.Spam)
+        fakeProvider.markNotSpamError = IOException("Gmail error")
+        val result = repository.markNotSpam("e1")
+        assertTrue(result is EmailActionResult.Failure)
+        val failure = result as EmailActionResult.Failure
+        assertFalse(failure.remoteApplied)
+        assertEquals(UiErrorReason.NO_CONNECTION, failure.reason)
+        assertEquals("spam", get("e1")?.folder)
+    }
+
     @Test fun c1_deletePermanently_Gmail_fails_returns_Failure_room_unchanged() = runTest {
         seed("e1", EmailFolder.Trash)
         fakeProvider.deletePermanentlyError = IOException("Gmail error")
@@ -124,6 +135,15 @@ class EmailRepositoryActionContractsTest {
         assertEquals("inbox", get("e1")?.folder)
         assertEquals(1, fakeProvider.restoreFromTrashCalls)
         assertEquals(listOf("gmail.restoreFromTrash", "room.commit"), events)
+    }
+
+    @Test fun c1_markNotSpam_success_remote_first_room_reflects() = runTest {
+        seed("e1", EmailFolder.Spam)
+        val result = repository.markNotSpam("e1")
+        assertTrue(result is EmailActionResult.Success)
+        assertEquals("inbox", get("e1")?.folder)
+        assertEquals(1, fakeProvider.markNotSpamCalls)
+        assertEquals(listOf("gmail.markNotSpam", "room.commit"), events)
     }
 
     @Test fun c1_deletePermanently_success_remote_first_room_reflects() = runTest {

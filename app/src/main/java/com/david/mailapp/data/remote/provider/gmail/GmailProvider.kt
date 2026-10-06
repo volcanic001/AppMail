@@ -179,6 +179,10 @@ class GmailProvider(
         return fetchGmailPage(client, labelId = "TRASH", pageToken = pageToken, delayFn = lookupDelay, clock = clock, sink = networkDiagnosticSink)
     }
 
+    override suspend fun fetchSpam(pageToken: String?): PaginatedResult<Email> {
+        return fetchGmailPage(client, labelId = "SPAM", pageToken = pageToken, delayFn = lookupDelay, clock = clock, sink = networkDiagnosticSink)
+    }
+
     override suspend fun search(query: String, pageToken: String?): PaginatedResult<Email> {
         val result = fetchGmailPage(client, query = query, pageToken = pageToken, delayFn = lookupDelay, clock = clock, sink = networkDiagnosticSink)
         return result
@@ -253,6 +257,12 @@ class GmailProvider(
 
     override suspend fun restoreFromTrash(emailId: String) {
         client.post("users/me/messages/$emailId/untrash")
+    }
+
+    override suspend fun markNotSpam(emailId: String) {
+        client.post("users/me/messages/$emailId/modify") {
+            setBody(ModifyRequest(addLabelIds = listOf("INBOX"), removeLabelIds = listOf("SPAM")))
+        }
     }
 
     override suspend fun deletePermanently(emailId: String) {

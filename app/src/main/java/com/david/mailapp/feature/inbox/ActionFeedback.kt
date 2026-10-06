@@ -60,6 +60,12 @@ sealed class ActionFeedback {
         override val id: ActionFeedbackId = ActionFeedbackId.next()
     ) : ActionFeedback()
 
+    /** A spam email was marked "not spam" and moved back to the inbox. */
+    data class MarkedNotSpam(
+        val emailId: String,
+        override val id: ActionFeedbackId = ActionFeedbackId.next()
+    ) : ActionFeedback()
+
     /**
      * Remote trash operation failed for [failedCount] emails.
      * Distinct from the generic [Failure] so the UI can show a

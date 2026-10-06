@@ -29,6 +29,7 @@ import com.david.mailapp.feature.inbox.InboxScreen
 import com.david.mailapp.feature.search.SearchScreen
 import com.david.mailapp.feature.settings.SettingsScreen
 import com.david.mailapp.feature.trash.TrashScreen
+import com.david.mailapp.feature.spam.SpamScreen
 import com.david.mailapp.ui.theme.MotionTokens
 import com.david.mailapp.ui.theme.ColorPalette
 
@@ -109,6 +110,30 @@ fun MainNavHost(
                 .collectAsStateWithLifecycle()
             TrashScreen(
                 listState = trashListState,
+                highlightedEmailId = highlightedEmailId,
+                showEmailDividers = showEmailDividers,
+                onClearHighlight = {
+                    backStackEntry.savedStateHandle[KEY_CLOSED_EMAIL_ID] = null
+                },
+                onMenuClick = onMenuClick,
+                onEmailClick = { emailId ->
+                    navController.navigateToOverlay(MainRoute.EmailDetail(emailId))
+                }
+            )
+        }
+
+        composable<MainRoute.Spam>(
+            enterTransition = { fadeIn(spring(dampingRatio = 0.65f, stiffness = 350f)) },
+            exitTransition = { fadeOut(spring(dampingRatio = 0.65f, stiffness = 350f)) },
+            popEnterTransition = { EnterTransition.None },
+            popExitTransition = { ExitTransition.None }
+        ) { backStackEntry ->
+            val spamListState = androidx.compose.foundation.lazy.rememberLazyListState()
+            val highlightedEmailId by backStackEntry.savedStateHandle
+                .getStateFlow<String?>(KEY_CLOSED_EMAIL_ID, null)
+                .collectAsStateWithLifecycle()
+            SpamScreen(
+                listState = spamListState,
                 highlightedEmailId = highlightedEmailId,
                 showEmailDividers = showEmailDividers,
                 onClearHighlight = {

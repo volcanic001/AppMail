@@ -108,6 +108,41 @@ class FakeEmailProvider : EmailProvider {
     var fetchEmailByIdResultsByCall: List<EmailLookupResult> = emptyList()
     var inlineImagesError: Exception? = null
 
+    // ── Spam (Phase 1) ───────────────────────────────────────────
+    private val spamPlans = mutableListOf<FolderFetchPlan>()
+    fun enqueueSpam(
+        result: PaginatedResult<Email>,
+        gate: CompletableDeferred<Unit>? = null,
+        ignoreCancellation: Boolean = false
+    ) = FolderFetchPlan(result, gate, ignoreCancellation).also(spamPlans::add)
+
+    var fetchSpamResult: PaginatedResult<Email> = PaginatedResult(emptyList(), null)
+    var fetchSpamDeferred: CompletableDeferred<Unit>? = null
+    var fetchSpamError: Exception? = null
+    var fetchSpamCalls = 0
+    val receivedSpamTokens = mutableListOf<String?>()
+
+    var markNotSpamDeferred: CompletableDeferred<Unit>? = null
+    var markNotSpamCalls = 0
+    var markNotSpamError: Exception? = null
+
+    override suspend fun fetchSpam(pageToken: String?): PaginatedResult<Email> {
+        eventLog?.add("gmail.fetch.spam")
+        fetchSpamCalls++
+        receivedSpamTokens += pageToken
+        if (spamPlans.isNotEmpty()) return execute(spamPlans.removeAt(0))
+        fetchSpamDeferred?.await()
+        fetchSpamError?.let { throw it }
+        return fetchSpamResult
+    }
+
+    override suspend fun markNotSpam(emailId: String) {
+        eventLog?.add("gmail.markNotSpam")
+        markNotSpamDeferred?.await()
+        markNotSpamCalls++
+        markNotSpamError?.let { throw it }
+    }
+
     override suspend fun fetchInbox(pageToken: String?): PaginatedResult<Email> {
         eventLog?.add("gmail.fetch.inbox")
         fetchInboxCalls++

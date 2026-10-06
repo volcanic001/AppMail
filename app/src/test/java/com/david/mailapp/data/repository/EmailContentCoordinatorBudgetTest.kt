@@ -130,9 +130,11 @@ class EmailContentCoordinatorBudgetTest {
     private class FakeProvider(val result: Email) : EmailProvider {
         override suspend fun fetchInbox(pageToken: String?): PaginatedResult<Email> = throw NotImplementedError()
         override suspend fun fetchTrash(pageToken: String?): PaginatedResult<Email> = throw NotImplementedError()
+        override suspend fun fetchSpam(pageToken: String?): PaginatedResult<Email> = throw NotImplementedError()
         override suspend fun search(query: String, pageToken: String?): PaginatedResult<Email> = throw NotImplementedError()
         override suspend fun moveToTrash(emailId: String) {}
         override suspend fun restoreFromTrash(emailId: String) {}
+        override suspend fun markNotSpam(emailId: String) {}
         override suspend fun deletePermanently(emailId: String) {}
         override suspend fun emptyTrash() {}
         override suspend fun markAsRead(emailId: String) {}

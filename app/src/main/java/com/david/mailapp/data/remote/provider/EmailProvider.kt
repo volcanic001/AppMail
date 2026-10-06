@@ -21,6 +21,9 @@ interface EmailProvider {
     /** Fetch trashed messages. */
     suspend fun fetchTrash(pageToken: String? = null): PaginatedResult<Email>
 
+    /** Fetch spam (junk) messages. */
+    suspend fun fetchSpam(pageToken: String? = null): PaginatedResult<Email>
+
     /** Search messages using Gmail's native query syntax. */
     suspend fun search(query: String, pageToken: String? = null): PaginatedResult<Email>
 
@@ -29,6 +32,9 @@ interface EmailProvider {
 
     /** Restore an email from trash back to inbox on the server. */
     suspend fun restoreFromTrash(emailId: String)
+
+    /** Mark a spam email as "not spam": removes the SPAM label and restores INBOX. */
+    suspend fun markNotSpam(emailId: String)
 
     /** Permanently delete an email on the server. */
     suspend fun deletePermanently(emailId: String)

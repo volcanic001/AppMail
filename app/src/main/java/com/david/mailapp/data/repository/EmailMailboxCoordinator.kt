@@ -27,6 +27,7 @@ internal class EmailMailboxCoordinator(
 
     private val inboxCommitCoordinator = FolderCommitCoordinator()
     private val trashCommitCoordinator = FolderCommitCoordinator()
+    private val spamCommitCoordinator = FolderCommitCoordinator()
 
     // ── Reactive reads ───────────────────────────────────────────
 
@@ -38,6 +39,12 @@ internal class EmailMailboxCoordinator(
 
     fun getTrash(): Flow<List<Email>> {
         return dao.observeSummariesByFolder("trash").map { projections ->
+            projections.map { it.toDomain() }
+        }
+    }
+
+    fun getSpam(): Flow<List<Email>> {
+        return dao.observeSummariesByFolder("spam").map { projections ->
             projections.map { it.toDomain() }
         }
     }
@@ -91,6 +98,30 @@ internal class EmailMailboxCoordinator(
             result = result,
             generation = gen,
             commitCoordinator = trashCommitCoordinator,
+            lease = lease
+        )
+
+        return result
+    }
+
+    suspend fun refreshSpam(pageToken: String?): PaginatedResult<Email> {
+        val gen = if (pageToken == null) {
+            spamCommitCoordinator.nextGeneration()
+        } else {
+            spamCommitCoordinator.currentGeneration()
+        }
+
+        val lease = writeGuard.capture() ?: return PaginatedResult(emptyList(), null)
+        val p = providerFactory() ?: return PaginatedResult(emptyList(), null)
+        val fetched = p.fetchSpam(pageToken)
+        val result = if (fetched.isComplete) fetched else fetched.copy(nextPageToken = null)
+
+        persistMailboxPage(
+            folder = EmailFolder.Spam,
+            pageToken = pageToken,
+            result = result,
+            generation = gen,
+            commitCoordinator = spamCommitCoordinator,
             lease = lease
         )
 
