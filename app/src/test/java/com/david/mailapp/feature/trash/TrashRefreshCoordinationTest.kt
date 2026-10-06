@@ -101,6 +101,32 @@ class TrashRefreshCoordinationTest {
     }
 
     @Test
+    fun `carga inicial con papelera vacia permanece en Loading hasta que la red resuelva`() = runTest(mainDispatcher) {
+        val source = ControllingTrashSource()
+        val gate = CompletableDeferred<Unit>()
+        val plan = source.enqueue(PaginatedResult(emptyList(), null), gate)
+        val viewModel = TrashViewModel(source)
+        runCurrent()
+        plan.started.await()
+
+        // Room emitió vacío al instante, pero el refresh inicial sigue en vuelo:
+        // NO debe parpadear al estado "papelera vacía" todavía (regresión).
+        assertTrue(
+            "Debe seguir en Loading mientras carga por primera vez",
+            viewModel.uiState.value is TrashUiState.Loading
+        )
+
+        gate.complete(Unit)
+        advanceUntilIdle()
+
+        // Ahora la red confirmó que está vacía → Success(vacío), sin spinner.
+        val state = viewModel.uiState.value
+        assertTrue("Debe resolver a Success tras la red", state is TrashUiState.Success)
+        assertTrue((state as TrashUiState.Success).emails.isEmpty())
+        assertFalse(state.isRefreshing)
+    }
+
+    @Test
     fun `refresh inmediato despues de paginacion no conserva flag obsoleto`() = runTest(mainDispatcher) {
         val source = ControllingTrashSource()
         source.enqueue(PaginatedResult(listOf(email("initial")), "page-2"))

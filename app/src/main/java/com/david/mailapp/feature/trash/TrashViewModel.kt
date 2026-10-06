@@ -33,6 +33,14 @@ class TrashViewModel(
     private var paginationJob: Job? = null
     private var currentGeneration = 0L
 
+    /**
+     * True until the first refresh completes. While it holds, an empty Room
+     * emission must NOT flip the screen to the "trash is empty" state — the
+     * cache simply has not loaded yet. We keep showing the loading skeleton
+     * until the server confirms the real contents. Mirrors InboxViewModel.
+     */
+    private var isInitialRefresh = true
+
     init {
         observeRoom()
         refresh()
@@ -45,7 +53,14 @@ class TrashViewModel(
             source.observeTrash().collect { emails ->
                 _uiState.update { current ->
                     when (current) {
-                        is TrashUiState.Loading -> TrashUiState.Success(emails = emails)
+                        is TrashUiState.Loading -> {
+                            // On the very first load, an empty cache emission is
+                            // "not loaded yet", not "confirmed empty": stay in
+                            // Loading (skeleton) until the refresh resolves it.
+                            if (!isInitialRefresh || emails.isNotEmpty()) {
+                                TrashUiState.Success(emails = emails, isRefreshing = isInitialRefresh)
+                            } else current
+                        }
                         is TrashUiState.Success -> current.copy(emails = emails)
                         is TrashUiState.Error -> current
                     }
@@ -80,8 +95,16 @@ class TrashViewModel(
                     if (result.isComplete) {
                         nextPageToken = result.nextPageToken
                     }
+                    isInitialRefresh = false
                     _uiState.update { current ->
-                        if (current is TrashUiState.Success) current.copy(isRefreshing = false) else current
+                        when (current) {
+                            is TrashUiState.Success -> current.copy(isRefreshing = false)
+                            // Trash is genuinely empty: the cache never produced a
+                            // non-empty emission, so close out the initial load here.
+                            is TrashUiState.Loading ->
+                                TrashUiState.Success(emails = result.items, isRefreshing = false)
+                            is TrashUiState.Error -> current
+                        }
                     }
                 }
             } catch (e: CancellationException) {
@@ -89,6 +112,7 @@ class TrashViewModel(
             } catch (e: Exception) {
                 if (currentGeneration == myGen) {
                     Log.e("TrashVM", "refresh failed", e)
+                    isInitialRefresh = false
                     _uiState.update { current ->
                         if (current is TrashUiState.Success) {
                             current.copy(isRefreshing = false)
