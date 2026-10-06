@@ -32,9 +32,11 @@ internal class EmailActionCoordinator(
         }
 
         // 2. Local write with exception/rejection handling.
-        //    "spam" is reconciled too so that deleting from the Spam screen
-        //    (which reuses this path) recovers correctly on local failure.
-        return commitWithReconcile(lease, p, folders = listOf("inbox", "trash", "spam")) {
+        //    Deleting from the Spam screen reuses this path; its folder is NOT
+        //    reconciled here on purpose, to avoid an extra spam fetch on every
+        //    failed inbox delete. A stale spam row self-heals on the next
+        //    refresh of that screen.
+        return commitWithReconcile(lease, p, folders = listOf("inbox", "trash")) {
             dao.moveToFolder(emailId, "trash")
         }
     }
