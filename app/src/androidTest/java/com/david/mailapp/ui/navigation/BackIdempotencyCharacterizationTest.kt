@@ -884,6 +884,7 @@ class BackIdempotencyCharacterizationTest {
                         onBack = {},
                         onReply = {},
                         onForward = {},
+                        onToggleStar = {},
                         onRetry = {},
                         onRetryBody = {},
                         onPdfAttachmentClick = {},
