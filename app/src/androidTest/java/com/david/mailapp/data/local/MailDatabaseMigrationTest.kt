@@ -243,4 +243,65 @@ class MailDatabaseMigrationTest {
 
         v7Db.close()
     }
+
+    @Test
+    fun migrate7To8_reopensOnlyPreviouslyEmptyContentForRecovery() {
+        val v7Db: SupportSQLiteDatabase = helper.createDatabase(testDbName, 7)
+        val columns = """
+            id, thread_id, sender, sender_initials, recipient_to,
+            subject, snippet, timestamp, is_read, is_starred,
+            has_attachments, labels, folder, body, clean_body,
+            pdf_attachments_json, pdf_metadata_scanned, rfc_message_id, rfc_references,
+            content_state, body_kind, inline_references_json,
+            cached_content_bytes, content_last_access_epoch_ms
+        """.trimIndent()
+        val placeholders = List(24) { "?" }.joinToString(",")
+        val cachedPdf =
+            "[{\"fileName\":\"cached.pdf\",\"mimeType\":\"application/pdf\",\"attachmentId\":\"pdf-1\",\"partId\":\"2\"}]"
+
+        v7Db.execSQL(
+            "INSERT INTO emails ($columns) VALUES ($placeholders)",
+            arrayOf<Any?>(
+                "empty-email", "thread-1", "A", "A", "B", "Image only", "", 1L,
+                1, 0, 1, "INBOX", "inbox", "", "", cachedPdf, 1, null, null,
+                "EMPTY", "UNKNOWN", "[]", 0L, 99L
+            )
+        )
+        v7Db.execSQL(
+            "INSERT INTO emails ($columns) VALUES ($placeholders)",
+            arrayOf<Any?>(
+                "ready-email", "thread-2", "A", "A", "B", "Text", "", 2L,
+                1, 0, 0, "INBOX", "inbox", "<p>ready</p>", "<p>ready</p>", "[]", 1, null, null,
+                "READY", "HTML", "[]", 24L, 100L
+            )
+        )
+        v7Db.close()
+
+        val v8Db = helper.runMigrationsAndValidate(
+            testDbName,
+            8,
+            true,
+            MailDatabase.MIGRATION_7_8
+        )
+
+        val empty = v8Db.query("SELECT * FROM emails WHERE id = 'empty-email'")
+        assertTrue(empty.moveToFirst())
+        assertEquals("NOT_FETCHED", empty.getString(empty.getColumnIndexOrThrow("content_state")))
+        assertEquals("UNKNOWN", empty.getString(empty.getColumnIndexOrThrow("body_kind")))
+        assertEquals(0L, empty.getLong(empty.getColumnIndexOrThrow("cached_content_bytes")))
+        assertEquals(0L, empty.getLong(empty.getColumnIndexOrThrow("content_last_access_epoch_ms")))
+        assertEquals(cachedPdf, empty.getString(empty.getColumnIndexOrThrow("pdf_attachments_json")))
+        assertEquals(1, empty.getInt(empty.getColumnIndexOrThrow("pdf_metadata_scanned")))
+        empty.close()
+
+        val ready = v8Db.query("SELECT * FROM emails WHERE id = 'ready-email'")
+        assertTrue(ready.moveToFirst())
+        assertEquals("READY", ready.getString(ready.getColumnIndexOrThrow("content_state")))
+        assertEquals("HTML", ready.getString(ready.getColumnIndexOrThrow("body_kind")))
+        assertEquals("<p>ready</p>", ready.getString(ready.getColumnIndexOrThrow("body")))
+        assertEquals(24L, ready.getLong(ready.getColumnIndexOrThrow("cached_content_bytes")))
+        ready.close()
+
+        v8Db.close()
+    }
 }

@@ -10,7 +10,7 @@ import com.david.mailapp.data.local.dao.EmailDao
 import com.david.mailapp.data.local.entity.EmailEntity
 @Database(
     entities = [EmailEntity::class],
-    version = 7,
+    version = 8,
     exportSchema = true
 )
 abstract class MailDatabase : RoomDatabase() {
@@ -46,6 +46,22 @@ abstract class MailDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Gmail image-only messages were previously classified as EMPTY.
+                // Invalidate that terminal classification once so the corrected
+                // MIME parser can recover them without discarding PDF metadata.
+                db.execSQL("""
+                    UPDATE emails
+                    SET content_state = 'NOT_FETCHED',
+                        body_kind = 'UNKNOWN',
+                        cached_content_bytes = 0,
+                        content_last_access_epoch_ms = 0
+                    WHERE content_state = 'EMPTY'
+                """.trimIndent())
+            }
+        }
+
         fun create(context: Context): MailDatabase {
             return instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
@@ -53,7 +69,7 @@ abstract class MailDatabase : RoomDatabase() {
                     MailDatabase::class.java,
                     "mailapp.db"
                 )
-                    .addMigrations(MIGRATION_5_6, MIGRATION_6_7)
+                    .addMigrations(MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
                     .build()
                     .also { instance = it }
             }

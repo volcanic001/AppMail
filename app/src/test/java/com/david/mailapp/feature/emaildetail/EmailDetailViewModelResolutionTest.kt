@@ -15,6 +15,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -231,6 +232,162 @@ class EmailDetailViewModelResolutionTest {
         assertTrue(vm.uiState.value is EmailDetailUiState.Ready)
         assertEquals(1, source.inlineImagesCallCount)
         assertEquals(0, source.bodyFetchCallCount)
+    }
+
+    @Test
+    fun readyMixedHtmlWithRefsButNoCid_appendsAndDownloadsCachedImage() = runTest {
+        val source = FakeEmailDetailSource("e1")
+        val ref = com.david.mailapp.domain.model.EmailInlineReference(
+            "mailapp-inline-image-1",
+            "image-att-1",
+            "image/png"
+        )
+        source.resolveResult = EmailResolutionResult.Found(
+            FakeEmailDetailSource.sampleEmail(
+                body = "<html><p>Visible text</p></html>",
+                bodyBlank = false,
+                pdfScanned = true
+            ).copy(
+                cleanBody = "<p>Visible text</p>",
+                inlineReferences = listOf(ref)
+            )
+        )
+        source.inlineImagesResult = mapOf(
+            "mailapp-inline-image-1" to "data:image/png;base64,AA"
+        )
+        source.injectInlineImagesResult =
+            "<p>Visible text</p><div class=\"mailapp-inline-images\">" +
+                "<img src=\"data:image/png;base64,AA\" alt=\"\"></div>"
+
+        val vm = createViewModel(source)
+
+        val ready = vm.uiState.value as EmailDetailUiState.Ready
+        assertTrue(ready.email.body.contains("data:image/png;base64,AA"))
+        assertTrue(ready.email.body.contains("Visible text"))
+        assertFalse(ready.inlineImagesLoading)
+        assertEquals(1, source.inlineImagesCallCount)
+        assertEquals(0, source.bodyFetchCallCount)
+    }
+
+    @Test
+    fun readyWithCidAndMissingRefs_recoversMetadataThenInjectsInlineImage() = runTest {
+        val source = FakeEmailDetailSource("e1")
+        val cachedBody = "<html><p>cached</p><img src=\"cid:image-1\"></html>"
+        val cached = FakeEmailDetailSource.sampleEmail(
+            body = cachedBody,
+            bodyBlank = false,
+            pdfScanned = true
+        )
+        val recovered = cached.copy(
+            inlineReferences = listOf(
+                com.david.mailapp.domain.model.EmailInlineReference(
+                    "image-1",
+                    "att-1",
+                    "image/png"
+                )
+            )
+        )
+        source.resolveResult = EmailResolutionResult.Found(cached)
+        source.bodyFetchGate = CompletableDeferred()
+        source.bodyFetchResult = com.david.mailapp.data.repository.EmailContentRecoveryResult.Found(
+            recovered,
+            com.david.mailapp.data.repository.EmailContentStorage.PERSISTED
+        )
+        source.inlineImagesResult = mapOf("image-1" to "data:image/png;base64,AA")
+        source.injectInlineImagesResult =
+            "<html><p>cached</p><img src=\"data:image/png;base64,AA\"></html>"
+
+        val vm = newViewModel(source)
+        runCurrent()
+
+        val initial = vm.uiState.value as EmailDetailUiState.Ready
+        assertEquals(cachedBody, initial.email.body)
+        assertTrue(initial.inlineImagesLoading)
+        assertEquals(1, source.bodyFetchCallCount)
+
+        source.bodyFetchGate?.complete(Unit)
+        advanceUntilIdle()
+
+        val ready = vm.uiState.value as EmailDetailUiState.Ready
+        assertEquals(source.injectInlineImagesResult, ready.email.body)
+        assertFalse(ready.inlineImagesLoading)
+        assertEquals(1, source.bodyFetchCallCount)
+        assertEquals(1, source.inlineImagesCallCount)
+    }
+
+    @Test
+    fun repeatedLegacyCidEmissions_duringRecovery_keepExactlyOneRecoveryCall() = runTest {
+        val source = FakeEmailDetailSource("e1")
+        val cached = FakeEmailDetailSource.sampleEmail(
+            body = "<html><img src=\"cid:image-1\"></html>",
+            bodyBlank = false,
+            pdfScanned = true
+        )
+        source.resolveResult = EmailResolutionResult.Found(cached)
+        source.bodyFetchGate = CompletableDeferred()
+
+        val vm = newViewModel(source)
+        runCurrent()
+        source.emitRoomEmail(cached)
+        source.emitRoomEmail(cached.copy(subject = "updated"))
+        runCurrent()
+
+        val loading = vm.uiState.value as EmailDetailUiState.Ready
+        assertTrue(loading.inlineImagesLoading)
+        assertEquals(1, source.bodyFetchCallCount)
+
+        source.bodyFetchGate?.complete(Unit)
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun failedLegacyCidRecovery_keepsCachedBodyAndStopsWithoutRetryLoop() = runTest {
+        val source = FakeEmailDetailSource("e1")
+        val cachedBody = "<html><p>still readable</p><img src=\"cid:image-1\"></html>"
+        val cachedPdf = com.david.mailapp.domain.model.PdfAttachmentMetadata(
+            "cached.pdf",
+            "application/pdf",
+            "pdf-att-1",
+            128L,
+            "pdf-part-1"
+        )
+        val cached = FakeEmailDetailSource.sampleEmail(
+            body = cachedBody,
+            bodyBlank = false,
+            pdfScanned = true,
+            pdfAttachments = listOf(cachedPdf)
+        )
+        source.resolveResult = EmailResolutionResult.Found(cached)
+        source.bodyFetchResult = com.david.mailapp.data.repository.EmailContentRecoveryResult.Failure(
+            EmailResolutionFailureReason.NO_CONNECTION
+        )
+        source.bodyFetchGate = CompletableDeferred()
+
+        val vm = newViewModel(source)
+        runCurrent()
+        source.emitRoomEmail(cached.copy(subject = "updated while recovering"))
+        runCurrent()
+        source.bodyFetchGate?.complete(Unit)
+        advanceUntilIdle()
+
+        val ready = vm.uiState.value as EmailDetailUiState.Ready
+        assertEquals(cachedBody, ready.email.body)
+        assertEquals("updated while recovering", ready.email.subject)
+        assertEquals(listOf(cachedPdf), ready.email.pdfAttachments)
+        assertFalse(ready.inlineImagesLoading)
+        assertEquals(1, source.bodyFetchCallCount)
+        assertEquals(0, source.inlineImagesCallCount)
+
+        source.emitRoomEmail(ready.email.copy(isStarred = true))
+        advanceUntilIdle()
+
+        val afterEmission = vm.uiState.value as EmailDetailUiState.Ready
+        assertEquals(cachedBody, afterEmission.email.body)
+        assertEquals("updated while recovering", afterEmission.email.subject)
+        assertTrue(afterEmission.email.isStarred)
+        assertEquals(listOf(cachedPdf), afterEmission.email.pdfAttachments)
+        assertFalse(afterEmission.inlineImagesLoading)
+        assertEquals(1, source.bodyFetchCallCount)
     }
 
     @Test
