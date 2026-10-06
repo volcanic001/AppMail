@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -44,6 +45,7 @@ import com.david.mailapp.core.di.AppContainer
 import com.david.mailapp.core.localization.asString
 import com.david.mailapp.core.localization.toUiText
 import com.david.mailapp.ui.components.ShimmerLoading
+import com.david.mailapp.ui.theme.ShapeTokens
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
@@ -163,6 +165,14 @@ fun TrashScreen(
         if (showEmptyDialog) {
             AlertDialog(
                 onDismissRequest = { showEmptyDialog = false },
+                shape = ShapeTokens.Dialog,
+                icon = {
+                    Icon(
+                        Icons.Default.DeleteSweep,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                },
                 title = { Text(stringResource(R.string.trash_empty_dialog_title)) },
                 text = { Text(stringResource(R.string.trash_empty_dialog_body)) },
                 confirmButton = {
@@ -170,7 +180,10 @@ fun TrashScreen(
                         onClick = {
                             showEmptyDialog = false
                             viewModel.emptyTrash()
-                        }
+                        },
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        )
                     ) { Text(stringResource(R.string.trash_empty_dialog_confirm)) }
                 },
                 dismissButton = {
@@ -201,3 +214,4 @@ internal fun EmptyTrash() {
         )
     }
 }
+
