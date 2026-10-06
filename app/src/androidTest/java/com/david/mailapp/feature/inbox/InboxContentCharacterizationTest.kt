@@ -8,17 +8,21 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.test.TouchInjectionScope
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.down
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.moveBy
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.click
-import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.test.swipeLeft
+import androidx.compose.ui.test.up
 import androidx.test.platform.app.InstrumentationRegistry
 import com.david.mailapp.R
 import com.david.mailapp.core.localization.UiErrorReason
@@ -110,11 +114,39 @@ class InboxContentCharacterizationTest {
             onRefresh = { refreshCalls++ }
         )
 
-        composeRule.onNodeWithTag("inbox_list").performTouchInput {
-            swipeDown()
-        }
+        composeRule.onNodeWithTag("inbox_list").performTouchInput { pullDown() }
+        composeRule.waitForIdle()
 
         assertEquals(1, refreshCalls)
+    }
+
+    @Test
+    fun pull_to_refresh_gesture_on_populated_state_triggers_refresh_callback() {
+        var refreshCalls = 0
+        setContent(
+            InboxUiState.Success(emails = (1..20).map { testEmail("e$it") }),
+            onRefresh = { refreshCalls++ }
+        )
+
+        composeRule.onNodeWithTag("inbox_list").performTouchInput { pullDown() }
+        composeRule.waitForIdle()
+
+        assertEquals(1, refreshCalls)
+    }
+
+    /**
+     * A pull-to-refresh drag, as [PullToRefreshBox] needs to see it.
+     *
+     * Two things matter. It must start well away from the top edge, because the
+     * glass top bar is drawn over the list and swallows touches there, and it
+     * must arrive as several slow incremental drags followed by a release with
+     * no velocity — a plain `swipeDown()` reads as a fling and the box never
+     * crosses its threshold.
+     */
+    private fun TouchInjectionScope.pullDown() {
+        down(center)
+        repeat(10) { moveBy(Offset(0f, 50f), delayMillis = 32) }
+        up()
     }
 
     @Test

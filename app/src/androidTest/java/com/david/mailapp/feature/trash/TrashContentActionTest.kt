@@ -81,7 +81,10 @@ class TrashContentActionTest {
             snackbarHostState = snackbarHostState,
             onDelete = {
                 deleteCalls++
+                // The ViewModel blocks the row while the action runs; without that
+                // toggle the swiped row never snaps back and ignores later swipes.
                 state = state.copy(
+                    activeActionEmailIds = setOf(email.id),
                     pendingFeedbackQueue = listOf(ActionFeedback.Failure(UiErrorReason.NO_CONNECTION))
                 )
             },
@@ -100,7 +103,15 @@ class TrashContentActionTest {
         composeRule.waitUntil(timeoutMillis = 2_000) {
             state.pendingFeedbackQueue.isEmpty()
         }
+
+        // The action settles: releasing the row is what makes it snap back.
+        composeRule.runOnIdle { state = state.copy(activeActionEmailIds = emptySet()) }
+        // The snap-back waits 250 ms before the row takes gestures again.
+        val readyAt = System.currentTimeMillis() + 700
+        composeRule.waitUntil(timeoutMillis = 3_000) { System.currentTimeMillis() >= readyAt }
+
         composeRule.onNodeWithText(email.subject).performTouchInput { swipeLeft() }
+        composeRule.waitForIdle()
 
         composeRule.onNodeWithText("Sin conexión a Internet").assertExists()
         composeRule.onNodeWithText(email.subject).assertExists()
