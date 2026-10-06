@@ -167,6 +167,25 @@ class TrashViewModel(
         }
     }
 
+    /**
+     * Permanently empties the whole trash (remote + local). Guarded so a
+     * double-tap cannot start two concurrent empties, and a no-op when the
+     * trash is already empty. The confirmation dialog lives in the UI layer.
+     */
+    fun emptyTrash() {
+        if (!beginEmptyTrash()) return
+        viewModelScope.launch {
+            try {
+                when (val r = source.emptyTrash()) {
+                    is EmailActionResult.Success -> enqueueFeedback(ActionFeedback.TrashEmptied())
+                    is EmailActionResult.Failure -> enqueueFeedback(ActionFeedback.Failure(r.reason))
+                }
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { enqueueFeedback(ActionFeedback.Failure(e.toUiErrorReason())) }
+            finally { endEmptyTrash() }
+        }
+    }
+
     fun consumeFeedback(feedbackId: ActionFeedbackId) {
         _uiState.update { current ->
             if (current is TrashUiState.Success) current.consumeFeedback(feedbackId) else current
@@ -181,6 +200,21 @@ class TrashViewModel(
             if (current !is TrashUiState.Success) return false
             if (emailId in current.activeActionEmailIds) return false
             if (_uiState.compareAndSet(current, current.withActive(emailId))) return true
+        }
+    }
+
+    private fun beginEmptyTrash(): Boolean {
+        while (true) {
+            val current = _uiState.value
+            if (current !is TrashUiState.Success) return false
+            if (!current.canEmptyTrash) return false
+            if (_uiState.compareAndSet(current, current.copy(isEmptyingTrash = true))) return true
+        }
+    }
+
+    private fun endEmptyTrash() {
+        _uiState.update { current ->
+            if (current is TrashUiState.Success) current.copy(isEmptyingTrash = false) else current
         }
     }
 

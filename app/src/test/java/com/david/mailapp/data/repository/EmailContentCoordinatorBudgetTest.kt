@@ -134,6 +134,7 @@ class EmailContentCoordinatorBudgetTest {
         override suspend fun moveToTrash(emailId: String) {}
         override suspend fun restoreFromTrash(emailId: String) {}
         override suspend fun deletePermanently(emailId: String) {}
+        override suspend fun emptyTrash() {}
         override suspend fun markAsRead(emailId: String) {}
         override suspend fun setStarred(emailId: String, starred: Boolean) {}
         override suspend fun fetchEmailById(emailId: String): EmailLookupResult = EmailLookupResult.Found(result)

@@ -83,6 +83,51 @@ class TrashViewModelActionTest {
         assertTrue(state.pendingFeedbackQueue.any { it is ActionFeedback.RestoredToInbox })
     }
 
+    // ── Empty trash ─────────────────────────────────────────────
+
+    @Test fun emptyTrash_success_enqueues_TrashEmptied_and_clears_flag() = runTest {
+        val src = FakeTrashSource(deleteResult = EmailActionResult.Success)
+        src.room.value = listOf(email)
+        val vm = TrashViewModel(src)
+        advanceUntilIdle()
+
+        vm.emptyTrash()
+        advanceUntilIdle()
+
+        val state = vm.uiState.value as TrashUiState.Success
+        assertTrue(state.pendingFeedbackQueue.any { it is ActionFeedback.TrashEmptied })
+        assertFalse(state.isEmptyingTrash)
+        assertEquals(1, src.emptyTrashCalls)
+    }
+
+    @Test fun emptyTrash_noop_when_already_empty() = runTest {
+        val src = FakeTrashSource(deleteResult = EmailActionResult.Success)
+        val vm = TrashViewModel(src)
+        advanceUntilIdle()
+
+        vm.emptyTrash()
+        advanceUntilIdle()
+
+        val state = vm.uiState.value as TrashUiState.Success
+        assertEquals(0, src.emptyTrashCalls)
+        assertTrue(state.pendingFeedbackQueue.none { it is ActionFeedback.TrashEmptied })
+    }
+
+    @Test fun emptyTrash_failure_enqueues_Failure_not_TrashEmptied() = runTest {
+        val src = FakeTrashSource(deleteResult = EmailActionResult.Failure(UiErrorReason.NO_CONNECTION, false))
+        src.room.value = listOf(email)
+        val vm = TrashViewModel(src)
+        advanceUntilIdle()
+
+        vm.emptyTrash()
+        advanceUntilIdle()
+
+        val state = vm.uiState.value as TrashUiState.Success
+        assertTrue(state.pendingFeedbackQueue.any { it is ActionFeedback.Failure })
+        assertTrue(state.pendingFeedbackQueue.none { it is ActionFeedback.TrashEmptied })
+        assertFalse(state.isEmptyingTrash)
+    }
+
     // ── Block duplicates ────────────────────────────────────────
 
     @Test fun delete_duplicate_blocked_while_active() = runTest {
@@ -268,6 +313,11 @@ open class FakeTrashSource(
         restoreGate?.await()
         restoreError?.let { throw it }
         return restoreResult
+    }
+    var emptyTrashCalls = 0
+    override suspend fun emptyTrash(): EmailActionResult {
+        emptyTrashCalls++
+        return deleteResult
     }
     open override suspend fun refreshTrash(pageToken: String?): PaginatedResult<Email> = PaginatedResult(emptyList(), null)
     override fun observeTrash(): Flow<List<Email>> = room

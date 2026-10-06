@@ -54,6 +54,12 @@ class GmailProvider(
 
         /** 250 ms after the initial attempt, 750 ms after the first retry. */
         private val DEFAULT_LOOKUP_BACKOFF_MILLIS = listOf(250L, 750L)
+
+        /** Gmail's `messages/batchDelete` accepts at most 1000 ids per call. */
+        internal const val GMAIL_BATCH_DELETE_MAX = 1000
+
+        /** Gmail's `messages.list` caps `maxResults` at 500. */
+        internal const val TRASH_LIST_PAGE_SIZE = 500
     }
 
     // ── individual recovery ────────────────────────────────────
@@ -251,6 +257,46 @@ class GmailProvider(
 
     override suspend fun deletePermanently(emailId: String) {
         client.delete("users/me/messages/$emailId")
+    }
+
+    /**
+     * Empties trash in two phases:
+     *  1. List every message id under the TRASH label, paginating until
+     *     Gmail stops returning a nextPageToken. Only ids are requested
+     *     (LIST_FIELDS projection) — no per-message detail fetch.
+     *  2. Delete the collected ids in batches of [GMAIL_BATCH_DELETE_MAX]
+     *     via `messages/batchDelete` (one call per chunk instead of one
+     *     DELETE per message).
+     *
+     * Cancellation propagates from the underlying client calls. Any HTTP
+     * failure propagates to the caller (the coordinator maps it to a
+     * typed result and reconciles the local cache).
+     */
+    override suspend fun emptyTrash() {
+        val ids = collectTrashMessageIds()
+        if (ids.isEmpty()) return
+        for (chunk in ids.chunked(GMAIL_BATCH_DELETE_MAX)) {
+            client.post("users/me/messages/batchDelete") {
+                setBody(BatchDeleteRequest(ids = chunk))
+            }
+        }
+    }
+
+    /** Collects all message ids under the TRASH label across every page. */
+    private suspend fun collectTrashMessageIds(): List<String> {
+        val ids = mutableListOf<String>()
+        var pageToken: String? = null
+        do {
+            val response: MessageListResponse = client.get("users/me/messages") {
+                parameter("labelIds", "TRASH")
+                parameter("fields", GmailProjections.LIST_FIELDS)
+                parameter("maxResults", TRASH_LIST_PAGE_SIZE)
+                if (pageToken != null) parameter("pageToken", pageToken)
+            }.body()
+            response.messages?.forEach { ids.add(it.id) }
+            pageToken = response.nextPageToken
+        } while (pageToken != null)
+        return ids
     }
 
     override suspend fun markAsRead(emailId: String) {

@@ -165,6 +165,7 @@ private class ControllingTrashSource : TrashEmailSource {
 
     override suspend fun deletePermanently(emailId: String) = com.david.mailapp.data.repository.EmailActionResult.Success
     override suspend fun restoreFromTrash(emailId: String) = com.david.mailapp.data.repository.EmailActionResult.Success
+    override suspend fun emptyTrash() = com.david.mailapp.data.repository.EmailActionResult.Success
 }
 
 private fun email(id: String) = Email(

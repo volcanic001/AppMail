@@ -66,6 +66,12 @@ data class ModifyRequest(
     val removeLabelIds: List<String>? = null
 )
 
+/** Request body for `POST users/me/messages/batchDelete` (up to 1000 ids). */
+@Serializable
+data class BatchDeleteRequest(
+    val ids: List<String>
+)
+
 // ── users.getProfile response ──────────────────────────────────
 
 @Serializable

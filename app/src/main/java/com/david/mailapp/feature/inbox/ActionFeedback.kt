@@ -55,6 +55,11 @@ sealed class ActionFeedback {
         override val id: ActionFeedbackId = ActionFeedbackId.next()
     ) : ActionFeedback()
 
+    /** The whole trash was emptied permanently. */
+    data class TrashEmptied(
+        override val id: ActionFeedbackId = ActionFeedbackId.next()
+    ) : ActionFeedback()
+
     /**
      * Remote trash operation failed for [failedCount] emails.
      * Distinct from the generic [Failure] so the UI can show a

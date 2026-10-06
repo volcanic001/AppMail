@@ -33,6 +33,15 @@ interface EmailProvider {
     /** Permanently delete an email on the server. */
     suspend fun deletePermanently(emailId: String)
 
+    /**
+     * Permanently delete every message currently in trash on the server.
+     *
+     * Enumerates the full trash label (paginating as needed) and deletes it,
+     * so messages that were never paginated into the local cache are removed
+     * too — "empty trash" empties the real trash, not only what is cached.
+     */
+    suspend fun emptyTrash()
+
     /** Mark an email as read on the server. */
     suspend fun markAsRead(emailId: String)
 

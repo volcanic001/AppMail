@@ -26,7 +26,9 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -34,11 +36,14 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -75,6 +80,8 @@ fun TrashScreen(
         factory = TrashViewModel.Factory(repository)
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val successState = uiState as? TrashUiState.Success
+    var showEmptyDialog by remember { mutableStateOf(false) }
 
     val snackbarHostState = remember { SnackbarHostState() }
     val hazeState = remember { HazeState() }
@@ -142,6 +149,19 @@ fun TrashScreen(
                     Icon(Icons.Default.Menu, contentDescription = stringResource(R.string.action_menu))
                 }
             },
+            actions = {
+                if (successState != null && successState.emails.isNotEmpty()) {
+                    IconButton(
+                        onClick = { showEmptyDialog = true },
+                        enabled = successState.canEmptyTrash
+                    ) {
+                        Icon(
+                            Icons.Default.DeleteSweep,
+                            contentDescription = stringResource(R.string.trash_empty_action)
+                        )
+                    }
+                }
+            },
             colors = TopAppBarDefaults.topAppBarColors(
                 containerColor = Color.Transparent,
                 scrolledContainerColor = Color.Transparent
@@ -151,6 +171,27 @@ fun TrashScreen(
                 .fillMaxWidth()
                 .hazeEffect(state = hazeState, style = HazeMaterials.thin())
         )
+
+        if (showEmptyDialog) {
+            AlertDialog(
+                onDismissRequest = { showEmptyDialog = false },
+                title = { Text(stringResource(R.string.trash_empty_dialog_title)) },
+                text = { Text(stringResource(R.string.trash_empty_dialog_body)) },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            showEmptyDialog = false
+                            viewModel.emptyTrash()
+                        }
+                    ) { Text(stringResource(R.string.trash_empty_dialog_confirm)) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showEmptyDialog = false }) {
+                        Text(stringResource(R.string.trash_empty_dialog_cancel))
+                    }
+                }
+            )
+        }
     }
 }
 

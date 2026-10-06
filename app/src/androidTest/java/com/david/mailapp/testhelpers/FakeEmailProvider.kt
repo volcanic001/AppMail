@@ -198,6 +198,17 @@ class FakeEmailProvider : EmailProvider {
         deletePermanentlyError?.let { throw it }
     }
 
+    var emptyTrashDeferred: CompletableDeferred<Unit>? = null
+    var emptyTrashCalls = 0
+    var emptyTrashError: Exception? = null
+
+    override suspend fun emptyTrash() {
+        eventLog?.add("gmail.emptyTrash")
+        emptyTrashDeferred?.await()
+        emptyTrashCalls++
+        emptyTrashError?.let { throw it }
+    }
+
     override suspend fun markAsRead(emailId: String) {
         eventLog?.add("gmail.markAsRead")
         markAsReadDeferred?.await()

@@ -75,6 +75,25 @@ internal class EmailActionCoordinator(
         }
     }
 
+    suspend fun emptyTrash(): EmailActionResult {
+        val lease = writeGuard.capture() ?: return EmailActionResult.Failure(
+            UiErrorReason.NO_ACTIVE_ACCOUNT, remoteApplied = false)
+        val p = providerFactory() ?: return EmailActionResult.Failure(
+            UiErrorReason.NO_ACTIVE_ACCOUNT, remoteApplied = false)
+
+        try {
+            p.emptyTrash()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return EmailActionResult.Failure(e.toUiErrorReason(), remoteApplied = false)
+        }
+
+        return commitWithReconcile(lease, p, folders = listOf("trash")) {
+            dao.clearFolder("trash")
+        }
+    }
+
     suspend fun markAsRead(emailId: String): EmailActionResult {
         val lease = writeGuard.capture() ?: return EmailActionResult.Failure(
             UiErrorReason.NO_ACTIVE_ACCOUNT, remoteApplied = false)

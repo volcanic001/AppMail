@@ -106,6 +106,10 @@ class EmailRepository(
     suspend fun deletePermanently(emailId: String): EmailActionResult =
         actionCoordinator.deletePermanently(emailId)
 
+    /** Permanently empty the whole trash (remote + local). */
+    suspend fun emptyTrash(): EmailActionResult =
+        actionCoordinator.emptyTrash()
+
     suspend fun markAsRead(emailId: String): EmailActionResult =
         actionCoordinator.markAsRead(emailId)
 

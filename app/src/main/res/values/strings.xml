@@ -148,6 +148,13 @@
     <string name="inbox_title">Bandeja</string>
     <string name="trash_title">Papelera</string>
 
+    <!-- Vaciar papelera -->
+    <string name="trash_empty_action">Vaciar papelera</string>
+    <string name="trash_empty_dialog_title">¿Vaciar la papelera?</string>
+    <string name="trash_empty_dialog_body">Se eliminarán permanentemente todos los correos de la papelera, incluidos los que aún no se han cargado. Esta acción no se puede deshacer.</string>
+    <string name="trash_empty_dialog_confirm">Vaciar papelera</string>
+    <string name="trash_empty_dialog_cancel">Cancelar</string>
+
     <!-- Estados vacíos -->
     <string name="inbox_empty">Tu bandeja está vacía</string>
     <string name="trash_empty">La papelera está vacía</string>
@@ -156,6 +163,7 @@
     <string name="snackbar_moved_to_trash">Movido a la papelera</string>
     <string name="snackbar_moved_to_trash_plural">%d correos movidos a la papelera</string>
     <string name="snackbar_deleted_permanently">Eliminado permanentemente</string>
+    <string name="snackbar_trash_emptied">Papelera vaciada</string>
     <string name="snackbar_restored_to_inbox">Restaurado en la bandeja</string>
     <string name="snackbar_trash_failed_single">No se pudo mover 1 correo</string>
     <string name="snackbar_trash_failed_plural">No se pudieron mover %d correos</string>

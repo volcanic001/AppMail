@@ -13,9 +13,12 @@ sealed interface TrashUiState {
         val nextPageToken: String? = null,
         val isRefreshing: Boolean = false,
         val isLoadingNextPage: Boolean = false,
+        val isEmptyingTrash: Boolean = false,
         val activeActionEmailIds: Set<String> = emptySet(),
         val pendingFeedbackQueue: List<ActionFeedback> = emptyList()
     ) : TrashUiState {
+        /** The empty-trash action is offered only when there is something to delete. */
+        val canEmptyTrash: Boolean get() = emails.isNotEmpty() && !isEmptyingTrash
         fun withFeedback(feedback: ActionFeedback) = copy(pendingFeedbackQueue = pendingFeedbackQueue + feedback)
         fun consumeFeedback(feedbackId: ActionFeedbackId) = copy(
             pendingFeedbackQueue = pendingFeedbackQueue.filterNot { it.id == feedbackId }

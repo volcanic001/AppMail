@@ -11,6 +11,7 @@ interface TrashEmailSource {
     suspend fun refreshTrash(pageToken: String?): PaginatedResult<Email>
     suspend fun deletePermanently(emailId: String): EmailActionResult
     suspend fun restoreFromTrash(emailId: String): EmailActionResult
+    suspend fun emptyTrash(): EmailActionResult
 }
 
 internal class RepositoryTrashEmailSource(
@@ -20,4 +21,5 @@ internal class RepositoryTrashEmailSource(
     override suspend fun refreshTrash(pageToken: String?) = repository.refreshTrash(pageToken)
     override suspend fun deletePermanently(emailId: String) = repository.deletePermanently(emailId)
     override suspend fun restoreFromTrash(emailId: String) = repository.restoreFromTrash(emailId)
+    override suspend fun emptyTrash() = repository.emptyTrash()
 }
